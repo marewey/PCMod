@@ -4,11 +4,13 @@ if "%1"=="len" call :len %2 %3&goto :eof
 set ftppass=cnff
 set program="%cd%\PCMod.hta"
 set url=markspi.ddns.me
-set debug=data\backup\debug.log
+set debug=data\debug.log
 if not exist "settings.txt" call :save new
 if not "%1"=="login" echo.^>%1 %2 %3
 if "%1"=="login" echo.^>%1 %2 ****
 call :load %1
+if not "%debug%"=="nul" echo.DEBUGGING to log: %debug%
+if not exist "%debug%" >%debug% echo.STARTING DEBUG LOG... %date% %time%
 ::INIT
 if "%1"=="init" call :init
 ::LINKS
@@ -318,7 +320,7 @@ goto :eof
 
 ::===============================  CHANGE SETTINGS/BUTTONS  ==================================
 :launch
-del cmd\update_.bat
+del cmd\update_.bat 2>nul
 call cmd\launch.bat launcher
 goto :eof
 
@@ -585,11 +587,11 @@ for /f "tokens=1-4 delims=;" %%a in ('type data\indexes\version') do (
 	if "%%a"=="Launcher" if "%%c"=="PCMod" set launcher_version=%%b
 )
 ::check for internet
+if "%debug%"=="" set debug=nul
 call :net.check
 goto :eof
 :save
 echo.SAVING...
-if "%debug%"=="" set debug=nul
 if "%1"=="new" set shortcut=1&set log-logins=1&set lite=0&set autoupdate=1&set autoserver=0&set memory=4096&set pack=2-4-x&set pack-index=0&set debug=nul
 >settings.txt echo.autoserver=%autoserver%
 >>settings.txt echo.autoupdate=%autoupdate%
@@ -599,4 +601,5 @@ if "%1"=="new" set shortcut=1&set log-logins=1&set lite=0&set autoupdate=1&set a
 >>settings.txt echo.memory=%memory%
 >>settings.txt echo.pack-index=%pack-index%
 >>settings.txt echo.pack=%pack%
+>>settings.txt echo.debug=%debug%
 goto :eof

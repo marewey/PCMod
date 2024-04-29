@@ -1,27 +1,36 @@
 @echo off
 @setlocal EnableDelayedExpansion Enableextensions
 title PCMod
-set debug=data\backup\debug.log
-if not "%debug%"=="nul" echo.DEBUGGING to log: %debug%
-set debug_=^>^>%debug% 2^>^&1
->%debug% echo.STARTING DEBUG LOG...
+
 call :get.time.formated
 echo.[START: %timee%]
 if not "%1"=="launcher" cd ..&set connection=1&set url=markspi.ddns.me
 echo.Running in '%cd%'
 echo.Connection: %connection%
+echo.########### LOAD ############
 call cmd\refreshenv.cmd >nul
+::LOAD VARs FROM FILE
 call :vars
-:: call :net.check this should be moved to settings and launch should be called launchly from there
+::CHECK FOR DEBUG LOG AND SET IT UP
+if "%debug%"=="" set debug=nul
+if not "%debug%"=="nul" echo.DEBUGGING to log: %debug%
+set debug_=^>^>%debug% 2^>^&1
+::GET SKIN FILES if not VANILLA
 if /i not "%modloader%"=="vanilla" call :skinget
+call :mcuuid
+echo.########### LOGIN ###########
+::LOGIN for USER
+if "%connection%"=="1" call :auth
+:: LOG THE LOGIN
 if "%log-logins%"=="1" call :log-logins in
+echo.########### LAUNCH ##########
 call :launch
 ::GAME RUNS HERE
 call :shutdown
 call :get.time.formated
 echo.[END:%timee%]
 ::Move Current Log to the Logs folder
-%debug_% copy data\launch.log data\packs\%pack%\logs\launch-%timee%.log
+copy "data\launch.log" "data\packs\%pack%\logs\launch-%timee%.log" >nul
 exit
 
 :get.time.formated
@@ -38,16 +47,16 @@ set modcnt=0
 set mcuuid=00000000-0000-0000-0000-000000000000
 set uuid=PC2-NOUUID
 set pack=2-4-x
-set version=2.4.0
+set version=2.4.1
 set modloader=forge
 set mcversion=1.19.2
 set mlversion=43.3.5
 echo.Reading Variables from File...
 for /f "tokens=1-2 delims==" %%a in ('type settings.txt') do set %%a=%%b
 for /f %%a in ('type data\indexes\user') do if not "%%a"=="" set user=%%a
-for /f %%a in ('type data\indexes\modcount') do set modcnt=%%a
 for /f %%a in ('type data\indexes\mcuuid') do if not "%%a"=="" set mcuuid=%%a
-for /f %%a in ('type data\indexes\uuid') do set uuid=%%a
+if exist "data\indexes\modcount" for /f %%a in ('type data\indexes\modcount') do set modcnt=%%a
+if exist "data\indexes\uuid" for /f %%a in ('type data\indexes\uuid') do set uuid=%%a
 for /f "tokens=1-5 delims=;" %%a in ('type data\indexes\version') do (
 	if "%%a"=="%pack%" set pack_version=%%b&set modloader=%%c&set mcversion=%%d&set mlversion=%%e
 	if "%%a"=="Launcher" if "%%c"=="PCMod" set launcher_version=%%b
@@ -56,7 +65,6 @@ set m-version=%modloader%:%mcversion%-%mlversion%
 if /i "%modloader%"=="vanilla" set m-version=%mcversion%
 if /i "%modloader%"=="fabric" set m-version=%modloader%:%mcversion%:%mlversion%
 if /i "%modloader%"=="#-BTW" set m-version=%mlversion%
-call :mcuuid
 if "%autoserver%"=="1" set autoserver_=--server plattecraft.ddns.net --server-port 25566
 if "%autoserver%"=="1" if "%pack%"=="2-4-x" set autoserver_=--server plattecraft.ddns.net --server-port 25566
 if "%autoserver%"=="1" if "%pack%"=="BTW" set autoserver_=--server plattecraft.ddns.net --server-port 25568
@@ -67,7 +75,7 @@ goto :eof
 ::Convert username to UUID
 set /p "=Converting Username to UUID... "<nul
 if exist "bin\uuid-tool-1.0.jar" for /f "tokens=1-2 delims= " %%a in ('echo.%user%^|data\packs\%pack%\jvm\java-runtime-gamma\bin\java.exe -jar bin\uuid-tool-1.0.jar -o') do (
-	if "%user%"=="%%a" set mcuuid=%%b&echo.%user% UUID: %%b
+	if "%user%"=="%%a" set mcuuid=%%b&echo.'%user%' UUID: %%b
 )
 >data\indexes\mcuuid echo.%mcuuid%
 set mcuuid=%mcuuid:-=%
@@ -75,7 +83,7 @@ goto :eof
 
 :skinget
 if "%connection%"=="0" goto :eof
-echo.##### SKIN DOWNLOADER #####
+echo.---=== SKIN DOWNLOADER ===---
 ::Get local Skin Version
 for /f "tokens=1-2 delims= " %%a in ('type data\indexes\skindex') do set %%a_v=%%b
 ::Get the skindex
@@ -93,7 +101,8 @@ if not "%skin_updates%"=="0" echo.Updated Skins: %skin_updates%
 for /f "tokens=1-2 delims= " %%a in ('type data\indexes\skindex') do if not exist "data\packs\%pack%\cachedImages\skins\%%a.png" %debug_% bin\wget -T 5 -O "data\packs\%pack%\cachedImages\skins\%%a.png" "http://%url%/pcmod2/skins/%%a"&echo.Getting skin for "%%a" ...
 ::If Skin version changed, download it
 for /f "tokens=1-2 delims= " %%a in ('type data\indexes\skindex') do if not "%%b"=="!%%a_v!" %debug_% bin\wget -T 5 -O "data\packs\%pack%\cachedImages\skins\%%a.png" "http://%url%/pcmod2/skins/%%a"&echo.Updating skin for "%%a" ... (!%%a_v! to %%b)
-echo.#####  DONE  #####
+if "%skin_missing%"=="0" if "%skin_updates%"=="0" echo.No Skins Downloaded.
+echo.---===##### DONE ######===---
 ::copy "data\packs\%pack%\cachedImages\skins\%user%.png" "data\packs\%pack%\cachedImages\skins\uuid\%mcuuid%.png" >nul
 goto :eof
 
@@ -149,18 +158,19 @@ set cnt=0
 echo.Starting Crashreport Catcher... %cnt%
 if exist "data\packs\%pack%\crash-reports\*.txt" for /f %%A in ('dir /a-d-s-h /b data\packs\%pack%\crash-reports\*.txt ^| find /v /c ""') do set cnt=%%A
 ::=== START PROCESS
-echo.LAUNCHING... (data\packs\%pack% %m-version%)
 ::Close HTA files
 title PCMod - Launcher
 "%cd%\bin\nircmd.exe" win close title "PCMod - Modlist"
 "%cd%\bin\nircmd.exe" win close title "PCMod Launcher - %user%"
 ::Check to make sure installed
 call :checkinstall
+echo.LAUNCHING... (data\packs\%pack% %m-version%)
 ::Display Launching VBS Popup
 >cmd\launching.vbs echo.CreateObject("WScript.Shell").Popup "Launching PCMod...			" ^& vbcrlf ^& "	* Username: %user%" ^& vbcrlf ^& "	* MC-UUID: %mcuuid%" ^& vbcrlf ^& "	* PCMod Version: %pack%/%pack_version%" ^& vbcrlf ^& "	* Memory Used: %memory%Mb" ^& vbcrlf ^& "	* Mods: %modcnt%", 30, "PCMod - Launcher"
 start cmd\launching.vbs
 ::Launch Game
-portablemc --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" start -u %user% -i %mcuuid% %autoserver_% --jvm-args="-Xmx%memory%M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M" %m-version%
+if "%showconsole%"=="1" echo. **** Detatching Session, Starting in Console Mode. **** &start portablemc --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" --output human start -u %user% -i %mcuuid% %autoserver_% --jvm-args="-Xmx%memory%M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M" %m-version%
+if not "%showconsole%"=="1" portablemc --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" --output human start -u %user% -i %mcuuid% %autoserver_% --jvm-args="-Xmx%memory%M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M" %m-version%
 ::=== END PROCESS
 echo.EXITING...
 ::Recount Crashreporter Catcher
