@@ -1,0 +1,7 @@
+autoserver=0
+autoupdate=1
+lite=0
+log-logins=1
+shortcut=1
+pack-index=0
+pack=2-4-x

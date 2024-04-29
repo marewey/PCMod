@@ -1,0 +1,506 @@
+<html>
+<head>
+   <HTA:APPLICATION
+   ID = "PCMod"
+   APPLICATIONNAME = "PCMod"
+   BORDER = "thin"
+   CAPTION = "yes"
+   ICON = "data\icons\icon.ico"
+   SHOWINTASKBAR = "yes"
+   SINGLEINSTANCE = "no"
+   SYSMENU = "yes"
+   WINDOWSTATE = "normal"
+   SCROLL = "no"
+   SCROLLFLAT = "yes"
+   VERSION = "2.4.0"
+   INNERBORDER = "no"
+   SELECTION = "yes"
+   MAXIMIZEBUTTON = "yes"
+   MINIMIZEBUTTON = "yes"
+   NAVIGABLE = "yes"
+   CONTEXTMENU = "yes"
+   BORDERSTYLE = "normal"
+   >
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+ /* The sidebar menu */
+.sidenav {
+  height: 98%; /* Full-height: remove this if you want "auto" height */
+  width: 200px; /* Set the width of the sidebar */
+  position: absolute;
+  z-index: 1; /* Stay on top */
+  top: 5; /* Stay at the top */
+  left: 5;
+  background-color: #2c4569; /* Color */
+  color: #afc9f0; /* Color */
+  overflow-x: hidden; /* Disable horizontal scroll */
+  padding-top: 2px;
+  padding-bottom: 10px;
+}
+.settingnav {
+  height: 98%; /* Full-height: remove this if you want "auto" height */
+  width: 200px; /* Set the width of the sidebar */
+  position: absolute;
+  z-index: 1; /* Stay on top */
+  top: 5; /* Stay at the top */
+  right: 5px;
+  background-color: #2c4569; /* Black */
+  overflow-x: hidden; /* Disable horizontal scroll */
+  padding-top: 2px;
+  padding-bottom: 10px;
+}
+.loginnav {
+  width: 200px; /* Set the width of the sidebar */
+  position: absolute;
+  z-index: 1; /* Stay on top */
+  bottom: 5; /* Stay at the top */
+  right: 5px;
+  background-color: #2c4569; /* Black */
+  overflow-x: hidden; /* Disable horizontal scroll */
+  padding-top: 2px;
+  padding-bottom: 5px;
+}
+.playernav {
+  width: 200px; /* Set the width of the sidebar */
+  position: absolute;
+  z-index: 1; /* Stay on top */
+  bottom: 5; /* Stay at the top */
+  left: 5px;
+  background-color: #2c4569; /* Black */
+  overflow-x: hidden; /* Disable horizontal scroll */
+  padding-top: 2px;
+  padding-bottom: 5px;
+}
+/* The navigation menu links */
+.sidenav button {
+  padding: 6px 16px 6px 16px;
+  text-decoration: none;
+  font-size: 15px;
+  display: block;
+  font: 17px;
+  font-family: 'Nobile', Helvetica, Arial, sans-serif;
+}
+
+/* Style page content */
+.main {
+  margin-top: 20px;
+  margin-left: 200px; /* Same as the width of the sidebar */
+  margin-right: 200px; /* Same as the width of the sidebar */
+  padding: 0px 10px;
+}
+
+/* On smaller screens, where height is less than 450px, change the style of the sidebar (less padding and a smaller font size) */
+@media screen and (max-height: 450px) {
+  .sidenav {padding-top: 15px;}
+  .sidenav a {font-size: 18px;}
+  .playernav {padding-top: 15px;}
+  .playernav a {font-size: 18px;}
+} 
+
+/* ======= ORIGINAL ======== */
+body {
+    background: url(data\icons\dirt.png) repeat 0 0;
+	background-color:#243855;
+	color:000000;
+	border-color:#707b7c
+}
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Corben', Georgia, Times, serif;
+}
+p, div {
+    font-family: 'Nobile', Helvetica, Arial, sans-serif;
+}
+button {
+	background-color:#ccd1d1;
+	color:#111112;
+	font: 22px;
+}
+input {
+	background-color:#ccd1d1;
+	color:#111112;
+	align: right;
+}
+#title {
+    text-align:center;
+    padding:2px;
+    font-size:15px;
+}
+#content {
+    background-color:#2c4569;
+    color:#afc9f0;
+    text-align:left;
+    padding:10px;
+}
+#menu {
+    background-color:#243855;
+    color:#afc9f0;
+    text-align:left;
+    padding:10px;
+	font: 22px;
+}
+#menu2 {
+    background-color:#243855;
+    color:#afc9f0;
+    text-align:left;
+    padding:10px;
+	font: 22px;
+}
+#menu3 {
+    background-color:#243855;
+    color:#afc9f0;
+    text-align:left;
+    padding:1px;
+	font: 22px;
+}
+#version {
+    text-align:right;
+    padding:1px;
+	font-weight: 600;
+}
+
+input.largerCheckbox { 
+    width: 30px; 
+    height: 30px; 
+}
+</style>
+<script language="VBScript">
+Function FileExists(FilePath)
+  Set fso = CreateObject("Scripting.FileSystemObject")
+  If fso.FileExists(FilePath) Then
+    FileExists=CBool(1)
+  Else
+    FileExists=CBool(0)
+  End If
+End Function
+Sub sleep (Timesec)
+    Set objwsh = CreateObject("WScript.Shell") 
+    objwsh.Run "Timeout /T " & Timesec & " /nobreak" ,0 ,true
+    Set objwsh = Nothing
+End Sub
+Sub RunProgram
+		Set Shell=CreateObject("wscript.shell") 
+		Shell.Run ("cmd\settings.bat launch >data\launch.log 2>&1"),0
+End Sub
+Sub RunUpdate
+	Set Shell=CreateObject("wscript.shell") 
+	Shell.Run ("cmd\settings.bat update empty"),1
+End Sub
+Sub Login
+	Set Shell=CreateObject("wscript.shell") 
+	userr = document.getElementById("user").value
+	passs = document.getElementById("pass").value
+	Shell.Run ("cmd\settings.bat login " & userr & " " & passs & " >>data\init.log 2>&1"),0
+	sleep 1
+	ReadSettings
+End Sub
+Sub SettingsShortcut
+	Set Shell=CreateObject("wscript.shell") 
+		If Shortcut.Checked Then
+			Shell.Run ("cmd\settings.bat shortcut 1 >>data\init.log 2>&1"),0
+		Else
+			Shell.Run ("cmd\settings.bat shortcut 0 >>data\init.log 2>&1"),0
+		End If
+End Sub
+Sub SettingsLL
+	Set Shell=CreateObject("wscript.shell") 
+		If LL.Checked Then
+			Shell.Run ("cmd\settings.bat log-logins 1 >>data\init.log 2>&1"),0
+		Else
+			Shell.Run ("cmd\settings.bat log-logins 0 >>data\init.log 2>&1"),0
+		End If
+End Sub
+Sub SettingsLT
+	Set Shell=CreateObject("wscript.shell") 
+		If LT.Checked Then
+			Shell.Run ("cmd\settings.bat lite 1 >>data\init.log 2>&1"),0
+		Else
+			Shell.Run ("cmd\settings.bat lite 0 >>data\init.log 2>&1"),0
+		End If
+End Sub
+Sub SettingsAutoServer
+	Set Shell=CreateObject("wscript.shell") 
+		If AutoServer.Checked Then
+			Shell.Run ("cmd\settings.bat autoserver 1 >>data\init.log 2>&1"),0
+		Else
+			Shell.Run ("cmd\settings.bat autoserver 0 >>data\init.log 2>&1"),0
+		End If
+End Sub
+Sub SettingsMEM
+	Set Shell=CreateObject("wscript.shell") 
+	memm = document.getElementById("MEM").value
+	Shell.Run ("cmd\settings.bat memset " & memm & " >>data\init.log 2>&1"),0
+End Sub
+Sub SettingsVERSION
+	Set Shell=CreateObject("wscript.shell") 
+	versel = document.getElementById("VERSION-select").value
+	Shell.Run ("cmd\settings.bat version-select " & versel & " >>data\init.log 2>&1"),0
+	sleep 2
+	ReadSettings
+End Sub
+Sub Modlist
+	Set Shell=CreateObject("wscript.shell") 
+	Shell.Run ("cmd\settings.bat modlist start >>data\init.log 2>&1"),0
+'	Shell.Run ("data\pages\modlist.hta"),1
+End Sub
+Sub Website
+	Set Shell=CreateObject("wscript.shell") 
+	Shell.Run ("cmd\settings.bat web pcmod >>data\init.log 2>&1"),0
+End Sub
+Sub Discord
+	Set Shell=CreateObject("wscript.shell") 
+	Shell.Run ("cmd\settings.bat web discord >>data\init.log 2>&1"),0
+End Sub
+Sub Account
+	Set Shell=CreateObject("wscript.shell") 
+	Shell.Run ("cmd\settings.bat web auth >>data\init.log 2>&1"),0
+End Sub
+Sub RefreshPlayers
+	Set Shell=CreateObject("wscript.shell") 
+	Shell.Run ("cmd\settings.bat refreshplayers >>data\init.log 2>&1"),0
+	sleep 4
+	RefreshOnline
+End Sub
+Sub RefreshOnline
+	If FileExists("data\indexes\online") Then
+	 Set objFileToReadOnline = CreateObject("Scripting.FileSystemObject").OpenTextFile("data\indexes\online",1)
+	 Dim strOnline
+	 do while not objFileToReadOnline.AtEndOfStream
+	     strOnline = objFileToReadOnline.ReadAll
+		 document.getElementById("online").innerHTML = strOnline
+	 loop
+	 objFileToReadOnline.Close
+	 Set objFileToReadOnline = Nothing
+	end if
+End Sub
+Sub Init
+	Set Shell=CreateObject("wscript.shell") 
+	Shell.Run ("cmd\settings.bat init >data\init.log 2>&1"),0
+	If FileExists("data\indexes\version") Then
+		Set objFileToReadVersion = CreateObject("Scripting.FileSystemObject").OpenTextFile("data\indexes\version",1)
+		Dim strVersion
+		Dim Opt
+		do while not objFileToReadVersion.AtEndOfStream
+			strVersion = objFileToReadVersion.ReadLine()
+			strVersion = Split(strVersion,";")
+			if FileExists("data\packs\"+strVersion(0)+"\PCMod-"+strVersion(0)+".pak") then
+				AddOption strVersion(0)
+			end if
+		loop
+		objFileToReadVersion.Close
+		Set objFileToReadVersion = Nothing
+	end if
+	ReadSettings
+End Sub
+Sub ReadSettings
+	If FileExists("settings.txt") Then
+	 Set objFileToReadSettings = CreateObject("Scripting.FileSystemObject").OpenTextFile("settings.txt",1)
+	 Dim strSetting
+	 Dim strPack
+	 do while not objFileToReadSettings.AtEndOfStream
+	     strSetting = objFileToReadSettings.ReadLine()
+		 strSetting = Split(strSetting,"=")
+		 if strSetting(0)="shortcut" then
+			if strSetting(1)="1" then
+				document.getElementById("Shortcut").checked=True
+			else
+				document.getElementById("Shortcut").checked=False
+			end if
+		 end if
+		 if strSetting(0)="autoserver" then
+			if strSetting(1)="1" then
+				document.getElementById("AutoServer").checked=True
+			else
+				document.getElementById("AutoServer").checked=False
+			end if
+		 end if
+		 if strSetting(0)="log-logins" then
+			if strSetting(1)="1" then
+				document.getElementById("LL").checked=True
+			else
+				document.getElementById("LL").checked=False
+			end if
+		 end if
+		 if strSetting(0)="lite" then
+			if strSetting(1)="1" then
+				document.getElementById("LT").checked=True
+			else
+				document.getElementById("LT").checked=False
+			end if
+		 end if
+		 if strSetting(0)="memory" then
+			document.getElementById("MEM").value = strSetting(1)
+		 end if
+		 if strSetting(0)="pack-index" then
+			document.getElementById("VERSION-select").selectedIndex = strSetting(1)
+		 end if
+		 if strSetting(0)="pack" then
+			strPack = strSetting(1)
+		 end if
+	 loop
+	 objFileToReadSettings.Close
+	 Set objFileToReadSettings = Nothing
+	end if
+	If FileExists("data\indexes\modcount") Then
+	 Set objFileToReadMod = CreateObject("Scripting.FileSystemObject").OpenTextFile("data\indexes\modcount",1)
+	 Dim strMod
+	 do while not objFileToReadMod.AtEndOfStream
+	     strMod = objFileToReadMod.ReadLine()
+		 document.getElementById("modcount").innerHTML = strMod
+	 loop
+	 objFileToReadMod.Close
+	 Set objFileToReadMod = Nothing
+	end if
+	If FileExists("data\indexes\version") Then
+		Set objFileToReadVersion = CreateObject("Scripting.FileSystemObject").OpenTextFile("data\indexes\version",1)
+		Dim arrVersion
+		Dim strVersion
+		Dim strLVersion
+		Dim Opt
+		do while not objFileToReadVersion.AtEndOfStream
+			arrVersion = objFileToReadVersion.ReadLine()
+			arrVersion = Split(arrVersion,";")
+			If arrVersion(0)=strPack Then
+				strVersion = arrVersion(1)
+				document.getElementById("version").innerHTML = arrVersion(1)
+			end if
+			If arrVersion(0)="Launcher" Then
+				strLVersion = arrVersion(1)
+				document.getElementById("version").innerHTML = arrVersion(1)
+			end if
+		loop
+		document.getElementById("version").innerHTML = "Launcher: "+strLVersion+" / Pack: "+strVersion
+		objFileToReadVersion.Close
+		Set objFileToReadVersion = Nothing
+	end if
+	If FileExists("data\indexes\user") Then
+	 Set objFileToReadUser = CreateObject("Scripting.FileSystemObject").OpenTextFile("data\indexes\user",1)
+	 Dim strUser
+	 do while not objFileToReadUser.AtEndOfStream
+	     strUser = objFileToReadUser.ReadLine()
+		 document.getElementById("user").value = strUser
+	 loop
+	 objFileToReadUser.Close
+	 Set objFileToReadUser = Nothing
+	end if
+	If FileExists("data\indexes\online") Then
+		sleep 2
+		RefreshOnline
+	end if
+End Sub
+Sub AddOption (ByRef text)
+	Dim Opt
+	set Opt = document.createElement ("option")
+	Dim oSelect
+	set oSelect = document.getElementById("VERSION-select")
+	Opt.value = document.getElementById("VERSION-select").length & " " & text
+	Opt.text = text
+	oSelect.add(Opt)
+End Sub
+</script>
+<script type="text/javascript">
+    window.resizeTo(1100,655);
+</script>
+<title>PCMod Launcher - Loading...</title>
+</head>
+<body onload="vbscript:Init">
+<!-- Side Bar -->
+<div class="sidenav" height="100%">
+	<table border="0" cellpadding="1px" id="menu" width="100%">
+		<th align="center"><hr>Tasks/Links<hr></th>
+		<tr><td align="center" width="auto">
+		<button style="width: 92%;" id="ML" onclick="Modlist" style="width: 100px;">Modlist (<span id="modcount">--</span> mods) </button>
+		</td></tr><tr><td align="center" width="auto">
+		<button style="width: 92%;" onclick="Website">PCMod website</button>
+		</td></tr><tr><td align="center" width="auto">
+		<button style="width: 92%;" onclick="Discord">Join Discord</button>
+		</td></tr><tr><td align="center" width="auto">
+		<button style="width: 92%;" onclick="Account">My Account</button>
+		</td></tr>
+	</table>
+</div>
+<div class="playernav">
+		<table width="100%" id="menu3">
+		<th align="center"><hr>Players Online<hr>
+		</th>
+		<tr><td>
+		<button style="height:25px;width:100%;font-size:10px" onclick="RefreshPlayers">Refresh</button><hr>
+		</td></tr>
+		<tr><td align="left" style="padding-left:10px;">
+		<p style="width: 0px;height: 195px;font: 16px;font-weight:bolder;" id="online"></p>
+		</td></tr><tr><td><hr></td></tr>
+	</table>
+</div>
+<div class="settingnav">
+	<table border="0" cellpadding="2px" id="menu2" width="100%">
+		<th align="center" colspan="2"><hr>Settings<hr></th>
+		<tr><td align="left" width="auto">
+		<label for="Shortcut">Shortcut </label>
+		</td><td align="right">
+		<input class="largerCheckbox" title="Creates a shotcut on your desktop." type="checkbox" id="Shortcut" onclick="SettingsShortcut"></span><br>
+		</td></tr><tr><td align="left" width="auto">
+		<label for="AutoServer">Auto Server </label>
+		</td><td align="right">
+		<input class="largerCheckbox" title="Launch into the server." type="checkbox" id="AutoServer" onclick="SettingsAutoServer"><br>
+		</td></tr><tr><td align="left" width="auto">
+		<label for="LL">Log Logins </label>
+		</td><td align="right">
+		<input class="largerCheckbox" title="Keeps track of how often you play." type="checkbox" id="LL" onclick="SettingsLL"><br>
+		</td></tr><tr><td align="left" width="auto">
+		<label for="LT">Lite Mode </label>
+		</td><td align="right">
+		<input class="largerCheckbox" title="Removes clients side mods. (for slower computers)." type="checkbox" id="LT" onclick="SettingsLT"><br>
+		</td></tr><tr><td align="left" width="auto">
+		<label for="VERSION-select">Version</label>
+		</td><td align="right">
+		<select title="Select Previous versions of the game." size="1" width="100px" name="version-select" id="VERSION-select" style="font-size:9px;align:left;" onfocusout="SettingsVERSION">
+		</select><br>
+		</td></tr><tr><td align="left" width="auto">
+		<label for="MEM">Memory</label>
+		</td><td align="right">
+		<input title="Sets Memory Allocated to game, in megabytes." value="4096" type="number" style="font-size:9px;align:left;" maxlength="5" size="4"	id="MEM" onfocusout="SettingsMEM"><br>
+		</td></tr><tr><td colspan="2" align="center" width="auto">
+		<hr><button style="width: 100px;font: 10px;">Save</button><hr>
+		</td>
+		</tr>
+	</table>
+	<br><br><br><br>
+</div>
+<div class="loginnav">
+	<table border=0 cellpadding="1px" id="menu2" width="100%">
+		<form>
+		<th colspan="2" align="center"><hr>Login<hr></th>
+		<tr><td align="left">
+		User</td><td align="left">
+		<input type="text" size="16" id="user" placeholder="Username" value="Loading..." style="font-size:14;"></td>
+		</tr><tr><td align="left">
+		Pass</td><td align="left">
+		<input type="password" size="16" id="pass" placeholder="Password" style="font-size:14;"></td>
+		</tr><tr><td></td><td colspan="1" align="left">
+		<input type="button" style="width: 126px;font: 16px;" value="Login" onclick="Login">
+		</td>
+		</form>
+		</tr>
+		<tr><td colspan="2" style="padding-top:5px;"><hr></td></tr>
+	</table>
+</div>
+<!-- MAIN PAGE -->
+<div class="main">
+<div id="title">
+<img height="20%" src="data\icons\pcmod.png"><br>
+</div>
+<br>
+<div id="content">
+<center>
+<table width="50%" height="69%" border=0><tr>
+<td colspan=2>
+<iframe id="news" width="100%" height="100%" title="PCMod News" name="PCMod News" src="data\pages\news.html"></iframe><br><p>
+</td></tr><tr>
+<td align="center"><button style="width: 100%;" onclick="RunProgram"><br><h2>LAUNCH</h2></button></td>
+<td align="center" height="100px"><button style="width: 100%;" onclick="RunUpdate"><br><h2>UPDATE</h2></button></td>
+</tr></table>
+</center>
+</div>
+<sub style="font:14px;text-align:right;width:100%;padding:1px;color:#ccd1d1;" type="text" id="version">-.-.-</sub>
+</body>
+</html>
+<!--Designed and Programmed by Mark Rewey with the help of Korey Webb and Kaler Webb-->

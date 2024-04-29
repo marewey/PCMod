@@ -1,0 +1,19 @@
+I. Mod Permissions
+	1. I did not make any of these mods, you can look them all up on curseforge.
+	2. I do not own any of these mods (Except Mark's Coins). This is just a modpack with a custom launcher for Plattecraft Server.
+II. Minecraft
+	1. Minecraft was made by Mojang and owns this game.
+III. Code Permissions
+	1. By using this product, you are aware that information about the machine you are using will be collected.
+	2. By using this product, you may use 3rd party software in order to simplify the process of the code.
+	3. By using this product, you agree to these terms.
+IV. Ownership
+	1. I (Mark Rewey) only own the code of everything in .\cmd\*.bat, MLC.exe, as well as PCMod.hta.
+	2. I do not own Minecraft, Mojang, Microsoft, Java, or any of the mods in the mods folder.
+	3. I do not own wget, ftps, 7za, tr, nircmd, or xcode.
+	4. I do host the update server.
+	5. I did create the Coin Mod, however textures are from an old commodity mod.
+V. portable-mc
+	1. I do not own portable-mc. portable-mc is something I found online.
+VI. Java
+	1. I do not own Java or Oracle.

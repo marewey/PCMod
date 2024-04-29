@@ -1,0 +1,17 @@
+
+["Speed Reduction"]
+	#This is how powerful the slowness effect will be, when having 3-8 Defense. Default: 0.0
+	FirstTierSpeed = 0.0
+	#This is how powerful the slowness effect will be, when having 9-15 Defense. Default: 1.0
+	SecondTierSpeed = 1.0
+	#This is how powerful the slowness effect will be, when having 16+ Defense. Default: 2.0
+	ThirdTierSpeed = 2.0
+
+["Armor Points for Reduction"]
+	#This is the amount of defense you need to have in order to have the first tier speed reduction. Put the minimal number. Default: 3.0
+	FirstTierDefense = 15.0
+	#This is the amount of defense you need to have in order to have the first second speed reduction. Put the minimal number. Default: 9.0
+	SecondTierDefense = 20.0
+	#This is the amount of defense you need to have in order to have the third tier speed reduction. Put the minimal number. Default: 16.0
+	ThirdTierDefense = 25.0
+
