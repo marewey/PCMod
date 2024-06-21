@@ -170,7 +170,7 @@ echo.LAUNCHING... (data\packs\%pack% %m-version%)
 start cmd\launching.vbs
 ::Launch Game
 if "%showconsole%"=="1" echo. **** Detatching Session, Starting in Console Mode. **** &start portablemc --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" --output human start -u %user% -i %mcuuid% %autoserver_% --jvm-args="-Xmx%memory%M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M" %m-version%
-if not "%showconsole%"=="1" portablemc --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" --output human start -u %user% -i %mcuuid% %autoserver_% --jvm-args="-Xmx%memory%M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M" %m-version%
+if not "%showconsole%"=="1" portablemc --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" start -u %user% -i %mcuuid% %autoserver_% --jvm-args="-Xmx%memory%M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M" %m-version%
 ::=== END PROCESS
 echo.EXITING...
 ::Recount Crashreporter Catcher
