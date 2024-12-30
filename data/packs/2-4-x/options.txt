@@ -175,10 +175,10 @@ key_key.cgm.attachments:key.keyboard.z
 key_Reload Menu | CTRL + ALT + :key.keyboard.unknown
 key_Toggle Customization Overlay | CTRL + ALT + :key.keyboard.keypad.subtract
 key_key.walljump.walljump:key.keyboard.left.shift
-soundCategory_master:0.20364238
-soundCategory_music:0.20598592
+soundCategory_master:0.5
+soundCategory_music:0.25
 soundCategory_record:1.0
-soundCategory_weather:0.6619718
+soundCategory_weather:1.0
 soundCategory_block:1.0
 soundCategory_hostile:1.0
 soundCategory_neutral:1.0
