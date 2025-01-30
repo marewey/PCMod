@@ -75,7 +75,7 @@ echo.Launching Update...
 set update_type=%1
 set update_version=%2
 if "%update_type%"=="" set update_type=empty
-if "%connection%"=="1" if not "%update%"=="" bin\wget -q -T 5 http://%url%/pcmod2/updates/cmd/update.bat -O cmd\update.bat
+if "%connection%"=="1" if not "%update%"=="" bin\wget -q -T 5 http://%url%/pcmod2/updates/launcher/base/cmd/update.bat -O cmd\update.bat
 :: use launcher/pack/empty for 1
 copy cmd\update.bat cmd\update_.bat
 call cmd\update_.bat %update_type% %update_version%
@@ -92,11 +92,12 @@ call :download
 if "%connection%"=="1" call :refreshplayers
 goto :eof
 :download
-echo.Downloading News.html, Script.zs and PCMod-%pack%.pak...
+echo.Downloading News.html, Servers.dat, Script.zs and PCMod-%pack%.pak...
 if "%connection%"=="0" echo.*** No Connection ***
 if "%connection%"=="1" bin\wget.exe -q -T 5 -O data\pages\news.html http://%url%/pcmod2/updates/news.html
 ::if "%connection%"=="1" bin\wget.exe -q -T 5 -O data\packs\%pack%\PCMod-%pack%.pak http://%url%/pcmod2/updates/PCMod-%pack%.pak
-if "%connection%"=="1" if exist "data\packs\%pack%\scripts\script.zs" bin\wget.exe -q -T 5 -O data\packs\%pack%\scripts\script.zs http://%url%/pcmod2/updates/scripts/script.zs
+if "%connection%"=="1" if exist "data\packs\%pack%\scripts\script.zs" bin\wget.exe -q -T 5 -O data\packs\%pack%\scripts\script.zs http://%url%/pcmod2/updates/pack/scripts/script_%pack%.zs
+if "%connection%"=="1" if exist "data\packs\%pack%\servers.dat" bin\wget.exe -q -T 5 -O data\packs\%pack%\servers.dat http://%url%/pcmod2/updates/pack/servers/servers_%pack%.dat
 goto :eof
 :setup
 call :pythoncheck
@@ -113,7 +114,7 @@ echo. --Set Gamedir: %cd%\data\packs\%pack%
 goto :eof
 
 :fresh.id
-set /a P_=%random%*3/2+162735
+set /a P_=%random%*3/2+126735
 set uuid=PC2-%P_%%username:~0,1%0
 >data\indexes\uuid echo.%uuid%&echo.New UUID: %uuid%
 :fresh
@@ -547,7 +548,7 @@ goto :eof
 
 :mcuuid
 set pack_=%pack%
-if not exist "data\packs\%pack_%\jvm\*\bin\java.exe" set pack_=2-4-x
+if not exist "data\packs\%pack_%\jvm\*\bin\java.exe" set pack_=2-5-x
 for /f "tokens=*" %%a in ('dir /b /a:d data\packs\%pack_%\jvm\java*') do set java_runtime=data\packs\%pack_%\jvm\%%a\bin\java.exe
 ::Convert username to UUID
 set /p "=Converting Username to UUID... "<nul
@@ -581,7 +582,7 @@ if exist "data\indexes\uuid" for /f %%a in ('type data\indexes\uuid') do set uui
 if exist "data\indexes\mcuuid" for /f %%a in ('type data\indexes\mcuuid') do set mcuuid=%%a
 ::load which pack/version you are using
 if "%pack-index%"=="" set pack-index=0
-if "%pack%"=="" set pack=2-4-x
+if "%pack%"=="" set pack=2-5-x
 for /f "tokens=1-4 delims=;" %%a in ('type data\indexes\version') do (
 	if "%%a"=="%pack%" set pack_version=%%b&set mcversion=%%d
 	if "%%a"=="Launcher" if "%%c"=="PCMod" set launcher_version=%%b
@@ -592,7 +593,7 @@ call :net.check
 goto :eof
 :save
 echo.SAVING...
-if "%1"=="new" set shortcut=1&set log-logins=1&set lite=0&set autoupdate=1&set autoserver=0&set memory=4096&set pack=2-4-x&set pack-index=0&set debug=nul
+if "%1"=="new" set shortcut=1&set log-logins=1&set lite=0&set autoupdate=1&set autoserver=0&set memory=4096&set pack=2-5-x&set pack-index=0&set debug=nul
 >settings.txt echo.autoserver=%autoserver%
 >>settings.txt echo.autoupdate=%autoupdate%
 >>settings.txt echo.lite=%lite%
@@ -603,3 +604,7 @@ if "%1"=="new" set shortcut=1&set log-logins=1&set lite=0&set autoupdate=1&set a
 >>settings.txt echo.pack=%pack%
 >>settings.txt echo.debug=%debug%
 goto :eof
+
+::˜ Copy Right Mark Rewey © (2018)
+:: Designed for Plattecraft Server.
+:: http://www.markspi.ddns.me/pcmod

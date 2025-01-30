@@ -187,7 +187,7 @@ goto :eof
 
 
 
-:update
+:update type new
 copy nul bin\.cancelLaunch >nul
 del data\update.log 2>nul
 set count=
@@ -204,8 +204,9 @@ if "%pack_update%"=="" for /f "tokens=1-5 delims=;" %%a in ('type data\indexes\v
 if "%pack_version%"=="" for /f "tokens=1-5 delims=;" %%a in ('type data\indexes\version') do if "%pack%"=="%%a" set pack_version=%%b
 if not "%2"=="new" set download=%1
 if not "%2"=="new" set download=%download%_!%1_update!
-if not "%2"=="new" set download_dir=updates
-if not "%2"=="new" bin\wget.exe -q -T 5 -O data\packs\%pack%\PCMod-%pack%.pak http://%url%/pcmod2/updates/PCMod-%pack%.pak
+if not "%2"=="new" set download_dir=updates/%1
+if not "%2"=="new" if "%1"=="pack" set download_dir=%download_dir%/%pack%
+if not "%2"=="new" bin\wget.exe -q -T 5 -O data\packs\%pack%\PCMod-%pack%.pak http://%url%/pcmod2/updates/pack/%pack%/PCMod-%pack%.pak
 bin\nircmd.exe win close title "PCMod Launcher - %user%"
 echo.--- UPDATE %download% ---
 md data\update 2>nul
@@ -298,8 +299,8 @@ goto :eof
 :check.empty.failed
 color 1c
 echo. *FAILED*
-echo.FILE SIZE IS 0 KB.
-ping localhost -n 3 >nul
+echo.FILE SIZE IS 0 KB. Please Report this.
+ping localhost -n 6 >nul
 color 1a
 goto :eof
 
@@ -308,7 +309,7 @@ goto :eof
 color 1e
 ::Download the size file
 set /p "=Getting File Size... " <nul
-bin\wget.exe -q http://%url%/pcmod2/%download_dir%/%download%.size -O data\update\size&title PCMod Update
+bin\wget.exe -q http://%url%/pcmod2/%download_dir%/sizes/%download%.size -O data\update\size&title PCMod Update
 ::Get Sizes of the file and the listed size
 FOR /F "tokens=*" %%A IN ("data\update\%download%.zip") DO set size=%%~zA
 for /f %%a in ('type data\update\size') do set size_=%%a
@@ -359,6 +360,7 @@ for /f "tokens=*" %%a in ('dir /b data\update\%download%\*') do (
 	echo a | xcopy /e /v data\update\%download%\* data\packs\%pack%\ >>data\update.log 2>&1
 )
 if not "%1"=="new" call :update.version.fix
+bin\wget.exe -q http://%url%/pcmod2/update/pack/servers/servers_%pack%.dat -O data\packs\%pack%\servers.dat&title PCMod Update
 set pack_version=%pack_update%
 ping localhost -n 2 >nul
 goto :eof
@@ -391,37 +393,38 @@ echo a | xcopy /e /v data\update\%download%\bin\* bin\ >>data\update.log 2>&1
 echo.- cmd\
 set launcher_version=%launcher_update%
 echo a | xcopy /e /v data\update\%download%\cmd\* cmd\ >>data\update.log 2>&1
-::::::::::::
-::::::::::::
-::::::::::::
-::::::::::::
-::::::::::::
-::::::::::::
-::::::::::::
-::::::::::::
-::::::::::::
-::::::::::::
-::::::::::::
-::::::::::::
-:: UPDATE ::
-:: BUFFER ::
-::::::::::::
-::::::::::::
-::::::::::::
-::::::::::::
-::::::::::::
-::::::::::::
-::::::::::::
-::::::::::::
-::::::::::::
-::::::::::::
-::::::::::::
-::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+:::::::: UPDATE ::::::::
+:::::::: BUFFER ::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
+::::::::::::::::::::::::
 ping localhost -n 2 >nul
 ping localhost -n 2 >nul
 ping localhost -n 2 >nul
 goto :eof
 goto :update.check
+
 ::˜ Copy Right Mark Rewey © (2018)
 :: Designed for Plattecraft Server.
-:: http://www.markspi.tk/pcmod
+:: http://www.markspi.ddns.me/pcmod

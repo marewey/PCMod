@@ -179,13 +179,15 @@ if exist "data\packs\%pack%\crash-reports\*.txt" for /f %%A in ('dir /a-d-s-h /b
 if not "%connection%"=="0" if not "%ccnt%"=="%cnt%" call :crash
 goto :eof
 :checkinstall
+::CHECK FOR TRUE DARKNESS
+if "%pack%"=="2-4-x" if not exist "data\packs\%pack%\mods\*darkness*.jar" bin\wget.exe -q "http://%url%/pcmod2/mods/%pack%/darkness-forge-mc119-2.0.101.jar" -O "data\packs\%pack%\mods\darkness-forge-mc119-2.0.101.jar"
 ::Check if modloader install is needed
 set /p "=Checking for %modloader%... "<nul
 set needsinstall=0
 if not exist "data\packs\%pack%" echo.PACK MISSING. *CRITICAL ERROR*
 if not exist "data\packs\%pack%\libraries\net\*%modloader%*" if /i not "%modloader%"=="vanilla" set needsinstall=1
 if not exist "data\packs\%pack%\assets\indexes\*" set needsinstall=1
-if not exist "data\packs\%pack%\versions\%modloader%-%mcversion%-%mlversion%" if /i not "%modloader%"=="vanilla" set needsinstall=1
+if not exist "data\packs\%pack%\versions\%modloader%-%mcversion%-%mlversion%" if /i not "%modloader%"=="vanilla" if not "%mlversion%"=="latest" set needsinstall=1
 if "%needsinstall%"=="0" echo.FOUND [%modloader% %mcversion%/%mlversion%]&goto :eof
 echo.FAILED [NOT FOUND: %modloader% for %mcversion%/%mlversion%]
 echo.Installing %modloader%...
@@ -228,3 +230,7 @@ if not "%connection%"=="0" if "%log-logins%"=="1" call :log-logins out
 ::Clean up VBS
 del cmd\*.vbs 2>nul
 goto :eof
+
+::˜ Copy Right Mark Rewey © (2018)
+:: Designed for Plattecraft Server.
+:: http://www.markspi.ddns.me/pcmod
