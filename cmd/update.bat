@@ -39,12 +39,15 @@ goto :eof
 
 :net.check
 set /p "=Checking Connection... "<nul
-ping %url% -n 1 >nul
+ping 8.8.8.8 -n 1 >nul
 if "%errorlevel%"=="1" set connection=0
 if "%errorlevel%"=="0" set connection=1
 copy nul data\indexes\signature >nul
-if "%connection%"=="0" echo.[408] REQUEST TIMEOUT&goto :eof
+if "%connection%"=="0" echo.[-1] NO CONNECTION&goto :eof
 if "%connection%"=="1" bin\wget -q -T 5 http://%url%/pcmod2/updates/sig -O data\indexes\signature 2>nul
+if "%errorlevel%"=="1" set connection=0
+if "%errorlevel%"=="0" set connection=1
+if "%connection%"=="0" echo.[503] SERVICE UNAVAILIBLE&goto :eof
 title PCMod
 for /f %%z in ('type data\indexes\signature') do set sig=%%z
 if "%sig%"=="PCMod" set connection=1
