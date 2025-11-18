@@ -24,7 +24,7 @@ exit
 
 :vars
 set ftppass=cnff
-set url=markspi.ddns.me
+set url=pcmod.ddns.me
 for /f "tokens=1-2 delims==" %%a in ('type settings.txt') do set %%a=%%b
 for /f "tokens=1-4 delims=;" %%a in ('type data\indexes\version') do (
 	if "%%a"=="%pack%" set pack_version=%%b
@@ -44,7 +44,7 @@ if "%errorlevel%"=="1" set connection=0
 if "%errorlevel%"=="0" set connection=1
 copy nul data\indexes\signature >nul
 if "%connection%"=="0" echo.[-1] NO CONNECTION&goto :eof
-if "%connection%"=="1" bin\wget -q -T 5 http://%url%/pcmod2/updates/sig -O data\indexes\signature 2>nul
+if "%connection%"=="1" bin\wget -q -T 5 http://%url%/updates/sig -O data\indexes\signature 2>nul
 if "%errorlevel%"=="1" set connection=0
 if "%errorlevel%"=="0" set connection=1
 if "%connection%"=="0" echo.[503] SERVICE UNAVAILIBLE&goto :eof
@@ -62,7 +62,7 @@ goto :eof
 :update.check
 if "%connection%"=="0" echo.*** No Connection ***&goto :eof
 echo.Checking for updates...
-bin\wget -q -T 5 http://%url%/pcmod2/version -O data\indexes\version.tmp
+bin\wget -q -T 5 http://%url%/version -O data\indexes\version.tmp
 title PCMod
 set pack_update=
 set launcher_update=
@@ -209,7 +209,7 @@ if not "%2"=="new" set download=%1
 if not "%2"=="new" set download=%download%_!%1_update!
 if not "%2"=="new" set download_dir=updates/%1
 if not "%2"=="new" if "%1"=="pack" set download_dir=%download_dir%/%pack%
-if not "%2"=="new" bin\wget.exe -q -T 5 -O data\packs\%pack%\PCMod-%pack%.pak http://%url%/pcmod2/updates/pack/%pack%/PCMod-%pack%.pak
+if not "%2"=="new" bin\wget.exe -q -T 5 -O data\packs\%pack%\PCMod-%pack%.pak http://%url%/updates/pack/%pack%/PCMod-%pack%.pak
 bin\nircmd.exe win close title "PCMod Launcher - %user%"
 echo.--- UPDATE %download% ---
 md data\update 2>nul
@@ -284,9 +284,9 @@ if exist "data\indexes\missingmods.txt" echo.Missing Mods found...&type data\ind
 echo.Downloading Missing Mods...
 for /f "tokens=1-5 delims=;" %%a in ('type data\packs\%pack%\PCMod-%pack%.pak') do (
 	if not exist "data\packs\%pack%\mods\%%b" (
-		if "%%a"=="C" set /p "=- Downloading %%d..."<NUL&bin\wget.exe -q "http://%url%/pcmod2/mods/%pack%/%%b" -O "data\packs\%pack%\mods\%%b"&call :check.empty %%b
-		if "%%a"=="U" set /p "=- Downloading %%d..."<NUL&bin\wget.exe -q "http://%url%/pcmod2/mods/%pack%/%%b" -O "data\packs\%pack%\mods\%%b"&call :check.empty %%b
-		if "%%a"=="B" set /p "=- Downloading %%d..."<NUL&bin\wget.exe -q "http://%url%/pcmod2/mods/%pack%/%%b" -O "data\packs\%pack%\mods\%%b"&call :check.empty %%b
+		if "%%a"=="C" set /p "=- Downloading %%d..."<NUL&bin\wget.exe -q "http://%url%/mods/%pack%/%%b" -O "data\packs\%pack%\mods\%%b"&call :check.empty %%b
+		if "%%a"=="U" set /p "=- Downloading %%d..."<NUL&bin\wget.exe -q "http://%url%/mods/%pack%/%%b" -O "data\packs\%pack%\mods\%%b"&call :check.empty %%b
+		if "%%a"=="B" set /p "=- Downloading %%d..."<NUL&bin\wget.exe -q "http://%url%/mods/%pack%/%%b" -O "data\packs\%pack%\mods\%%b"&call :check.empty %%b
 	)
 )
 goto :eof
@@ -312,7 +312,7 @@ goto :eof
 color 1e
 ::Download the size file
 set /p "=Getting File Size... " <nul
-bin\wget.exe -q http://%url%/pcmod2/%download_dir%/sizes/%download%.size -O data\update\size&title PCMod Update
+bin\wget.exe -q http://%url%/%download_dir%/sizes/%download%.size -O data\update\size&title PCMod Update
 ::Get Sizes of the file and the listed size
 FOR /F "tokens=*" %%A IN ("data\update\%download%.zip") DO set size=%%~zA
 for /f %%a in ('type data\update\size') do set size_=%%a
@@ -322,7 +322,7 @@ echo.%size_:~0,-6%.%size_:~-6,-4% MB
 if exist "data\update\%download%.zip" if "%size%"=="%size_%" echo.Using offline zip file.&goto :eof
 if exist "data\update\%download%.zip" if not "%size%"=="%size_%" echo.Size does not match. (%size:~0,-6%.%size:~-6,-5% MB ~= %size_:~0,-6%.%size_:~-6,-5% MB)&echo.Redownloading...&del data\update\%download%.zip 2>data\update_error.log
 echo.Downloading File... (%download%.zip)
-start /min bin\wget.exe http://%url%/pcmod2/%download_dir%/%download%.zip -O data\update\%download%.zip
+start /min bin\wget.exe http://%url%/%download_dir%/%download%.zip -O data\update\%download%.zip
 set size=0000000
 call :update.download.progress
 FOR /F "usebackq" %%A IN ('data\update\%download%.zip') DO set size=%%~zA
@@ -363,7 +363,7 @@ for /f "tokens=*" %%a in ('dir /b data\update\%download%\*') do (
 	echo a | xcopy /e /v data\update\%download%\* data\packs\%pack%\ >>data\update.log 2>&1
 )
 if not "%1"=="new" call :update.version.fix
-bin\wget.exe -q http://%url%/pcmod2/update/pack/servers/servers_%pack%.dat -O data\packs\%pack%\servers.dat&title PCMod Update
+bin\wget.exe -q http://%url%/update/pack/servers/servers_%pack%.dat -O data\packs\%pack%\servers.dat&title PCMod Update
 set pack_version=%pack_update%
 ping localhost -n 2 >nul
 goto :eof
@@ -430,4 +430,4 @@ goto :update.check
 
 ::˜ Copy Right Mark Rewey © (2018)
 :: Designed for Plattecraft Server.
-:: http://www.markspi.ddns.me/pcmod
+:: http://pcmod.ddns.me

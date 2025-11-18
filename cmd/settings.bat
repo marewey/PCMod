@@ -3,7 +3,7 @@
 if "%1"=="len" call :len %2 %3&goto :eof
 set ftppass=cnff
 set program="%cd%\PCMod.hta"
-set url=markspi.ddns.me
+set url=pcmod.ddns.me
 set debug=data\debug.log
 if not exist "settings.txt" call :save new
 if not "%1"=="login" echo.^>%1 %2 %3
@@ -41,7 +41,7 @@ exit /b
 call :net.check popup
 echo.Checking for updates... Pack %pack% [%pack_version%] Launcher [%launcher_version%]
 if "%connection%"=="0" echo.*** No Connection ***&goto :eof
-bin\wget -q -T 5 http://%url%/pcmod2/version -O data\indexes\version.tmp
+bin\wget -q -T 5 http://%url%/version -O data\indexes\version.tmp
 title PCMod
 set pack_update=
 set launcher_update=
@@ -75,7 +75,7 @@ echo.Launching Update...
 set update_type=%1
 set update_version=%2
 if "%update_type%"=="" set update_type=empty
-if "%connection%"=="1" if not "%update%"=="" bin\wget -q -T 5 http://%url%/pcmod2/updates/launcher/base/cmd/update.bat -O cmd\update.bat
+if "%connection%"=="1" if not "%update%"=="" bin\wget -q -T 5 http://%url%/updates/launcher/base/cmd/update.bat -O cmd\update.bat
 :: use launcher/pack/empty for 1
 copy cmd\update.bat cmd\update_.bat
 call cmd\update_.bat %update_type% %update_version%
@@ -94,10 +94,10 @@ goto :eof
 :download
 echo.Downloading News.html, Servers.dat, Script.zs and PCMod-%pack%.pak...
 if "%connection%"=="0" echo.*** No Connection ***
-if "%connection%"=="1" bin\wget.exe -q -T 5 -O data\pages\news.html http://%url%/pcmod2/updates/news.html
-::if "%connection%"=="1" bin\wget.exe -q -T 5 -O data\packs\%pack%\PCMod-%pack%.pak http://%url%/pcmod2/updates/PCMod-%pack%.pak
-if "%connection%"=="1" if exist "data\packs\%pack%\scripts\script.zs" bin\wget.exe -q -T 5 -O data\packs\%pack%\scripts\script.zs http://%url%/pcmod2/updates/pack/scripts/script_%pack%.zs
-if "%connection%"=="1" if exist "data\packs\%pack%\servers.dat" bin\wget.exe -q -T 5 -O data\packs\%pack%\servers.dat http://%url%/pcmod2/updates/pack/servers/servers_%pack%.dat
+if "%connection%"=="1" bin\wget.exe -q -T 5 -O data\pages\news.html http://%url%/updates/news.html
+::if "%connection%"=="1" bin\wget.exe -q -T 5 -O data\packs\%pack%\PCMod-%pack%.pak http://%url%/updates/PCMod-%pack%.pak
+if "%connection%"=="1" if exist "data\packs\%pack%\scripts\script.zs" bin\wget.exe -q -T 5 -O data\packs\%pack%\scripts\script.zs http://%url%/updates/pack/scripts/script_%pack%.zs
+if "%connection%"=="1" if exist "data\packs\%pack%\servers.dat" bin\wget.exe -q -T 5 -O data\packs\%pack%\servers.dat http://%url%/updates/pack/servers/servers_%pack%.dat
 goto :eof
 :setup
 call :pythoncheck
@@ -187,7 +187,7 @@ set user_=%user%
 for /f "usebackq" %%a in (`echo.%user_% ^| bin\tr -dc '[_[:alnum:]]\n\r'`) do set user=%%a
 if not "%user%"=="%user_%" echo.Username invalid (%user_%), Correcting username (%user%)
 if "%user%"=="" bin\nircmd.exe infobox "No username supplied. Please enter one." "PCMod Error"&echo.*** PCMod Error: No username supplied. Please enter one.
-bin\wget -O%temp%\au.th --post-data "x=%token%&u=%user%&z=auth" "http://%url%/pcmod2/commands/authp.php" 2>nul >nul
+bin\wget -O%temp%\au.th --post-data "x=%token%&u=%user%&z=auth" "http://%url%/commands/authp.php" 2>nul >nul
 for /f %%a in ('type %temp%\au.th') do set returnAuth=%%a
 del %temp%\au.th 2>nul
 ::Display AUTH Code and Reason
@@ -212,7 +212,7 @@ set memtot=%memtot:~0,-2%
 set memtot=%memtot:,=%
 set mem_gb=%memtot:~0,-3%
 echo.%memtot%MB / %mem_gb%GB
-if not exist "%temp%\mem" call :defaultmem
+if "%memory%"=="" call :defaultmem
 goto :eof
 :sysinfocheck
 echo.Collecting Systeminfo for memory settings...
@@ -221,7 +221,7 @@ goto :eof
 
 :defaultmem
 echo.Setting Default Memory Setting...
-set /a memory=3072+(64*%mem_gb%)
+set /a memory=3584+(64*%mem_gb%)
 >%temp%\mem echo.%memtot%
 echo.Default Memory Setting for your System: %memory%MB/%memtot%MB.
 goto :eof
@@ -248,12 +248,12 @@ if not "%pycheck%"=="0" echo.[NOT INSTALLED]&goto :py_install
 if "%pycheck%"=="0" for /f "tokens=1-2 delims= " %%a in ('type data\indexes\python_version') do echo.%%b
 ::========================== PORTABLEMC
 set /p "=Checking for PORTABLEMC... "<NUL
-pip list 2>nul | find "portablemc " 2>>data\pythonerror.log >data\indexes\portablemc_version
+py -m pip list 2>nul | find "portablemc " 2>>data\pythonerror.log >data\indexes\portablemc_version
 set pmc=%errorlevel%
 if "%pmc%"=="0" for /f "tokens=1-2 delims= " %%a in ('type data\indexes\portablemc_version') do echo.%%b
 if not "%pmc%"=="0" echo.[NOT INSTALLED]&goto :portablemc_install
 ::========================== Resolve
-if not exist "%temp%\python_checked" call :pyupgrade
+if not exist "%temp%\python_checked" call :pyupgrade&call :py_path
 if "%pycheck%"=="0" if "%pmc%"=="0" if not "%errorchecker%"=="" echo.Install Complete.&goto :eof
 if "%pycheck%"=="0" if "%pmc%"=="0" if "%errorchecker%"=="" goto :eof
 echo.Unexpected Error. Check logs.
@@ -267,16 +267,16 @@ del data\pythonerror.log 2>nul
 ::UPDATE PIP
 py -m pip install --upgrade pip 2>>data\pythonerror.log >>%debug%
 ::NO LONGER NEEDED
-echo.y|pip uninstall portablemc-fabric 2>>data\pythonerror.log >>%debug%
-echo.y|pip uninstall portablemc-forge 2>>data\pythonerror.log >>%debug%
+echo.y|py -m pip uninstall portablemc-fabric 2>>data\pythonerror.log >>%debug%
+echo.y|py -m pip uninstall portablemc-forge 2>>data\pythonerror.log >>%debug%
 ::UPDATE PMC
-pip install --upgrade --force-reinstall portablemc 2>>data\pythonerror.log >>%debug%
+py -m pip install --upgrade --target %cd%\bin\pmc --force-reinstall portablemc 2>>data\pythonerror.log >>%debug%
 >%temp%\python_checked echo.%date% - %time%
 goto :eof
 :portablemc_install
 set /a errorchecker=%errorchecker%+1
 set /p "=Installing PORTABLEMC... "<NUL
-pip install portablemc 2>>data\pythonerror.log >>%debug%
+py -m pip install portablemc 2>>data\pythonerror.log >>%debug%
 echo.[DONE]
 call cmd\refreshenv.cmd
 goto :pythoncheck
@@ -289,6 +289,7 @@ call cmd\refreshenv.cmd
 ::Find the PATH
 set py_path=ERROR
 set pmc_path=ERROR
+:py_path
 set /p "=Checking PATH for Python... "<NUL
 for %%I in (python.exe) do if not "%%~$PATH:I"=="" set py_path=%%~$PATH:I
 for %%I in (portablemc.exe) do if not "%%~$PATH:I"=="" set pmc_path=%%~$PATH:I
@@ -338,7 +339,7 @@ goto :eof
 
 :refreshplayers
 echo.Refreshing Player list...
-bin\wget.exe -q -T 5 -O data\indexes\online http://%url%/pcmod2/players/list-%pack%
+bin\wget.exe -q -T 5 -O data\indexes\online http://%url%/players/list-%pack%
 type data\indexes\online
 goto :eof
 
@@ -534,7 +535,7 @@ if "%errorlevel%"=="1" set connection=0
 if "%errorlevel%"=="0" set connection=1
 copy nul data\indexes\signature >nul
 if "%connection%"=="0" echo.[-1] NO CONNECTION&goto :eof
-if "%connection%"=="1" bin\wget -q -T 5 http://%url%/pcmod2/updates/sig -O data\indexes\signature
+if "%connection%"=="1" bin\wget -q -T 5 http://%url%/updates/sig -O data\indexes\signature
 if "%errorlevel%"=="1" set connection=0
 if "%errorlevel%"=="0" set connection=1
 if "%connection%"=="0" echo.[503] SERVICE UNAVAILIBLE&goto :eof
@@ -606,8 +607,10 @@ if "%1"=="new" set shortcut=1&set log-logins=1&set lite=0&set autoupdate=1&set a
 >>settings.txt echo.pack-index=%pack-index%
 >>settings.txt echo.pack=%pack%
 >>settings.txt echo.debug=%debug%
+echo.Settings.txt:
+type settings.txt
 goto :eof
 
 ::˜ Copy Right Mark Rewey © (2018)
 :: Designed for Plattecraft Server.
-:: http://www.markspi.ddns.me/pcmod
+:: http://pcmod.ddns.me

@@ -4,7 +4,7 @@ title PCMod
 
 call :get.time.formated
 echo.[START: %timee%]
-if not "%1"=="launcher" cd ..&set connection=1&set url=markspi.ddns.me
+if not "%1"=="launcher" cd ..&set connection=1&set url=pcmod.ddns.me
 echo.Running in '%cd%'
 echo.Connection: %connection%
 echo.########### LOAD ############
@@ -18,6 +18,7 @@ set debug_=^>^>%debug% 2^>^&1
 ::GET SKIN FILES if not VANILLA
 if /i not "%modloader%"=="vanilla" call :skinget
 call :mcuuid
+call :pmc_check
 echo.########### LOGIN ###########
 ::LOGIN for USER
 if "%connection%"=="1" call :auth
@@ -37,6 +38,16 @@ exit
 set time-=%time:~0,-9%-%time:~3,-6%-%time:~6,-3%
 set date-=%date:~10%-%date:~4,-8%-%date:~7,-5%
 set timee=%date-%_%time-%
+goto :eof
+
+:pmc_check
+set /p "=Checking for PMC..." <NUL
+set portablemc=portablemc
+%portablemc% -v show about >nul 2>nul
+if "%errorlevel%"=="0" echo. Using System Install
+if not "%errorlevel%"=="0" set portablemc=bin\pmc\bin\portablemc&echo. Using Local Install
+%portablemc% -v show about >nul 2>nul
+if not "%errorlevel%"=="0" echo.ERROR: PORTABLEMC not installed
 goto :eof
 
 :vars
@@ -87,7 +98,7 @@ echo.---=== SKIN DOWNLOADER ===---
 ::Get local Skin Version
 for /f "tokens=1-2 delims= " %%a in ('type data\indexes\skindex') do set %%a_v=%%b
 ::Get the skindex
-set /p "=Getting skindex..." <NUL&%debug_% bin\wget -T 5 -O data\indexes\skindex http://%url%/pcmod2/skins/skin.index&echo. DONE
+set /p "=Getting skindex..." <NUL&%debug_% bin\wget -T 5 -O data\indexes\skindex http://%url%/skins/skin.index&echo. DONE
 set skin_missing=0
 set skin_updates=0
 ::Count missing skins
@@ -98,9 +109,9 @@ for /f "tokens=1-2 delims= " %%a in ('type data\indexes\skindex') do if not "%%b
 if not "%skin_missing%"=="0" echo.Missing Skins: %skin_missing%
 if not "%skin_updates%"=="0" echo.Updated Skins: %skin_updates%
 ::If Skin does not exist, download it
-for /f "tokens=1-2 delims= " %%a in ('type data\indexes\skindex') do if not exist "data\packs\%pack%\cachedImages\skins\%%a.png" %debug_% bin\wget -T 5 -O "data\packs\%pack%\cachedImages\skins\%%a.png" "http://%url%/pcmod2/skins/%%a"&echo.Getting skin for "%%a" ...
+for /f "tokens=1-2 delims= " %%a in ('type data\indexes\skindex') do if not exist "data\packs\%pack%\cachedImages\skins\%%a.png" %debug_% bin\wget -T 5 -O "data\packs\%pack%\cachedImages\skins\%%a.png" "http://%url%/skins/%%a"&echo.Getting skin for "%%a" ...
 ::If Skin version changed, download it
-for /f "tokens=1-2 delims= " %%a in ('type data\indexes\skindex') do if not "%%b"=="!%%a_v!" %debug_% bin\wget -T 5 -O "data\packs\%pack%\cachedImages\skins\%%a.png" "http://%url%/pcmod2/skins/%%a"&echo.Updating skin for "%%a" ... (!%%a_v! to %%b)
+for /f "tokens=1-2 delims= " %%a in ('type data\indexes\skindex') do if not "%%b"=="!%%a_v!" %debug_% bin\wget -T 5 -O "data\packs\%pack%\cachedImages\skins\%%a.png" "http://%url%/skins/%%a"&echo.Updating skin for "%%a" ... (!%%a_v! to %%b)
 if "%skin_missing%"=="0" if "%skin_updates%"=="0" echo.No Skins Downloaded.
 echo.---===##### DONE ######===---
 ::copy "data\packs\%pack%\cachedImages\skins\%user%.png" "data\packs\%pack%\cachedImages\skins\uuid\%mcuuid%.png" >nul
@@ -118,7 +129,7 @@ for /f "usebackq" %%a in (`echo.%user_% ^| bin\tr -dc '[:alnum:]_\n\r'`) do set 
 if not "%user%"=="%user_%" echo.Username invalid (%user_%), Correcting username (%user%)
 if "%user%"=="" bin\nircmd.exe infobox "No username supplied. Please enter one." "PCMod - Error"&echo.*** PCMod Error: No username supplied. Please enter one.&exit
 ::Authenticate with Server
-%debug_% bin\wget -O%temp%\au.th --post-data "x=%token%&u=%user%&z=auth" "http://%url%/pcmod2/commands/authp.php"
+%debug_% bin\wget -O%temp%\au.th --post-data "x=%token%&u=%user%&z=auth" "http://%url%/commands/authp.php"
 for /f %%a in ('type %temp%\au.th') do set returnAuth=%%a
 del %temp%\au.th 2>nul
 ::Display AUTH Code and Reason
@@ -142,14 +153,14 @@ for /f %%a in ('type data\indexes\xip') do set xip=%%a
 if "%xip%"=="" set xip=xxx.xxx.xxx.xxx
 echo.Sending data to server... (state: %state%)
 echo.%uuid% - %state%: [%user%/%mcuuid%/%pack_version%/%launcher_version%],[%xip%],[%modcnt% mods/%memory% MB]
-%debug_% bin\wget -t 2 -T 5 -O nul "http://%url%/pcmod2/commands/login2.php" --post-data "user=%user%&uuid=%uuid%&state=%state%&mcuuid=%mcuuid%&version=%pack%/%pack_version%&lversion=%launcher_version%&netinfo=%xip%&modcount=%modcnt%&memory=%memory%"
+%debug_% bin\wget -t 2 -T 5 -O nul "http://%url%/commands/login2.php" --post-data "user=%user%&uuid=%uuid%&state=%state%&mcuuid=%mcuuid%&version=%pack%/%pack_version%&lversion=%launcher_version%&netinfo=%xip%&modcount=%modcnt%&memory=%memory%"
 if "%state%"=="in" call :pcmsg launched
 if "%state%"=="crash" call :pcmsg crashed
 goto :eof
 :pcmsg
 set pcmsg=%1
 echo.Sending Message to PC [%user% %pcmsg% the game.]...
-%debug_% bin\wget -T 5 -t 3 -O nul "http://%url%/pcmod2/commands/climsg2.php" --post-data "user=%user%&state=%pcmsg%&pack=%pack%"
+%debug_% bin\wget -T 5 -t 3 -O nul "http://%url%/commands/climsg2.php" --post-data "user=%user%&state=%pcmsg%&pack=%pack%"
 goto :eof
 
 :launch
@@ -169,8 +180,8 @@ echo.LAUNCHING... (data\packs\%pack% %m-version%)
 >cmd\launching.vbs echo.CreateObject("WScript.Shell").Popup "Launching PCMod...			" ^& vbcrlf ^& "	* Username: %user%" ^& vbcrlf ^& "	* MC-UUID: %mcuuid%" ^& vbcrlf ^& "	* PCMod Version: %pack%/%pack_version%" ^& vbcrlf ^& "	* Memory Used: %memory%Mb" ^& vbcrlf ^& "	* Mods: %modcnt%", 30, "PCMod - Launcher"
 start cmd\launching.vbs
 ::Launch Game
-if "%showconsole%"=="1" echo. **** Detatching Session, Starting in Console Mode. **** &start portablemc --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" --output human start -u %user% -i %mcuuid% %autoserver_% --jvm-args="-Xmx%memory%M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M" %m-version%
-if not "%showconsole%"=="1" portablemc --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" start -u %user% -i %mcuuid% %autoserver_% --jvm-args="-Xmx%memory%M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M" %m-version%
+if "%showconsole%"=="1" echo. **** Detatching Session, Starting in Console Mode. **** &start %portablemc% --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" --output human start -u %user% -i %mcuuid% %autoserver_% --jvm-args="-Xmx%memory%M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M" %m-version%
+if not "%showconsole%"=="1" %portablemc% --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" start -u %user% -i %mcuuid% %autoserver_% --jvm-args="-Xmx%memory%M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M" %m-version%
 ::=== END PROCESS
 echo.EXITING...
 ::Recount Crashreporter Catcher
@@ -180,7 +191,7 @@ if not "%connection%"=="0" if not "%ccnt%"=="%cnt%" call :crash
 goto :eof
 :checkinstall
 ::CHECK FOR TRUE DARKNESS
-if "%pack%"=="2-4-x" if not exist "data\packs\%pack%\mods\*darkness*.jar" bin\wget.exe -q "http://%url%/pcmod2/mods/%pack%/darkness-forge-mc119-2.0.101.jar" -O "data\packs\%pack%\mods\darkness-forge-mc119-2.0.101.jar"
+if "%pack%"=="2-4-x" if not exist "data\packs\%pack%\mods\*darkness*.jar" bin\wget.exe -q "http://%url%/mods/%pack%/darkness-forge-mc119-2.0.101.jar" -O "data\packs\%pack%\mods\darkness-forge-mc119-2.0.101.jar"
 ::Check if modloader install is needed
 set /p "=Checking for %modloader%... "<nul
 set needsinstall=0
@@ -195,7 +206,7 @@ echo.Installing %modloader%...
 >cmd\installing.vbs echo.CreateObject("WScript.Shell").Popup "Installing %modloader%..." ^& vbcrlf ^& "This may take a few minutes" ^& vbcrlf ^& "Please Wait...", 30, "PCMod - Launcher"
 start cmd\installing.vbs
 ::Dry run launcher to download resources
-portablemc --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" start --dry %m-version%
+%portablemc% --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" start --dry %m-version%
 goto :eof
 :crash
 ::Upload Crashreports
@@ -233,4 +244,4 @@ goto :eof
 
 ::˜ Copy Right Mark Rewey © (2018)
 :: Designed for Plattecraft Server.
-:: http://www.markspi.ddns.me/pcmod
+:: http://pcmod.ddns.me
