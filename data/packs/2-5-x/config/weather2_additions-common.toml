@@ -1,0 +1,27 @@
+#These configs will persist across saves on Singleplayer.
+#
+#Resolution of mapped blocks (1 = 1 block, 16 = 1 chunk, will reduce radius)
+#Range: > 1
+mapResolution = 16
+#How often the radar should query random chunks (1 = 1 tick, 20 = 1 second) (Small values will cause lag!)
+#Range: > 1
+radarMaxTimer = 20
+#The odds of the radar mapping a chunk (1.0 / (Math.abs(x) + Math.abs(z)) * loadChance > Math.random; basically pseudo-increases distance) (Small values will cause lag on non-pregenerated worlds)
+#Range: 1.401298464324817E-45 ~ 3.4028234663852886E38
+radarLoadChance = 120.0
+#The radius of the blocks that will be loaded around the player passively in blocks (Limited by server render distance!)
+#Range: > 1
+loadRadius = 6
+#How often the tablet should query random chunks (1 = 1 tick, 20 = 1 second) (Small values will cause lag or become buggy!)
+#Range: > 5
+tabletLoadChance = 30
+#The radius of the tablet map (low values tend to be buggy, large values tend to be laggy)
+#Range: > 1
+tabletRadius = 50
+#Rate at which pixels will be plotted around the player
+#Range: > 5
+loadRate = 13
+#What Operator level is required to run config commands
+#Range: 0 ~ 4
+opLevel = 0
+

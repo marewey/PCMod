@@ -1,9 +1,0 @@
-{
-  "useMojang": false,
-  "useCrafatar": false,
-  "useCustomServer": false,
-  "hostCustomServer": "http://example.com",
-  "useCustomServer2": true,
-  "hostCustomServer2Skin": "http://markspi.ddns.me/pcmod2/skins/%auto%",
-  "hostCustomServer2Cape": "http://markspi.ddns.me/pcmod2/capes/%auto%"
-}

@@ -1,0 +1,15 @@
+{
+  "id": "custom_4",
+  "name": "Cobble Road",
+  "materials": [
+    "minecraft:cobblestone",
+    "minecraft:gravel",
+    "minecraft:cobblestone",
+    "minecraft:cobblestone",
+    "minecraft:cobblestone",
+    "minecraft:mossy_cobblestone",
+    "minecraft:cobblestone",
+    "minecraft:cobblestone"
+  ],
+  "weight": 1
+}

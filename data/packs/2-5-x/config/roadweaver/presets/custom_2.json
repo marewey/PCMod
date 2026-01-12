@@ -1,0 +1,11 @@
+{
+  "id": "custom_2",
+  "name": "Concrete Road",
+  "materials": [
+    "minecraft:gray_concrete_powder",
+    "minecraft:gray_concrete",
+    "minecraft:gray_concrete",
+    "minecraft:gray_concrete"
+  ],
+  "weight": 1
+}

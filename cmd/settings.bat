@@ -31,12 +31,11 @@ if "%1"=="refreshplayers" call :refreshplayers
 ::MAIN BUTTONS
 if "%1"=="update" call :update.now %2 %3
 if "%1"=="launch" call :launch&exit
-
 call :save
 echo.[DONE]
 exit /b
 
-::===============================  UPDATE HANDLEING/CHECK  ==================================
+::===============================  UPDATE HANDLING/CHECK  ==================================
 :update.check
 call :net.check popup
 echo.Checking for updates... Pack %pack% [%pack_version%] Launcher [%launcher_version%]
@@ -75,9 +74,10 @@ echo.Launching Update...
 set update_type=%1
 set update_version=%2
 if "%update_type%"=="" set update_type=empty
-if "%connection%"=="1" if not "%update%"=="" bin\wget -q -T 5 http://%url%/updates/launcher/base/cmd/update.bat -O cmd\update.bat
+if "%connection%"=="1" if not "%update_version%"=="" bin\wget -q -T 5 http://%url%/updates/base/cmd/update.bat -O cmd\update.bat >>%debug%
 :: use launcher/pack/empty for 1
 copy cmd\update.bat cmd\update_.bat
+::call cmd\update_.bat %update_type% %update_version%
 call cmd\update_.bat %update_type% %update_version%
 goto :eof
 
@@ -92,7 +92,7 @@ call :download
 if "%connection%"=="1" call :refreshplayers
 goto :eof
 :download
-echo.Downloading News.html, Servers.dat, Script.zs and PCMod-%pack%.pak...
+echo.Downloading News.html, Servers.dat, Script.zs...
 if "%connection%"=="0" echo.*** No Connection ***
 if "%connection%"=="1" bin\wget.exe -q -T 5 -O data\pages\news.html http://%url%/updates/news.html
 ::if "%connection%"=="1" bin\wget.exe -q -T 5 -O data\packs\%pack%\PCMod-%pack%.pak http://%url%/updates/PCMod-%pack%.pak
@@ -102,7 +102,7 @@ goto :eof
 :setup
 call :pythoncheck
 if exist "data\indexes\uuid" for /f %%a in ('type data\indexes\uuid') do set uuid=%%a
-if exist "data\indexes\%computername%.sysinfo" call :memcalc
+call :memcalc
 if %mem_gb% leq 4 bin\nircmd.exe infobox "Your System does not have enough Memory: Using %memory%MB/%memtot%MB" "PCMod Error"
 call :user
 echo.Settings:
@@ -181,7 +181,8 @@ goto :eof
 echo.Authorizing User (%user%)...
 call :auth.decode
 ::If offline, notify and then skip
-if "%connection%"=="0" set returnAuth=408.auth&>cmd\408.vbs echo.CreateObject("WScript.Shell").Popup "***	Unable to verify identity with server." ^& vbcrlf ^& "	Check your internet connection.", 5, "PCMod - Error"&start cmd\408.vbs&goto :eof
+if "%connection%"=="0" echo.AUTH RETURN: null --- 408.auth&set returnAuth=408.auth&>cmd\408.vbs echo.CreateObject("WScript.Shell").Popup "***	Unable to verify identity with server." ^& vbcrlf ^& "	Check your internet connection.", 5, "PCMod - Error"&start cmd\408.vbs&goto :eof
+::if "%connection%"=="0" set returnAuth=408.auth&bin\nircmd.exe trayballoon "PCMod: Error" "***	Unable to verify identity with server.\n	Check your internet connection." "%cd%\data\icons\icon.ico" 7500&goto :eof
 ::Check to make sure there is a username and that its valid
 set user_=%user%
 for /f "usebackq" %%a in (`echo.%user_% ^| bin\tr -dc '[_[:alnum:]]\n\r'`) do set user=%%a
@@ -547,13 +548,15 @@ if "%sig%"=="" set connection=-1
 if "%connection%"=="1" echo.[200] OK
 if "%connection%"=="0" echo.[400] BAD REQUEST
 if "%connection%"=="-1" echo.[404] NOT FOUND
-if not "%sig%"=="PCMod" if "%1"=="popup" bin\nircmd.exe infobox "Unable to connect to MarksPi Server. Internet/Server Error" "PCMod Error"
+if not "%sig%"=="PCMod" if "%1"=="popup" bin\nircmd.exe infobox "Unable to connect to PCMod Server. Internet/Server Error" "PCMod Error"
 goto :eof
 
 :mcuuid
 set pack_=%pack%
-if not exist "data\packs\%pack_%\jvm\*\bin\java.exe" set pack_=2-5-x
-for /f "tokens=*" %%a in ('dir /b /a:d data\packs\%pack_%\jvm\java*') do set java_runtime=data\packs\%pack_%\jvm\%%a\bin\java.exe
+if not exist "data\packs\%pack_%\jvm\java*\bin\java.exe" set pack_=2-4-x
+for /f "tokens=* delims=*" %%a in ('dir /b /a:d data\packs\') do (
+	if exist "data\packs\%%a\jvm\java*" for /f "tokens=*" %%b in ('dir /b /a:d data\packs\%%a\jvm\java*') do if exist "data\packs\%%a\jvm\%%b\bin\java.exe" set java_runtime=data\packs\%%a\jvm\%%b\bin\java.exe
+)
 ::Convert username to UUID
 set /p "=Converting Username to UUID... "<nul
 if exist "bin\uuid-tool-1.0.jar" for /f "tokens=1-2 delims= " %%a in ('echo.%user%^|%java_runtime% -jar bin\uuid-tool-1.0.jar -o') do (

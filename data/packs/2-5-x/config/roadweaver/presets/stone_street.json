@@ -1,0 +1,15 @@
+{
+  "id": "stone_street",
+  "name": "Stone Street",
+  "materials": [
+    "minecraft:stone_bricks",
+    "minecraft:polished_andesite",
+    "minecraft:stone_bricks",
+    "minecraft:stone_bricks",
+    "minecraft:stone_bricks",
+    "minecraft:stone_bricks",
+    "minecraft:stone_bricks",
+    "minecraft:stone_bricks"
+  ],
+  "weight": 8
+}

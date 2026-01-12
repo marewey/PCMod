@@ -1,0 +1,156 @@
+#The chance of pillager armed with a gun.
+#Range: 0.0 ~ 1.0
+"Armed Chance" = 1.0
+#The chance of pillagers will drop their guns on death.
+#Range: 0.0 ~ 1.0
+"Drop Chance" = 0.0
+#Whether bullets ignore damage immunity.
+"Ignore Damage Immunity" = true
+#Whether the gun has friend fire.
+"Friend Fire" = false
+#Entities sharing the same tag from this list will be treated as allies.
+"Friendly Tag" = []
+
+["Shot Gun"]
+	#The chance of shotgun.
+	#Range: 0.0 ~ 1.0
+	"Shotgun Chance" = 0.2
+	#The power of each shotgun shell.
+	#Range: 0 ~ 5000
+	"Shotgun Power" = 5
+	#The number of shotgun shells.
+	#Range: 0 ~ 200
+	"Shells Number" = 7
+	#The shooting inaccuracy of shotgun AI; the lower the value, the higher the accuracy.
+	#Range: 0 ~ 10
+	"Shotgun Inaccuracy" = 2
+
+[Pistol]
+	#The chance of pistol.
+	#Range: 0.0 ~ 1.0
+	"Pistol Chance" = 0.5
+	#The power of pistol bullet.
+	#Range: 0 ~ 5000
+	"Pistol Power" = 9
+	#The shooting inaccuracy of pistol AI; the lower the value, the higher the accuracy.
+	#Range: 0 ~ 10
+	"Pistol Inaccuracy" = 2
+
+["Assault Rifle"]
+	#The chance of assault rifle.
+	#Range: 0.0 ~ 1.0
+	"Assault Rifle Chance" = 0.2
+	#The power of assault rifle bullet.
+	#Range: 0 ~ 5000
+	"Assault Rifle Power" = 12
+	#The percentage of assault rifle bullet damage that ignore armor.
+	#Range: 0.0 ~ 1.0
+	"Assault Rifle Bypass Armor Chance" = 0.25
+	#The shooting inaccuracy of assault rifle AI; the lower the value, the higher the accuracy.
+	#Range: 0 ~ 10
+	"Assault Rifle Inaccuracy" = 2
+	#Whether or not the assault rifle will fire automatically. If false, the assault rifle will use the three-round burst mode.
+	"Automatic Shooting" = true
+
+["Sniper's Rifle"]
+	#The chance of sniper's rifle.
+	#Range: 0.0 ~ 1.0
+	"Sniper's Rifle Chance" = 0.05
+	#The power of sniper's rifle bullet.
+	#Range: 0 ~ 5000
+	"Sniper's Rifle Power" = 25
+	#Sniper Rifle AI Attack Range Multiplier.
+	#Range: 0 ~ 5
+	"Sniper's Rifle Bonus" = 1
+	#The percentage of sniper's rifle bullet damage that ignore armor.
+	#Range: 0.0 ~ 1.0
+	"Sniper's Rifle Bypass Armor Chance" = 0.7
+	#The shooting inaccuracy of sniper's rifle AI; the lower the value, the higher the accuracy.
+	#Range: 0 ~ 10
+	"Sniper's Rifle Inaccuracy" = 2
+
+[Bazooka]
+	#The chance of bazooka.
+	#Range: 0.0 ~ 1.0
+	"Bazooka Chance" = 0.01
+	#The explosion level of bazooka rocket.
+	#Range: 1 ~ 50
+	"Bazooka Explosion Level" = 5
+	#Whether the explosion of bazooka rocket will break block.
+	"Bazooka Break Block" = false
+	#The shooting inaccuracy of bazooka AI; the lower the value, the higher the accuracy.
+	#Range: 0 ~ 10
+	"Bazooka Inaccuracy" = 2
+
+["Combat - Zombie Survival Kit"]
+	#The chance of flamethrower.
+	#Range: 0.0 ~ 1.0
+	"Flamethrower Chance" = 0.05
+	#The chance of flamethrower with fuel canister.
+	#Range: 0.0 ~ 1.0
+	"Fuel Canister Chance" = 0.8
+	#The chance of flamethrower with napalm fuel canister.
+	#Range: 0.0 ~ 1.0
+	"Napalm Fuel Canister Chance" = 0.1
+	#The chance of flamethrower with high temperature fuel canister.
+	#Range: 0.0 ~ 1.0
+	"High Temperature Fuel Canister Chance" = 0.1
+
+["Compat - TACZ"]
+	#Whether gunners are allowed to use TACZ firearms.
+	"TACZ Compat" = true
+	#Whether gunners are allowed to spawn with TACZ firearms.
+	#WARNING: Spawning with TACZ firearms will significantly increase the game's difficulty.
+	#
+	"Spawn With TACZ" = false
+	#Whether gunners consume ammo when using TACZ firearms.
+	#If enabled, gunners that spawn with TACZ weapons will also receive some spare ammunition.
+	#
+	"Gunner Needs Ammo In TACZ" = false
+	#If gunners consume ammo when using TACZ firearms, this sets the minimum number of magazines they will spawn with.
+	#
+	#Range: 0.0 ~ 100.0
+	"TACZ Min Ammo" = 3.0
+	#If gunners consume ammo when using TACZ firearms, this sets the maximum number of magazines they will spawn with.
+	#
+	#Range: 0.0 ~ 100.0
+	"TACZ Max Ammo" = 6.0
+	#TACZ firearm IDs and their weights for gunners upon spawning.
+	#Format: "tacz:m1911, 5" — this means the M1911 has a spawn weight of 5, and the probability will be calculated based on the total weight sum.
+	#
+	"TACZ Gun Type" = []
+	#The inaccuracy values for different types of TACZ firearms used by gunners.
+	#The lower the value, the higher the shooting accuracy.
+	#Format: "pistol, 5" — this means the inaccuracy value for pistols is 5.
+	#
+	"TACZ Gun Inaccuracy" = ["pistol, 2", "sniper, 0.15", "rifle, 2", "shotgun, 5", "smg, 5", "rpg, 5", "mg, 5"]
+
+	["Compat - TACZ"."Compat - Guard Villager & Recruits"]
+		#Whether Guard or Recruit will spawn with gun in TACZ.
+		"Villager Spawn With TACZ Gun" = false
+
+["Compat - Guard Villager & Recruits"]
+	#Whether Guard or Recruit will spawn with gun.
+	"Villager Spawn With Gun" = true
+	#The chance of Guard or Recruit armed with a gun.
+	#Range: 0.0 ~ 1.0
+	"Villager Armed Chance" = 1.0
+	#The chance of shotgun.
+	#Range: 0.0 ~ 1.0
+	"Villager Shotgun Chance" = 0.2
+	#The chance of pistol.
+	#Range: 0.0 ~ 1.0
+	"Villager Pistol Chance" = 0.5
+	#The chance of assault rifle.
+	#Range: 0.0 ~ 1.0
+	"Villager Assault Rifle Chance" = 0.2
+	#The chance of sniper's rifle.
+	#Range: 0.0 ~ 1.0
+	"Villager Sniper's Rifle Chance" = 0.05
+	#The chance of bazooka.
+	#Range: 0.0 ~ 1.0
+	"Villager Bazooka Chance" = 0.05
+	#The chance of flamethrower.
+	#Range: 0.0 ~ 1.0
+	"Villager Flamethrower Chance" = 0.05
+

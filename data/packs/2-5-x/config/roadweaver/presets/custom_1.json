@@ -1,0 +1,13 @@
+{
+  "id": "custom_1",
+  "name": "Granite Road",
+  "materials": [
+    "minecraft:polished_granite",
+    "create:cut_granite_bricks",
+    "minecraft:polished_granite",
+    "minecraft:polished_granite",
+    "minecraft:polished_granite",
+    "minecraft:granite"
+  ],
+  "weight": 1
+}

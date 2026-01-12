@@ -1,7 +1,6 @@
 @echo off
 @setlocal EnableDelayedExpansion Enableextensions
 title PCMod
-
 call :get.time.formated
 echo.[START: %timee%]
 if not "%1"=="launcher" cd ..&set connection=1&set url=pcmod.ddns.me
