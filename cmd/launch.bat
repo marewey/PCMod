@@ -76,6 +76,7 @@ if /i "%modloader%"=="vanilla" set m-version=%mcversion%
 if /i "%modloader%"=="fabric" set m-version=%modloader%:%mcversion%:%mlversion%
 if /i "%modloader%"=="#-BTW" set m-version=%mlversion%
 if "%autoserver%"=="1" set autoserver_=--server plattecraft.ddns.net --server-port 25566
+if "%autoserver%"=="1" if "%pack%"=="2-5-x" set autoserver_=--server plattecraft.ddns.net --server-port 25565
 if "%autoserver%"=="1" if "%pack%"=="2-4-x" set autoserver_=--server plattecraft.ddns.net --server-port 25566
 if "%autoserver%"=="1" if "%pack%"=="BTW" set autoserver_=--server plattecraft.ddns.net --server-port 25568
 if "%autoserver%"=="1" if "%pack%"=="2-3-x" set autoserver_=--server plattecraft.ddns.net --server-port 25567
