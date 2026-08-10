@@ -1,8 +1,8 @@
 {
   "useMojang": false,
   "useCrafatar": false,
-  "useCustomServer": false,
-  "hostCustomServer": "http://pcmod.ddns.me",
+  "useCustomServer": true,
+  "hostCustomServer": "http://pcmod.ddns.me/skins/",
   "useCustomServer2": true,
   "hostCustomServer2Skin": "http://pcmod.ddns.me/skins/%auto%",
   "hostCustomServer2Cape": "http://pcmod.ddns.me/capes/%auto%"

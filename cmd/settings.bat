@@ -1,7 +1,7 @@
 @echo off
 @setlocal EnableDelayedExpansion Enableextensions
 if "%1"=="len" call :len %2 %3&goto :eof
-set ftppass=cnff
+set ftppass=cpzbqsgc
 set program="%cd%\PCMod.hta"
 set url=pcmod.ddns.me
 set debug=data\debug.log
@@ -28,6 +28,7 @@ if "%1"=="version-select" call :version.select %2 %3
 if "%1"=="memset" call :memset %2
 ::PLAYER LIST
 if "%1"=="refreshplayers" call :refreshplayers
+if "%1"=="launchserver" call :launchserver
 ::MAIN BUTTONS
 if "%1"=="update" call :update.now %2 %3
 if "%1"=="launch" call :launch&exit
@@ -86,8 +87,8 @@ goto :eof
 if "%fresh%"=="1" set fresh=&call :fresh
 if exist "bin\.fresh" call :fresh.id&exit
 if "%user%"=="" call :fresh
-call :setup
 call :update.check
+call :setup
 call :download
 if "%connection%"=="1" call :refreshplayers
 goto :eof
@@ -342,6 +343,12 @@ goto :eof
 echo.Refreshing Player list...
 bin\wget.exe -q -T 5 -O data\indexes\online http://%url%/players/list-%pack%
 type data\indexes\online
+goto :eof
+
+:launchserver
+::PC1 PACK 2 -
+2>>%debug% bin\wget -t 2 -T 5 -O data\indexes\launchserver "http://%url%/servers/status.php" --post-data "id=PC1&pack=%pack%&cmd=2"
+title PCMod
 goto :eof
 
 :modlist

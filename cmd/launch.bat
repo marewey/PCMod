@@ -56,7 +56,7 @@ set memory=4096
 set modcnt=0
 set mcuuid=00000000-0000-0000-0000-000000000000
 set uuid=PC2-NOUUID
-set pack=2-4-x
+set pack=2-5-x
 set version=2.4.1
 set modloader=forge
 set mcversion=1.19.2
@@ -221,7 +221,7 @@ echo.Found new Crashreport (%cnt% to %ccnt%).
 if exist "data\packs\%pack%\crash-reports\*.*" for /f %%a in ('dir /b /o:d data\packs\%pack%\crash-reports') do set tmpfile=%%a
 >>bin\crashup.ftp echo.mput %tmpfile%
 >>bin\crashup.ftp echo.bye
-set ftppass=cnff
+set ftppass=cpzbqsgc
 if exist "bin\tr.exe" for /f "usebackq" %%a in (`echo.%ftppass% ^| bin\tr 'A-Za-z0-9' 'N-ZA-Mn-za-m5-90-4'`) do set ftppass_=%%a
 >cmd\crash.vbs echo.CreateObject("WScript.Shell").Popup "Minecraft has crashed. The crashreport was sent to the server for examination.", 15, "PCMod - Error"
 start cmd\crash.vbs

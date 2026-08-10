@@ -177,6 +177,16 @@ Sub sleep (Timesec)
     objwsh.Run "Timeout /T " & Timesec & " /nobreak" ,0 ,true
     Set objwsh = Nothing
 End Sub
+If FileExists("data\indexes\user") Then
+	 Set objFileToReadUser = CreateObject("Scripting.FileSystemObject").OpenTextFile("data\indexes\user",1)
+	 Dim strUser
+	 do while not objFileToReadUser.AtEndOfStream
+	     strUser = objFileToReadUser.ReadLine()
+		 
+	 loop
+	 objFileToReadUser.Close
+	 Set objFileToReadUser = Nothing
+end if
 Sub RunProgram
 		Set Shell=CreateObject("wscript.shell") 
 		Shell.Run ("cmd\settings.bat launch >data\launch.log 2>&1"),0
@@ -260,6 +270,10 @@ Sub RefreshPlayers
 	sleep 4
 	RefreshOnline
 End Sub
+Sub LaunchServer
+	Set Shell=CreateObject("wscript.shell") 
+	Shell.Run ("cmd\settings.bat launchserver >>data\init.log 2>&1"),0
+End Sub
 Sub RefreshOnline
 	If FileExists("data\indexes\online") Then
 	 Set objFileToReadOnline = CreateObject("Scripting.FileSystemObject").OpenTextFile("data\indexes\online",1)
@@ -274,7 +288,6 @@ Sub RefreshOnline
 End Sub
 Sub Init
 	Set Shell=CreateObject("wscript.shell") 
-	Shell.Run ("cmd\settings.bat init >data\init.log 2>&1"),0
 	If FileExists("data\indexes\version") Then
 		Set objFileToReadVersion = CreateObject("Scripting.FileSystemObject").OpenTextFile("data\indexes\version",1)
 		Dim strVersion
@@ -290,7 +303,28 @@ Sub Init
 		Set objFileToReadVersion = Nothing
 	end if
 	ReadSettings
+	Shell.Run ("cmd\settings.bat init >data\init.log 2>&1"),0
+	sleep 4
+	RefreshIframe
+	RefreshOnline
 End Sub
+Sub RefreshIframe()
+        Dim iframe
+        Set iframe = document.getElementById("news")
+        ' Get the current source and set it back to force a reload
+        Dim currentSrc
+        currentSrc = iframe.src
+        ' Optionally, add a timestamp or a cache-buster parameter to the URL to ensure the browser doesn't use a cached version
+        ' If the URL already has parameters, use "&" instead of "?"
+        If InStr(currentSrc, "?") = 0 Then
+            iframe.src = currentSrc & "?timestamp=" & Now()
+        Else
+            iframe.src = currentSrc & "&timestamp=" & Now()
+        End If
+        ' Alternatively, a simpler, though sometimes less effective against aggressive caching, method is just to re-assign the source
+        ' iframe.src = currentSrc 
+		Document.title = "PCMod Launcher - " & strUser
+    End Sub
 Sub ReadSettings
 	If FileExists("settings.txt") Then
 	 Set objFileToReadSettings = CreateObject("Scripting.FileSystemObject").OpenTextFile("settings.txt",1)
@@ -372,20 +406,7 @@ Sub ReadSettings
 		objFileToReadVersion.Close
 		Set objFileToReadVersion = Nothing
 	end if
-	If FileExists("data\indexes\user") Then
-	 Set objFileToReadUser = CreateObject("Scripting.FileSystemObject").OpenTextFile("data\indexes\user",1)
-	 Dim strUser
-	 do while not objFileToReadUser.AtEndOfStream
-	     strUser = objFileToReadUser.ReadLine()
-		 document.getElementById("user").value = strUser
-	 loop
-	 objFileToReadUser.Close
-	 Set objFileToReadUser = Nothing
-	end if
-	If FileExists("data\indexes\online") Then
-		sleep 2
-		RefreshOnline
-	end if
+	document.getElementById("user").value = strUser
 End Sub
 Sub AddOption (ByRef text)
 	Dim Opt
@@ -460,6 +481,9 @@ End Sub
 		<input title="Sets Memory Allocated to game, in megabytes." value="4096" type="number" style="font-size:9px;align:left;" maxlength="5" size="4"	id="MEM" onfocusout="SettingsMEM"><br>
 		</td></tr><tr><td colspan="2" align="center" width="auto">
 		<hr><button style="width: 100px;font: 10px;">Save</button><hr>
+		</td></tr><tr><td colspan="2" align="center" width="auto">
+		<button style="width: 100px;font: 10px;" onclick="LaunchServer">Launch Server</button>
+		</select><br>
 		</td>
 		</tr>
 	</table>

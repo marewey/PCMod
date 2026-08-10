@@ -1,0 +1,4 @@
+  WARNING: The scripts pip.exe, pip3.14.exe and pip3.exe are installed in 'F:\Appdata\Python\Python314\Scripts' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+WARNING: Skipping portablemc-fabric as it is not installed.
+WARNING: Skipping portablemc-forge as it is not installed.
