@@ -891,54 +891,17 @@ class PCModAPI:
                 print("FTP Crash upload failed:", e)
 
     def run_update(self):
-        print("Checking for updates natively...")
-        if not self.connection:
-            self.show_message("PCMod Update", "No internet connection detected. Skipping update checks.")
-            return
-
-        versions_list, launcher_version, pack_version = self.get_versions_info()
-
-        tmp_ver_file = os.path.join("data", "indexes", "version.tmp")
-        os.makedirs(os.path.dirname(tmp_ver_file), exist_ok=True)
+        print("Launching update process...")
         try:
-            urllib.request.urlretrieve(f"http://{self.url}/version", tmp_ver_file)
+            # Replicate exact settings.bat update sequence natively
+            shutil.copy(os.path.join("cmd", "update.bat"), os.path.join("cmd", "update_.bat"))
+            if platform.system().lower() == "windows":
+                # Start cmd/update_.bat empty in a visible console window (HTA behaviour)
+                subprocess.Popen(["cmd.exe", "/c", "call", "cmd\\update_.bat", "empty"], creationflags=subprocess.CREATE_NEW_CONSOLE)
+            else:
+                print("Self-update console launch is only supported on Windows.")
         except Exception as e:
-            print("Failed to download version index:", e)
-            self.show_message("PCMod Update", "Unable to download version index from server.")
-            return
-
-        pack_update = None
-        launcher_update = None
-
-        try:
-            with open(tmp_ver_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    parts = line.strip().split(";")
-                    if len(parts) >= 3:
-                        if parts[0] == self.pack:
-                            if parts[1] != pack_version:
-                                pack_update = parts[1]
-                        elif parts[0] == "Launcher" and parts[2] == "PCMod":
-                            if parts[1] != launcher_version:
-                                launcher_update = parts[1]
-        except Exception:
-            pass
-
-        if launcher_update or pack_update:
-            print("Updates found! Launcher:", launcher_update, "Pack:", pack_update)
-            msg = ""
-            if launcher_update:
-                msg += f"New Launcher Update ({launcher_update}) is available!\n"
-            if pack_update:
-                msg += f"New Pack Update ({self.pack} -> {pack_update}) is available!\n"
-            msg += "\nWould you like to start the update process now?"
-
-            res = self.show_confirmation("PCMod Update", msg)
-            if res:
-                os.system("cmd\\settings.bat update empty")
-        else:
-            print("All up to date.")
-            self.show_message("PCMod Update", "No updates found. You are completely up to date!")
+            print("Error executing updater:", e)
 
     def skinget(self):
         if not self.connection:
