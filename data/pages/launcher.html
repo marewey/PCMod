@@ -251,25 +251,13 @@ input.largerCheckbox {
 </div>
 
 <script>
-// Communication Bridge to PyWebView
-function callPython(methodName, ...args) {
-    if (window.pywebview && window.pywebview.api && window.pywebview.api[methodName]) {
-        return window.pywebview.api[methodName](...args);
-    } else {
-        console.warn("PyWebView api not ready yet for method: " + methodName);
-        return Promise.reject("PyWebView not ready");
-    }
-}
-
-// Initialization and settings reading
-window.addEventListener('pywebviewready', function() {
-    console.log("PyWebView is ready!");
-    initLauncher();
-});
+// Pure ES5/IE11 Compatible JavaScript Bridge for WebViews
+var isInitialized = false;
 
 function initLauncher() {
-    callPython('init_launcher').then(function(data) {
-        console.log("Launcher initialized with data:", data);
+    if (!window.pywebview || !window.pywebview.api) return;
+    window.pywebview.api.init_launcher().then(function(data) {
+        if (!data) return;
 
         // 1. Set username
         document.getElementById('user').value = data.user || "";
@@ -282,111 +270,151 @@ function initLauncher() {
         document.getElementById('MEM').value = data.settings.memory || "4096";
 
         // 3. Set Mod Count
-        document.getElementById('modcount').innerText = data.modcount || "--";
+        document.getElementById('modcount').innerHTML = data.modcount || "--";
 
         // 4. Set Version Text
-        document.getElementById('version').innerText = "Launcher: " + data.launcher_version + " / Pack: " + data.pack_version;
+        document.getElementById('version').innerHTML = "Launcher: " + data.launcher_version + " / Pack: " + data.pack_version;
 
         // 5. Populate Versions Select dropdown
         var select = document.getElementById('VERSION-select');
         select.innerHTML = "";
-        data.versions_list.forEach(function(v, idx) {
+        for (var i = 0; i < data.versions_list.length; i++) {
+            var v = data.versions_list[i];
             var opt = document.createElement('option');
-            opt.value = idx + " " + v.name;
+            opt.value = i + " " + v.name;
             opt.text = v.name;
             if (v.name === data.settings.pack) {
                 opt.selected = true;
             }
             select.add(opt);
-        });
+        }
 
         // 6. Set Online Players
         document.getElementById('online').innerHTML = data.online_players || "No players online";
-    }).catch(function(err) {
-        console.error("Failed to initialize launcher:", err);
     });
 }
 
+// Robust Polling for pywebview API to ensure it initializes safely on all WebView engines
+var initInterval = setInterval(function() {
+    if (window.pywebview && window.pywebview.api && !isInitialized) {
+        clearInterval(initInterval);
+        isInitialized = true;
+        initLauncher();
+    }
+}, 100);
+
+window.addEventListener('pywebviewready', function() {
+    clearInterval(initInterval);
+    if (!isInitialized) {
+        isInitialized = true;
+        initLauncher();
+    }
+});
+
 function openModlist() {
-    callPython('open_modlist');
+    if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.open_modlist();
+    }
 }
 
 function openWeb(site) {
-    callPython('open_web', site);
+    if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.open_web(site);
+    }
 }
 
 function refreshPlayers() {
     document.getElementById('online').innerHTML = "Refreshing...";
-    callPython('refresh_players').then(function(html) {
-        document.getElementById('online').innerHTML = html;
-    });
+    if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.refresh_players().then(function(html) {
+            document.getElementById('online').innerHTML = html;
+        });
+    }
 }
 
 function login() {
     var u = document.getElementById('user').value;
     var p = document.getElementById('pass').value;
-    callPython('login', u, p).then(function(res) {
-        if (res.status === "success") {
-            initLauncher();
-        }
-    });
+    if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.login(u, p).then(function(res) {
+            if (res && res.status === "success") {
+                initLauncher();
+            }
+        });
+    }
 }
 
 function toggleShortcut() {
     var val = document.getElementById('Shortcut').checked ? "1" : "0";
-    callPython('set_setting', 'shortcut', val);
+    if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_setting('shortcut', val);
+    }
 }
 
 function toggleAutoServer() {
     var val = document.getElementById('AutoServer').checked ? "1" : "0";
-    callPython('set_setting', 'autoserver', val);
+    if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_setting('autoserver', val);
+    }
 }
 
 function toggleLogLogins() {
     var val = document.getElementById('LL').checked ? "1" : "0";
-    callPython('set_setting', 'log-logins', val);
+    if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_setting('log-logins', val);
+    }
 }
 
 function toggleLiteMode() {
     var val = document.getElementById('LT').checked ? "1" : "0";
-    callPython('set_lite_mode', val).then(function() {
-        initLauncher();
-    });
+    if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_lite_mode(val).then(function() {
+            initLauncher();
+        });
+    }
 }
 
 function changeMemory() {
     var val = document.getElementById('MEM').value;
-    callPython('set_memory', val).then(function() {
-        initLauncher();
-    });
+    if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_memory(val).then(function() {
+            initLauncher();
+        });
+    }
 }
 
 function changeVersion() {
     var select = document.getElementById('VERSION-select');
-    var val = select.value; // e.g. "0 2-5-x"
-    callPython('set_version_select', val).then(function() {
-        initLauncher();
-    });
+    var val = select.value;
+    if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_version_select(val).then(function() {
+            initLauncher();
+        });
+    }
 }
 
 function saveSettingsButton() {
-    callPython('save_settings_btn').then(function() {
-        alert("Settings saved successfully!");
-    });
+    if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.save_settings_btn();
+    }
 }
 
 function launchServer() {
-    callPython('launch_server').then(function() {
-        alert("Server Status Requested!");
-    });
+    if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.launch_server();
+    }
 }
 
 function launchGame() {
-    callPython('launch_game');
+    if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.launch_game();
+    }
 }
 
 function runUpdate() {
-    callPython('run_update');
+    if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.run_update();
+    }
 }
 </script>
 </body>

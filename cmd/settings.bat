@@ -54,21 +54,13 @@ if "%launcher_update%"=="" if not "%pack_update%"=="" if "%autoupdate%"=="1" cal
 goto :eof
 :update.pack
 echo.Pack Update Found. [%pack_update%]
->cmd\pack_update.vbs echo.Set Shell=CreateObject("wscript.shell") 
->>cmd\pack_update.vbs echo.Question = Msgbox("PCMod Pack %pack% Version %pack_update% is out." ^& vbCrLf ^& "Would you like to update?" ^& vbCrLf ^& "Warning: You must be up to date to join server!",VbYesNO + VbQuestion, "PCMod Update")
->>cmd\pack_update.vbs echo.If Question = VbYes Then
->>cmd\pack_update.vbs echo.     Shell.Run ("cmd\settings.bat update pack %pack_update%"),1
->>cmd\pack_update.vbs echo.End If
-start /min cmd\pack_update.vbs
+:: Ask via Nircmd (Prevents VBScript blocking)
+start "" bin\nircmd.exe qboxcom "PCMod Pack %pack% Version %pack_update% is out.~nWould you like to update?~n~nWarning: You must be up to date to join the server!" "PCMod Update" "cmd\settings.bat update pack %pack_update%"
 goto :eof
 :update.launcher
 echo.Launcher Update Found. [%launcher_update%]
->cmd\launcher_update.vbs echo.Set Shell=CreateObject("wscript.shell") 
->>cmd\launcher_update.vbs echo.Question = Msgbox("PCMod Launcher %launcher_update% is out." ^& vbCrLf ^& "Would you like to update?" ^& vbCrLf ^& "Warning: For best stability, it is best to be up to date!",VbYesNO + VbQuestion, "PCMod Update")
->>cmd\launcher_update.vbs echo.If Question = VbYes Then
->>cmd\launcher_update.vbs echo.     Shell.Run ("cmd\settings.bat update launcher %launcher_update%"),1
->>cmd\launcher_update.vbs echo.End If
-start /min cmd\launcher_update.vbs
+:: Ask via Nircmd (Prevents VBScript blocking)
+start "" bin\nircmd.exe qboxcom "PCMod Launcher %launcher_update% is out.~nWould you like to update?~n~nWarning: For best stability, it is best to be up to date!" "PCMod Update" "cmd\settings.bat update launcher %launcher_update%"
 goto :eof
 :update.now
 echo.Launching Update...
@@ -182,8 +174,12 @@ goto :eof
 echo.Authorizing User (%user%)...
 call :auth.decode
 ::If offline, notify and then skip
-if "%connection%"=="0" echo.AUTH RETURN: null --- 408.auth&set returnAuth=408.auth&>cmd\408.vbs echo.CreateObject("WScript.Shell").Popup "***	Unable to verify identity with server." ^& vbcrlf ^& "	Check your internet connection.", 5, "PCMod - Error"&start cmd\408.vbs&goto :eof
-::if "%connection%"=="0" set returnAuth=408.auth&bin\nircmd.exe trayballoon "PCMod: Error" "***	Unable to verify identity with server.\n	Check your internet connection." "%cd%\data\icons\icon.ico" 7500&goto :eof
+if "%connection%"=="0" (
+	echo.AUTH RETURN: null --- 408.auth
+	set returnAuth=408.auth
+	start "" bin\nircmd.exe infobox "Unable to verify identity with server.~nCheck your internet connection." "PCMod - Error"
+	goto :eof
+)
 ::Check to make sure there is a username and that its valid
 set user_=%user%
 for /f "usebackq" %%a in (`echo.%user_% ^| bin\tr -dc '[_[:alnum:]]\n\r'`) do set user=%%a
@@ -194,8 +190,8 @@ for /f "usebackq" %%a in ("%temp%\au.th") do set returnAuth=%%a
 del "%temp%\au.th" 2>nul
 ::Display AUTH Code and Reason
 echo.AUTH RETURN: %token% --- %returnAuth%
-if "%returnAuth%"=="401.auth" >cmd\401.vbs echo.CreateObject("WScript.Shell").Popup "***	Password was incorrect. Try again." ^& vbcrlf ^& "	To reset password, Go to pcmod.ddns.me/account", 15, "PCMod - Error"&start cmd\401.vbs
-if "%returnAuth%"=="200.auth" >cmd\200.vbs echo.CreateObject("WScript.Shell").Popup "     Logged In Successfully.", 5, "PCMod - Login"&start cmd\200.vbs
+if "%returnAuth%"=="401.auth" start "" bin\nircmd.exe infobox "Password was incorrect. Try again.~nTo reset password, go to pcmod.ddns.me/account" "PCMod - Error"
+if "%returnAuth%"=="200.auth" start "" bin\nircmd.exe infobox "Logged In Successfully." "PCMod - Login"
 goto :eof
 :auth.decode
 echo.%user%|bin\xcode.exe data\indexes\auth >nul

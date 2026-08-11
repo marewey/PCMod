@@ -178,9 +178,8 @@ title PCMod - Launcher
 ::Check to make sure installed
 call :checkinstall
 echo.LAUNCHING... ("data\packs\%pack%" %m-version%)
-::Display Launching VBS Popup
->cmd\launching.vbs echo.CreateObject("WScript.Shell").Popup "Launching PCMod...			" ^& vbcrlf ^& "	* Username: %user%" ^& vbcrlf ^& "	* MC-UUID: %mcuuid%" ^& vbcrlf ^& "	* PCMod Version: %pack%/%pack_version%" ^& vbcrlf ^& "	* Memory Used: %memory%Mb" ^& vbcrlf ^& "	* Mods: %modcnt%", 30, "PCMod - Launcher"
-start cmd\launching.vbs
+::Display Launching Popup via Nircmd (Prevents VBScript blocking)
+start "" bin\nircmd.exe infobox "Launching PCMod...~n~n  * Username: %user%~n  * MC-UUID: %mcuuid%~n  * PCMod Version: %pack%/%pack_version%~n  * Memory Used: %memory%Mb~n  * Mods: %modcnt%" "PCMod - Launcher"
 ::Launch Game
 if "%showconsole%"=="1" echo. **** Detatching Session, Starting in Console Mode. **** &start %portablemc% --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" --output human start -u "%user%" -i "%mcuuid%" %autoserver_% --jvm-args="-Xmx%memory%M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M" %m-version%
 if not "%showconsole%"=="1" %portablemc% --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" start -u "%user%" -i "%mcuuid%" %autoserver_% --jvm-args="-Xmx%memory%M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M" %m-version%
@@ -204,9 +203,8 @@ if not exist "data\packs\%pack%\versions\%modloader%-%mcversion%-%mlversion%" if
 if "%needsinstall%"=="0" echo.FOUND [%modloader% %mcversion%/%mlversion%]&goto :eof
 echo.FAILED [NOT FOUND: %modloader% for %mcversion%/%mlversion%]
 echo.Installing %modloader%...
-::Display popup
->cmd\installing.vbs echo.CreateObject("WScript.Shell").Popup "Installing %modloader%..." ^& vbcrlf ^& "This may take a few minutes" ^& vbcrlf ^& "Please Wait...", 30, "PCMod - Launcher"
-start cmd\installing.vbs
+::Display popup via Nircmd (Prevents VBScript blocking)
+start "" bin\nircmd.exe infobox "Installing %modloader%...~nThis may take a few minutes.~nPlease Wait..." "PCMod - Launcher"
 ::Dry run launcher to download resources
 %portablemc% --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" start --dry %m-version%
 goto :eof
@@ -225,8 +223,7 @@ if exist "data\packs\%pack%\crash-reports\*.*" for /f "delims=" %%a in ('dir /b 
 >>bin\crashup.ftp echo.bye
 set ftppass=cpzbqsgc
 if exist "bin\tr.exe" for /f "usebackq" %%a in (`echo.%ftppass% ^| bin\tr 'A-Za-z0-9' 'N-ZA-Mn-za-m5-90-4'`) do set ftppass_=%%a
->cmd\crash.vbs echo.CreateObject("WScript.Shell").Popup "Minecraft has crashed. The crashreport was sent to the server for examination.", 15, "PCMod - Error"
-start cmd\crash.vbs
+start "" bin\nircmd.exe infobox "Minecraft has crashed. The crashreport was sent to the server for examination." "PCMod - Error"
 start "" "data\packs\%pack%\crash-reports\"
 if not "%connection%"=="0" if "%log-logins%"=="1" call :log-logins crash
 set /p "=Uploading Crash Report to Server... "<NUL

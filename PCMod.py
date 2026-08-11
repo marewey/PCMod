@@ -82,8 +82,9 @@ class PCModAPI:
                 with open(settings_file, "r", encoding="utf-8") as f:
                     for line in f:
                         if "=" in line:
-                            k, v = line.strip().split("=", 1)
-                            self.settings[k] = v
+                            parts = line.strip().split("=", 1)
+                            if len(parts) == 2:
+                                self.settings[parts[0]] = parts[1]
             except Exception as e:
                 print("Error loading settings:", e)
 
@@ -106,7 +107,6 @@ class PCModAPI:
         self.connection = False
         # Fast ping check
         try:
-            # Ping Google DNS once
             param = "-n" if platform.system().lower() == "windows" else "-c"
             subprocess.run(["ping", param, "1", "8.8.8.8"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=2)
             self.connection = True
@@ -131,6 +131,10 @@ class PCModAPI:
 
     def init_launcher(self):
         self.check_net()
+        # Initialize calculations
+        self.calculate_default_memory_if_needed()
+        self.init_downloads()
+
         # Pack-specific mod count
         modcount = self.get_mod_count()
         # Fetch versions list
@@ -149,6 +153,61 @@ class PCModAPI:
             "versions_list": versions_list,
             "online_players": online_players
         }
+
+    def calculate_default_memory_if_needed(self):
+        if self.settings.get("memory") and self.settings.get("memory") != "":
+            return
+
+        mem_bytes = 0
+        if platform.system().lower() == "windows":
+            try:
+                out = subprocess.check_output(["wmic", "computersystem", "get", "TotalPhysicalMemory"], stderr=subprocess.PIPE)
+                lines = out.decode('utf-8', errors='ignore').strip().split('\n')
+                if len(lines) >= 2:
+                    mem_bytes = int(lines[1].strip())
+            except Exception:
+                pass
+
+        if mem_bytes == 0:
+            mem_gb = 8
+        else:
+            mem_gb = mem_bytes // 1073741824
+
+        # formula: 3584+(64*mem_gb)
+        calculated_memory = 3584 + (64 * mem_gb)
+        self.settings["memory"] = str(calculated_memory)
+        self.save_settings()
+
+    def init_downloads(self):
+        if not self.connection:
+            return
+        print("Downloading News, servers.dat, script.zs...")
+        try:
+            # News.html
+            news_url = f"http://{self.url}/updates/news.html"
+            news_path = os.path.join("data", "pages", "news.html")
+            os.makedirs(os.path.dirname(news_path), exist_ok=True)
+            urllib.request.urlretrieve(news_url, news_path)
+        except Exception as e:
+            print("News download failed:", e)
+
+        try:
+            # Script.zs
+            script_path = os.path.join("data", "packs", self.pack, "scripts", "script.zs")
+            if os.path.exists(os.path.dirname(script_path)):
+                script_url = f"http://{self.url}/updates/pack/scripts/script_{self.pack}.zs"
+                urllib.request.urlretrieve(script_url, script_path)
+        except Exception as e:
+            print("script.zs download failed:", e)
+
+        try:
+            # Servers.dat
+            servers_path = os.path.join("data", "packs", self.pack, "servers.dat")
+            if os.path.exists(os.path.dirname(servers_path)):
+                servers_url = f"http://{self.url}/updates/pack/servers/servers_{self.pack}.dat"
+                urllib.request.urlretrieve(servers_url, servers_path)
+        except Exception as e:
+            print("servers.dat download failed:", e)
 
     def get_mod_count(self):
         modcount_file = os.path.join("data", "indexes", "modcount")
@@ -180,7 +239,11 @@ class PCModAPI:
                             if name == "Launcher":
                                 launcher_version = version_str
                             else:
-                                versions_list.append({"name": name, "version": version_str})
+                                # Standard HTA filter: only show if the pack actually exists locally
+                                pack_dir = os.path.join("data", "packs", name)
+                                pak_file = os.path.join(pack_dir, f"PCMod-{name}.pak")
+                                if os.path.exists(pak_file) or name == "Vanilla":
+                                    versions_list.append({"name": name, "version": version_str})
                                 if name == self.pack:
                                     pack_version = version_str
             except Exception as e:
@@ -371,13 +434,12 @@ class PCModAPI:
             tmp_b = tmp[48:]
 
             html_out.append(f"<tr><td style='{color}'><label>{tmp_a}<span class='altext'>{tmp_b}</span></label></td>")
-            html_out.append(f"td style='{color}'><label>{side}</label></td>")
+            html_out.append(f"<td style='{color}'><label>{side}</label></td>")
             html_out.append(f"<td style='{color}'><label>{m['version']}</label></td></tr>")
 
         html_out.append("</table></center></body></html>")
 
-        # Replace broken standard elements
-        fixed_html = "\n".join(html_out).replace("td style='", "<td style='")
+        fixed_html = "\n".join(html_out)
         try:
             with open(html_file, "w", encoding="utf-8") as f:
                 f.write(fixed_html)
@@ -400,6 +462,50 @@ class PCModAPI:
     def set_setting(self, key, value):
         self.settings[key] = value
         self.save_settings()
+
+        if key == "shortcut":
+            self.manage_shortcut(value)
+
+    def manage_shortcut(self, enable):
+        if platform.system().lower() != "windows":
+            return
+
+        desktop_dir = os.path.join(os.environ["USERPROFILE"], "Desktop")
+        shortcut_lnk = os.path.join(desktop_dir, "PCMod.lnk")
+        start_menu_dir = os.path.join(os.environ["APPDATA"], "Microsoft", "Windows", "Start Menu", "Programs", "Plattecraft")
+        start_menu_lnk = os.path.join(start_menu_dir, "PCMod.lnk")
+
+        if enable == "1":
+            print("Creating desktop and start menu shortcuts...")
+            target_path = os.path.abspath("checkpy.bat")
+            working_dir = os.path.abspath(".")
+            icon_path = os.path.abspath(os.path.join("data", "icons", "icon.ico"))
+
+            # PowerShell script to create shortcut robustly without VBScript blocking
+            ps_cmd = f"""
+            $WshShell = New-Object -ComObject WScript.Shell
+            $Shortcut = $WshShell.CreateShortcut('{shortcut_lnk}')
+            $Shortcut.TargetPath = '{target_path}'
+            $Shortcut.WorkingDirectory = '{working_dir}'
+            $Shortcut.Description = 'PCMod - Plattecraft Modded Launcher'
+            $Shortcut.IconLocation = '{icon_path}'
+            $Shortcut.Save()
+            """
+            try:
+                subprocess.run(["powershell", "-Command", ps_cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                # Copy to start menu
+                os.makedirs(start_menu_dir, exist_ok=True)
+                shutil.copy(shortcut_lnk, start_menu_lnk)
+            except Exception as e:
+                print("Error creating shortcut:", e)
+        else:
+            print("Deleting shortcuts...")
+            if os.path.exists(shortcut_lnk):
+                try: os.remove(shortcut_lnk)
+                except Exception: pass
+            if os.path.exists(start_menu_lnk):
+                try: os.remove(start_menu_lnk)
+                except Exception: pass
 
     def set_lite_mode(self, val):
         self.settings["lite"] = val
@@ -438,8 +544,6 @@ class PCModAPI:
                 src = os.path.join(mods_dir, filename)
                 dst = os.path.join(disabled_dir, filename)
                 if os.path.exists(src):
-                    # Check if special (required client mods)
-                    # We can keep them
                     is_special = False
                     for special in special_client_mods:
                         if special.lower() in filename.lower():
@@ -450,6 +554,8 @@ class PCModAPI:
                             shutil.move(src, dst)
                         except Exception:
                             pass
+            if self.window:
+                self.window.create_message_dialog("PCMod Modes", "Switched to Lite Mode successfully.")
         else:
             # Switch to default mode: move all disabled client-side mods back
             for filename in os.listdir(disabled_dir):
@@ -460,13 +566,14 @@ class PCModAPI:
                         shutil.move(src, dst)
                     except Exception:
                         pass
+            if self.window:
+                self.window.create_message_dialog("PCMod Modes", "Switched to Default Mode successfully.")
 
     def set_memory(self, val):
         self.settings["memory"] = val
         self.save_settings()
 
     def set_version_select(self, val):
-        # e.g. "0 2-5-x"
         parts = val.split(" ", 1)
         if len(parts) == 2:
             self.pack_index = int(parts[0])
@@ -480,6 +587,8 @@ class PCModAPI:
 
     def save_settings_btn(self):
         self.save_settings()
+        if self.window:
+            self.window.create_message_dialog("PCMod Settings", "Settings saved successfully!")
 
     def launch_server(self):
         if self.connection:
@@ -488,11 +597,23 @@ class PCModAPI:
                 data = urllib.parse.urlencode({'id': 'PC1', 'pack': self.pack, 'cmd': '2'}).encode('utf-8')
                 req = urllib.request.Request(url, data=data, headers={'User-Agent': 'Mozilla/5.0'})
                 urllib.request.urlopen(req, timeout=5)
+                if self.window:
+                    self.window.create_message_dialog("PCMod", "Server launch requested successfully.")
             except Exception as e:
                 print("Launch server request failed:", e)
+                if self.window:
+                    self.window.create_message_dialog("PCMod Error", "Server launch request failed.")
 
     def login(self, username, password):
         res = self.login_auth_flow(username, password)
+        if self.window:
+            if res["status"] == "success":
+                self.window.create_message_dialog("PCMod Login", "Logged In Successfully.")
+            else:
+                if res["auth"] == "401.auth":
+                    self.window.create_message_dialog("PCMod Error", "Password was incorrect. Try again.\nTo reset password, go to pcmod.ddns.me/account")
+                else:
+                    self.window.create_message_dialog("PCMod Error", f"Login failed. Return code: {res['auth']}")
         return res
 
     def login_auth_flow(self, username, password):
@@ -560,7 +681,6 @@ class PCModAPI:
             self.window.hide()
 
         # Run PortableMC
-        # Compute modloader and versions
         modloader = "forge"
         mcversion = "1.19.2"
         mlversion = "43.3.5"
@@ -660,7 +780,6 @@ class PCModAPI:
         except Exception:
             pass
 
-        # version details
         versions_list, launcher_version, pack_version = self.get_versions_info()
         modcount = self.get_mod_count()
         memory = self.settings.get("memory", "4096")
@@ -682,7 +801,6 @@ class PCModAPI:
             req = urllib.request.Request(url, data=data, headers={'User-Agent': 'Mozilla/5.0'})
             urllib.request.urlopen(req, timeout=5)
 
-            # Climsg call
             cli_url = f"http://{self.url}/commands/climsg2.php"
             cli_state = "launched" if state == "in" else "crashed" if state == "crash" else "closed"
             cli_data = urllib.parse.urlencode({
@@ -702,15 +820,13 @@ class PCModAPI:
         if self.settings.get("log-logins", "1") == "1":
             self.log_login_server("crash")
 
-        # Open in text editor/explorer natively
         try:
             os.startfile(crash_reports_dir)
         except Exception:
             pass
 
-        # Decrypt FTP password
         ftppass_enc = "cpzbqsgc"
-        ftppass = self.rot13_5_decode(ftppass_enc) # pcmodftp
+        ftppass = self.rot13_5_decode(ftppass_enc)
 
         if self.connection:
             print("Uploading crash report to server...")
@@ -718,7 +834,6 @@ class PCModAPI:
                 ftp = FTP(self.url, timeout=10)
                 ftp.login(user="pcmod", password=ftppass)
 
-                # Navigate to logins/username
                 try:
                     ftp.cwd("logins")
                 except Exception:
@@ -726,7 +841,6 @@ class PCModAPI:
                 try:
                     ftp.cwd(self.user)
                 except Exception:
-                    # Create if not exists
                     try:
                         ftp.mkd(self.user)
                         ftp.cwd(self.user)
@@ -741,30 +855,33 @@ class PCModAPI:
                 except Exception:
                     pass
 
-                # Upload file
                 with open(crash_path, "rb") as f:
                     ftp.storbinary(f"STOR {crash_file}", f)
 
                 ftp.quit()
                 print("Crash report upload completed!")
+                if self.window:
+                    self.window.create_message_dialog("PCMod Error", "Minecraft has crashed. The crashreport was successfully sent to the server for examination.")
             except Exception as e:
                 print("FTP Crash upload failed:", e)
 
     def run_update(self):
-        # Native update logic in Python
         print("Checking for updates natively...")
         if not self.connection:
+            if self.window:
+                self.window.create_message_dialog("PCMod Update", "No internet connection detected. Skipping update checks.")
             return
 
         versions_list, launcher_version, pack_version = self.get_versions_info()
 
-        # Download version index
         tmp_ver_file = os.path.join("data", "indexes", "version.tmp")
         os.makedirs(os.path.dirname(tmp_ver_file), exist_ok=True)
         try:
             urllib.request.urlretrieve(f"http://{self.url}/version", tmp_ver_file)
         except Exception as e:
             print("Failed to download version index:", e)
+            if self.window:
+                self.window.create_message_dialog("PCMod Update", "Unable to download version index from server.")
             return
 
         pack_update = None
@@ -775,7 +892,6 @@ class PCModAPI:
                 for line in f:
                     parts = line.strip().split(";")
                     if len(parts) >= 3:
-                        # e.g., 2-5-x;2.5.3a;forge;1.20.1
                         if parts[0] == self.pack:
                             if parts[1] != pack_version:
                                 pack_update = parts[1]
@@ -786,25 +902,32 @@ class PCModAPI:
             pass
 
         if launcher_update or pack_update:
-            # We can download updates
             print("Updates found! Launcher:", launcher_update, "Pack:", pack_update)
-            # Execute standard settings.bat update flow natively or via settings.bat
-            # Let's delegate to cmd/settings.bat update to reuse the robust updater menu!
-            os.system("cmd\\settings.bat update empty")
+            msg = ""
+            if launcher_update:
+                msg += f"New Launcher Update ({launcher_update}) is available!\n"
+            if pack_update:
+                msg += f"New Pack Update ({self.pack} -> {pack_update}) is available!\n"
+            msg += "\nWould you like to start the update process now?"
+
+            if self.window:
+                res = self.window.create_confirmation_dialog("PCMod Update", msg)
+                if res:
+                    os.system("cmd\\settings.bat update empty")
         else:
             print("All up to date.")
+            if self.window:
+                self.window.create_message_dialog("PCMod Update", "No updates found. You are completely up to date!")
 
     def skinget(self):
         if not self.connection:
             return
         print("Checking/Getting skins...")
         try:
-            # Get skindex
             skindex_file = os.path.join("data", "indexes", "skindex")
             os.makedirs(os.path.dirname(skindex_file), exist_ok=True)
             urllib.request.urlretrieve(f"http://{self.url}/skins/skin.index", skindex_file)
 
-            # Read skindex
             skins = {}
             with open(skindex_file, "r", encoding="utf-8", errors="ignore") as f:
                 for line in f:
@@ -816,12 +939,12 @@ class PCModAPI:
             os.makedirs(skins_dir, exist_ok=True)
 
             for skin_name, version in skins.items():
-                dest = os.path.join(skins_dir, f"{skin_name}.png")
-                # If file missing or version updated, download
-                # Simply download if missing or do direct fetch
+                # Sanitize skin_name to prevent directory traversal vulnerability
+                safe_skin_name = os.path.basename(skin_name)
+                dest = os.path.join(skins_dir, f"{safe_skin_name}.png")
                 if not os.path.exists(dest):
-                    print(f"Downloading skin: {skin_name}")
-                    urllib.request.urlretrieve(f"http://{self.url}/skins/{skin_name}", dest)
+                    print(f"Downloading skin: {safe_skin_name}")
+                    urllib.request.urlretrieve(f"http://{self.url}/skins/{urllib.parse.quote(skin_name)}", dest)
         except Exception as e:
             print("Skinget error:", e)
 
@@ -835,19 +958,16 @@ def start_launcher():
         print(f"Error: Launcher HTML file not found at {launcher_html}")
         return
 
-    # Resize window matching the exact size specified in HTA: width=1100, height=655
     api = PCModAPI()
     window = webview.create_window(
         title="PCMod Launcher",
         url=f"file:///{launcher_html}",
         width=1100,
         height=655,
-        resizable=True
+        resizable=True,
+        js_api=api
     )
     api.window = window
-
-    # Register API bridge
-    window.js_api = api
 
     webview.start()
 
