@@ -469,11 +469,26 @@ class PCModAPI:
         if key == "shortcut":
             self.manage_shortcut(value)
 
+    def get_windows_desktop(self):
+        if platform.system().lower() != "windows":
+            return None
+        try:
+            import winreg
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders")
+            val, _ = winreg.QueryValueEx(key, "Desktop")
+            winreg.CloseKey(key)
+            return os.path.expandvars(val)
+        except Exception:
+            return os.path.join(os.environ.get("USERPROFILE", ""), "Desktop")
+
     def manage_shortcut(self, enable):
         if platform.system().lower() != "windows":
             return
 
-        desktop_dir = os.path.join(os.environ["USERPROFILE"], "Desktop")
+        desktop_dir = self.get_windows_desktop()
+        if not desktop_dir or not os.path.exists(desktop_dir):
+            desktop_dir = os.path.join(os.environ.get("USERPROFILE", ""), "Desktop")
+
         shortcut_lnk = os.path.join(desktop_dir, "PCMod.lnk")
         start_menu_dir = os.path.join(os.environ["APPDATA"], "Microsoft", "Windows", "Start Menu", "Programs", "Plattecraft")
         start_menu_lnk = os.path.join(start_menu_dir, "PCMod.lnk")
@@ -498,7 +513,8 @@ class PCModAPI:
                 subprocess.run(["powershell", "-Command", ps_cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 # Copy to start menu
                 os.makedirs(start_menu_dir, exist_ok=True)
-                shutil.copy(shortcut_lnk, start_menu_lnk)
+                if os.path.exists(shortcut_lnk):
+                    shutil.copy(shortcut_lnk, start_menu_lnk)
             except Exception as e:
                 print("Error creating shortcut:", e)
         else:
