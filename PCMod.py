@@ -305,7 +305,7 @@ class PCModAPI:
         if os.path.exists(jar_path) and java_exe:
             try:
                 p = subprocess.Popen([java_exe, "-jar", jar_path, "-o"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                out, _ = p.communicate(input=f"{self.user}\n".encode('utf-8'))
+                out, _ = p.communicate(input=f"{self.user}\r\n".encode('utf-8'))
                 out_str = out.decode('utf-8', errors='ignore').strip()
                 parts = out_str.split()
                 if len(parts) >= 2 and parts[0] == self.user:
@@ -331,12 +331,12 @@ class PCModAPI:
         if os.path.exists(xcode_path) and os.name == 'nt':
             try:
                 p = subprocess.Popen([xcode_path, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                p.communicate(input=f"{username}\n".encode('utf-8'))
+                p.communicate(input=f"{username}\r\n".encode('utf-8'))
                 with open(auth_file, "r", encoding="utf-8", errors="ignore") as f:
                     token = f.read().strip().split()[0]
                 # re-encrypt back
                 p = subprocess.Popen([xcode_path, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                p.communicate(input=f"{username}\n".encode('utf-8'))
+                p.communicate(input=f"{username}\r\n".encode('utf-8'))
                 return token
             except Exception as e:
                 print("Error with xcode token:", e)
@@ -652,7 +652,7 @@ class PCModAPI:
         if os.path.exists(xcode_path) and os.name == 'nt':
             try:
                 p = subprocess.Popen([xcode_path, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                p.communicate(input=f"{username}\n".encode('utf-8'))
+                p.communicate(input=f"{username}\r\n".encode('utf-8'))
             except Exception:
                 pass
 
