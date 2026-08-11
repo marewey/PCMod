@@ -67,6 +67,7 @@ exit
 
 :vars
 set url=pcmod.ddns.me
+if "%pack%"=="" set pack=2-5-x
 for /f "usebackq tokens=1-4 delims=;" %%a in ("data/indexes/version") do (
 	if "%%a"=="%pack%" set pack_version=%%b
 	if "%%a"=="Launcher" if "%%c"=="PCMod" set launcher_version=%%b
@@ -559,21 +560,26 @@ goto :eof
 set /p "=Getting File Size... " <nul
 bin\wget.exe -q "http://%url%/%download_dir%/sizes/%download%.size" -O "data\update\size"&title PCMod Update
 ::Get Sizes of the file and the listed size
-FOR /F "usebackq tokens=*" %%A IN ("data\update\%download%.zip") DO set size=%%~zA
+set "size=0"
+if exist "data\update\%download%.zip" (
+    FOR %%A IN ("data\update\%download%.zip") DO set size=%%~zA
+)
 for /f "usebackq" %%a in ("data\update\size") do set size_=%%a
-echo.%size_:~0,-6%.%size_:~-6,-4% MB
+echo.!size_:~0,-6!.!size_:~-6,-4! MB
 ::If Zip file already exists (and has correct size) skip the download
-::echo.SIZE: %size_:~0,-6%.%size_:~-6,-5% MB
-if exist "data\update\%download%.zip" if "%size%"=="%size_%" echo.Using offline zip file.&goto :eof
-if exist "data\update\%download%.zip" if not "%size%"=="%size_%" echo.Size does not match. (%size:~0,-6%.%size:~-6,-5% MB ~= %size_:~0,-6%.%size_:~-6,-5% MB)&echo.Redownloading...&del "data\update\%download%.zip" 2>data\update_error.log
-echo.Downloading File... %download%.zip (%size_:~0,-6%.%size_:~-6,-4% MB)
+::echo.SIZE: !size_:~0,-6!.!size_:~-6,-5! MB
+if exist "data\update\%download%.zip" if "!size!"=="!size_!" echo.Using offline zip file.&goto :eof
+if exist "data\update\%download%.zip" if not "!size!"=="!size_!" echo.Size does not match. (!size:~0,-6!.!size:~-6,-5! MB ~= !size_:~0,-6!.!size_:~-6,-5! MB)&echo.Redownloading...&del "data\update\%download%.zip" 2>data\update_error.log
+echo.Downloading File... %download%.zip (!size_:~0,-6!.!size_:~-6,-4! MB)
 start /min bin\wget.exe "http://%url%/%download_dir%/%download%.zip" -O "data\update\%download%.zip"
 set size=0000000
 call :update.download.progress
-FOR /F "usebackq" %%A IN ("data\update\%download%.zip") DO set size=%%~zA
+if exist "data\update\%download%.zip" (
+    FOR %%A IN ("data\update\%download%.zip") DO set size=%%~zA
+)
 ::If Zip file has correct size go to next step
-if "%size%"=="%size_%" goto :eof
-if not "%size%"=="%size_%" echo.Size does not match. (%size% ~= %size_%)
+if "!size!"=="!size_!" goto :eof
+if not "!size!"=="!size_!" echo.Size does not match. (!size! ~= !size_!)
 set /a retrys=%retrys%+1
 echo.Failed to Download file...
 echo.Retrying (%retrys%/5)...
@@ -584,20 +590,22 @@ goto :update.download
 :update.download.progress
 set /a percent=100
 set bar=
-if "%size_%"=="" set /a size_=0
-if %size_% geq 1000000 set /a percent=( %size:~0,-6% * 100 ) / %size_:~0,-6%
+if "!size_!"=="" set /a size_=0
+if !size_! geq 1000000 set /a percent=( !size:~0,-6! * 100 ) / !size_:~0,-6!
 set /a "fill_bar = (PERCENT * 55) / 100"
 for /l %%a in (1,1,%fill_bar%) do set bar=!bar! 
 bin\bg.exe fcprint 0 0 70 "                                                       "
 bin\bg.exe fcprint 1 0 80 "                                                       "
-bin\bg.exe fcprint 0 0 70 "Download %download%: %size:~0,-6%.%size:~-6,-5% MB/%size_:~0,-6%.%size_:~-6,-5% MB (%percent%%%)"
+bin\bg.exe fcprint 0 0 70 "Download %download%: !size:~0,-6!.!size:~-6,-5! MB/!size_:~0,-6!.!size_:~-6,-5! MB (!percent!%%)"
 bin\bg.exe fcprint 1 0 F0 "%bar%"
-if "%size%"=="%size_%" goto :eof
+if "!size!"=="!size_!" goto :eof
 tasklist /fi "imagename eq wget.exe" | findstr "wget.exe" >nul
 if "%errorlevel%"=="1" goto :eof
 ping 127.0.0.1 -n 2 >nul
-FOR /F "usebackq" %%A IN ("data\update\%download%.zip") DO set size=%%~zA
-if %size% leq 1000000 set size=0000000
+if exist "data\update\%download%.zip" (
+    FOR %%A IN ("data\update\%download%.zip") DO set size=%%~zA
+)
+if !size! leq 1000000 set size=0000000
 goto :update.download.progress
 :update.extract
 echo.Extracting... %download%.zip

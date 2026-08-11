@@ -4,3 +4,4 @@ data/packs/2-5-x/mods/UNU Civilian Pack*
 data/packs/2-5-x/mods/Explosion-Overhaul*
 __pycache__/
 *.pyc
+cmd/update_.bat
