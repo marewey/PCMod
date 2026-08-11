@@ -108,6 +108,8 @@ for /f "tokens=1-2 delims= " %%a in ('type data\indexes\skindex') do if not "%%b
 ::Report this
 if not "%skin_missing%"=="0" echo.Missing Skins: %skin_missing%
 if not "%skin_updates%"=="0" echo.Updated Skins: %skin_updates%
+::Ensure output directory exists to avoid wget folder-missing failures
+if not exist "data\packs\%pack%\cachedImages\skins" mkdir "data\packs\%pack%\cachedImages\skins" 2>nul
 ::If Skin does not exist, download it
 for /f "tokens=1-2 delims= " %%a in ('type data\indexes\skindex') do if not exist "data\packs\%pack%\cachedImages\skins\%%a.png" %debug_% bin\wget -T 5 -O "data\packs\%pack%\cachedImages\skins\%%a.png" "http://%url%/skins/%%a"&echo.Getting skin for "%%a" ...
 ::If Skin version changed, download it
@@ -167,7 +169,7 @@ goto :eof
 ::Setup Crashreport Catcher
 set cnt=0
 echo.Starting Crashreport Catcher... %cnt%
-if exist "data\packs\%pack%\crash-reports\*.txt" for /f %%A in ('dir /a-d-s-h /b data\packs\%pack%\crash-reports\*.txt ^| find /v /c ""') do set cnt=%%A
+if exist "data\packs\%pack%\crash-reports\*.txt" for /f %%A in ('dir /a-d-s-h /b "data\packs\%pack%\crash-reports\*.txt" ^| find /v /c ""') do set cnt=%%A
 ::=== START PROCESS
 ::Close HTA files
 title PCMod - Launcher
@@ -175,18 +177,18 @@ title PCMod - Launcher
 "%cd%\bin\nircmd.exe" win close title "PCMod Launcher - %user%"
 ::Check to make sure installed
 call :checkinstall
-echo.LAUNCHING... (data\packs\%pack% %m-version%)
+echo.LAUNCHING... ("data\packs\%pack%" %m-version%)
 ::Display Launching VBS Popup
 >cmd\launching.vbs echo.CreateObject("WScript.Shell").Popup "Launching PCMod...			" ^& vbcrlf ^& "	* Username: %user%" ^& vbcrlf ^& "	* MC-UUID: %mcuuid%" ^& vbcrlf ^& "	* PCMod Version: %pack%/%pack_version%" ^& vbcrlf ^& "	* Memory Used: %memory%Mb" ^& vbcrlf ^& "	* Mods: %modcnt%", 30, "PCMod - Launcher"
 start cmd\launching.vbs
 ::Launch Game
-if "%showconsole%"=="1" echo. **** Detatching Session, Starting in Console Mode. **** &start %portablemc% --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" --output human start -u %user% -i %mcuuid% %autoserver_% --jvm-args="-Xmx%memory%M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M" %m-version%
-if not "%showconsole%"=="1" %portablemc% --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" start -u %user% -i %mcuuid% %autoserver_% --jvm-args="-Xmx%memory%M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M" %m-version%
+if "%showconsole%"=="1" echo. **** Detatching Session, Starting in Console Mode. **** &start %portablemc% --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" --output human start -u "%user%" -i "%mcuuid%" %autoserver_% --jvm-args="-Xmx%memory%M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M" %m-version%
+if not "%showconsole%"=="1" %portablemc% --work-dir "%cd%\data\packs\%pack%" --main-dir "%cd%\data\packs\%pack%" start -u "%user%" -i "%mcuuid%" %autoserver_% --jvm-args="-Xmx%memory%M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M" %m-version%
 ::=== END PROCESS
 echo.EXITING...
 ::Recount Crashreporter Catcher
 set ccnt=0
-if exist "data\packs\%pack%\crash-reports\*.txt" for /f %%A in ('dir /a-d-s-h /b data\packs\%pack%\crash-reports\*.txt ^| find /v /c ""') do set ccnt=%%A
+if exist "data\packs\%pack%\crash-reports\*.txt" for /f %%A in ('dir /a-d-s-h /b "data\packs\%pack%\crash-reports\*.txt" ^| find /v /c ""') do set ccnt=%%A
 if not "%connection%"=="0" if not "%ccnt%"=="%cnt%" call :crash
 goto :eof
 :checkinstall
@@ -214,18 +216,18 @@ echo.Found new Crashreport (%cnt% to %ccnt%).
 >bin\crashup.ftp echo.cd logins
 >>bin\crashup.ftp echo.cd "%user%"
 >>bin\crashup.ftp echo.prompt
->>bin\crashup.ftp echo.lcd data\packs\%pack%\
+>>bin\crashup.ftp echo.lcd "data\packs\%pack%"
 >>bin\crashup.ftp echo.mkdir crash-reports
 >>bin\crashup.ftp echo.cd crash-reports
 >>bin\crashup.ftp echo.lcd crash-reports
-if exist "data\packs\%pack%\crash-reports\*.*" for /f %%a in ('dir /b /o:d data\packs\%pack%\crash-reports') do set tmpfile=%%a
->>bin\crashup.ftp echo.mput %tmpfile%
+if exist "data\packs\%pack%\crash-reports\*.*" for /f "delims=" %%a in ('dir /b /o:d "data\packs\%pack%\crash-reports"') do set tmpfile=%%a
+>>bin\crashup.ftp echo.mput "%tmpfile%"
 >>bin\crashup.ftp echo.bye
 set ftppass=cpzbqsgc
 if exist "bin\tr.exe" for /f "usebackq" %%a in (`echo.%ftppass% ^| bin\tr 'A-Za-z0-9' 'N-ZA-Mn-za-m5-90-4'`) do set ftppass_=%%a
 >cmd\crash.vbs echo.CreateObject("WScript.Shell").Popup "Minecraft has crashed. The crashreport was sent to the server for examination.", 15, "PCMod - Error"
 start cmd\crash.vbs
-start data\packs\%pack%\crash-reports\
+start "" "data\packs\%pack%\crash-reports\"
 if not "%connection%"=="0" if "%log-logins%"=="1" call :log-logins crash
 set /p "=Uploading Crash Report to Server... "<NUL
 bin\ftps.exe -a -user:pcmod -password:%ftppass_% -s:bin\crashup.ftp %url% 21 >data\crashup.log 2>&1

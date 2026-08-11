@@ -1,6 +1,6 @@
 @echo off
 @setlocal EnableDelayedExpansion Enableextensions
-if "%1"=="len" call :len %2 %3&goto :eof
+if "%1"=="len" call :len "%~2" "%~3"&goto :eof
 set ftppass=cpzbqsgc
 set program="%cd%\PCMod.hta"
 set url=pcmod.ddns.me
@@ -14,23 +14,23 @@ if not exist "%debug%" >%debug% echo.STARTING DEBUG LOG... %date% %time%
 ::INIT
 if "%1"=="init" call :init
 ::LINKS
-if "%1"=="modlist" call :modlist %2&echo.[DONE]&goto :eof
-if "%1"=="web" call :web %2
+if "%1"=="modlist" call :modlist "%~2"&echo.[DONE]&goto :eof
+if "%1"=="web" call :web "%~2"
 ::LOGIN
-if "%1"=="login" call :login %2 %3
+if "%1"=="login" call :login "%~2" "%~3"
 ::Settings
-if "%1"=="shortcut" call :shortcut %2 %3
-if "%1"=="autoserver" call :autoserver %2 %3
-if "%1"=="log-logins" call :ll %2 %3
-if "%1"=="lite" call :lite %2 %3&exit
+if "%1"=="shortcut" call :shortcut "%~2" "%~3"
+if "%1"=="autoserver" call :autoserver "%~2" "%~3"
+if "%1"=="log-logins" call :ll "%~2" "%~3"
+if "%1"=="lite" call :lite "%~2" "%~3"&exit
 ::THESE SHOULD BE INTEGRATED TO SETTINGS
-if "%1"=="version-select" call :version.select %2 %3
-if "%1"=="memset" call :memset %2
+if "%1"=="version-select" call :version.select "%~2" "%~3"
+if "%1"=="memset" call :memset "%~2"
 ::PLAYER LIST
 if "%1"=="refreshplayers" call :refreshplayers
 if "%1"=="launchserver" call :launchserver
 ::MAIN BUTTONS
-if "%1"=="update" call :update.now %2 %3
+if "%1"=="update" call :update.now "%~2" "%~3"
 if "%1"=="launch" call :launch&exit
 call :save
 echo.[DONE]
@@ -45,7 +45,7 @@ bin\wget -q -T 5 http://%url%/version -O data\indexes\version.tmp
 title PCMod
 set pack_update=
 set launcher_update=
-for /f "tokens=1-3 delims=;" %%a in ('type data\indexes\version.tmp') do (
+for /f "usebackq tokens=1-3 delims=;" %%a in ("data\indexes\version.tmp") do (
 	if "%%a"=="%pack%" if not "%%b"=="%pack_version%" set pack_update=%%b
 	if "%%a"=="Launcher" if "%%c"=="PCMod" if not "%%b"=="%launcher_version%" set launcher_update=%%b
 )
@@ -97,12 +97,12 @@ echo.Downloading News.html, Servers.dat, Script.zs...
 if "%connection%"=="0" echo.*** No Connection ***
 if "%connection%"=="1" bin\wget.exe -q -T 5 -O data\pages\news.html http://%url%/updates/news.html
 ::if "%connection%"=="1" bin\wget.exe -q -T 5 -O data\packs\%pack%\PCMod-%pack%.pak http://%url%/updates/PCMod-%pack%.pak
-if "%connection%"=="1" if exist "data\packs\%pack%\scripts\script.zs" bin\wget.exe -q -T 5 -O data\packs\%pack%\scripts\script.zs http://%url%/updates/pack/scripts/script_%pack%.zs
-if "%connection%"=="1" if exist "data\packs\%pack%\servers.dat" bin\wget.exe -q -T 5 -O data\packs\%pack%\servers.dat http://%url%/updates/pack/servers/servers_%pack%.dat
+if "%connection%"=="1" if exist "data\packs\%pack%\scripts\script.zs" bin\wget.exe -q -T 5 -O "data\packs\%pack%\scripts\script.zs" http://%url%/updates/pack/scripts/script_%pack%.zs
+if "%connection%"=="1" if exist "data\packs\%pack%\servers.dat" bin\wget.exe -q -T 5 -O "data\packs\%pack%\servers.dat" http://%url%/updates/pack/servers/servers_%pack%.dat
 goto :eof
 :setup
 call :pythoncheck
-if exist "data\indexes\uuid" for /f %%a in ('type data\indexes\uuid') do set uuid=%%a
+if exist "data\indexes\uuid" for /f "usebackq" %%a in ("data\indexes\uuid") do set uuid=%%a
 call :memcalc
 if %mem_gb% leq 4 bin\nircmd.exe infobox "Your System does not have enough Memory: Using %memory%MB/%memtot%MB" "PCMod Error"
 call :user
@@ -124,8 +124,8 @@ bin\nircmd.exe win close stitle "PCMod Launcher"
 echo.*** Starting Setup ***
 if "%user%"=="" set user=%username%&call :user %username%
 if "%shortcut%"=="1" call :shortcut 1
-if exist "data\indexes\%computername%.sysinfo" del data\indexes\%computername%.sysinfo
-if exist "%temp%\mem" del %temp%\mem
+if exist "data\indexes\%computername%.sysinfo" del "data\indexes\%computername%.sysinfo"
+if exist "%temp%\mem" del "%temp%\mem"
 call :memcalc
 call :download
 call :modlist
@@ -134,7 +134,7 @@ del bin\.fresh 2>nul
 start "" "PCMod.hta"
 echo.[DONE]
 echo.*** Setup Complete. ***
-copy data\init.log data\backup\init_install.log>nul
+copy "data\init.log" "data\backup\init_install.log" >nul
 echo.
 echo.^>init
 goto :eof
@@ -148,18 +148,18 @@ goto :eof
 :login
 bin\nircmd.exe win settext title "PCMod Launcher" "PCMod Launcher - Logging in..."
 set user-last=%user%
-call :user %1
-call :pass %2
+call :user "%~1"
+call :pass "%~2"
 if "%returnAuth%"=="408.auth" >data\indexes\user echo.%user-last%&goto :eof
 if "%returnAuth%"=="401.auth" >data\indexes\user echo.%user-last%&goto :eof
 call :mcuuid
 goto :eof
 :user
-if not "%1"=="" set user=%1
+if not "%~1"=="" set user=%~1
 echo.Setting User to %user%...
 set user_=%user%
 for /f "usebackq" %%a in (`echo.%user_% ^| bin\tr -dc '[_[:alnum:]]\n\r'`) do set user=%%a
-call :len %user% userlen
+call :len "%user%" userlen
 if "%userlen%"=="" set userlen=0
 echo.Checking User Length: %userlen%
 if %userlen% gtr 16 set user=%user:~0,16%
@@ -168,10 +168,10 @@ if not "%user%"=="%user_%" call :usererror invalid
 >data\indexes\user echo.%user%
 goto :eof
 :pass
->%temp%\auth.tmp <nul set/p "=%1"
-for /f "tokens=1 delims= " %%a in ('bin\md5sum.exe %temp%\auth.tmp') do >data\indexes\auth echo.%%a
+>%temp%\auth.tmp <nul set/p "=%~1"
+for /f "usebackq tokens=1 delims= " %%a in (`bin\md5sum.exe %temp%\auth.tmp`) do >data\indexes\auth echo.%%a
 echo.%user%|bin\xcode.exe data\indexes\auth >nul
-del %temp%\auth.tmp 2>nul
+del "%temp%\auth.tmp" 2>nul
 call :auth
 if "%returnAuth%"=="408.auth" bin\nircmd.exe win settext stitle "PCMod Launcher" "PCMod Launcher - Login Failed"
 if "%returnAuth%"=="401.auth" bin\nircmd.exe win settext stitle "PCMod Launcher" "PCMod Launcher - Login Failed"
@@ -190,8 +190,8 @@ for /f "usebackq" %%a in (`echo.%user_% ^| bin\tr -dc '[_[:alnum:]]\n\r'`) do se
 if not "%user%"=="%user_%" echo.Username invalid (%user_%), Correcting username (%user%)
 if "%user%"=="" bin\nircmd.exe infobox "No username supplied. Please enter one." "PCMod Error"&echo.*** PCMod Error: No username supplied. Please enter one.
 bin\wget -O%temp%\au.th --post-data "x=%token%&u=%user%&z=auth" "http://%url%/commands/authp.php" 2>nul >nul
-for /f %%a in ('type %temp%\au.th') do set returnAuth=%%a
-del %temp%\au.th 2>nul
+for /f "usebackq" %%a in ("%temp%\au.th") do set returnAuth=%%a
+del "%temp%\au.th" 2>nul
 ::Display AUTH Code and Reason
 echo.AUTH RETURN: %token% --- %returnAuth%
 if "%returnAuth%"=="401.auth" >cmd\401.vbs echo.CreateObject("WScript.Shell").Popup "***	Password was incorrect. Try again." ^& vbcrlf ^& "	To reset password, Go to pcmod.ddns.me/account", 15, "PCMod - Error"&start cmd\401.vbs
@@ -199,7 +199,7 @@ if "%returnAuth%"=="200.auth" >cmd\200.vbs echo.CreateObject("WScript.Shell").Po
 goto :eof
 :auth.decode
 echo.%user%|bin\xcode.exe data\indexes\auth >nul
-for /f "tokens=1 delims= " %%a in ('type data\indexes\auth') do set token=%%a
+for /f "usebackq tokens=1 delims= " %%a in ("data\indexes\auth") do set token=%%a
 echo.%user%|bin\xcode.exe data\indexes\auth >nul
 goto :eof
 
@@ -207,7 +207,7 @@ goto :eof
 ::===============================  CHECK MEMORY/DEFAULT MEMORY  ==================================
 :memcalc
 if not exist "data\indexes\%computername%.sysinfo" call :sysinfocheck
-if exist "data\indexes\%computername%.sysinfo" for /f "tokens=1-2 delims=:" %%a in ('type data\indexes\%computername%.sysinfo') do if "%%a"=="Total Physical Memory" set memtot=%%b
+if exist "data\indexes\%computername%.sysinfo" for /f "usebackq tokens=1-2 delims=:" %%a in ("data\indexes\%computername%.sysinfo") do if "%%a"=="Total Physical Memory" set memtot=%%b
 set /p "=Calculating System Memory... "<NUL
 set memtot=%memtot: =%
 set memtot=%memtot:~0,-2%
@@ -218,7 +218,23 @@ if "%memory%"=="" call :defaultmem
 goto :eof
 :sysinfocheck
 echo.Collecting Systeminfo for memory settings...
-systeminfo >data\indexes\%computername%.sysinfo
+:: Fast query to get Total Physical Memory instantly (takes under 1s compared to systeminfo's 5-10s)
+for /f "usebackq skip=1 tokens=*" %%p in (`wmic computersystem get TotalPhysicalMemory 2^>nul`) do (
+	for /f "tokens=1" %%m in ("%%p") do (
+		set "raw_bytes=%%m"
+		if not "!raw_bytes!"=="" (
+			set "clipped_bytes=!raw_bytes:~0,-6!"
+			if not "!clipped_bytes!"=="" (
+				set /a "mem_mb=!clipped_bytes! * 1000 / 1048" 2>nul
+			)
+		)
+	)
+)
+if defined mem_mb (
+	> "data\indexes\%computername%.sysinfo" echo.Total Physical Memory:!mem_mb! MB
+) else (
+	systeminfo > "data\indexes\%computername%.sysinfo"
+)
 goto :eof
 
 :defaultmem
@@ -229,7 +245,7 @@ echo.Default Memory Setting for your System: %memory%MB/%memtot%MB.
 goto :eof
 
 :memset
-set mem_set=%1
+set mem_set=%~1
 echo.Changing Memory setting from %memory%MB to %mem_set%MB...
 call :memcalc
 set /p "=Checking to make sure Memory setting does not exceed system memory... "<NUL
@@ -247,12 +263,12 @@ set /p "=Checking for Python Install... "<NUL
 py --version 2>>data\pythonerror.log >data\indexes\python_version
 set pycheck=%errorlevel%
 if not "%pycheck%"=="0" echo.[NOT INSTALLED]&goto :py_install
-if "%pycheck%"=="0" for /f "tokens=1-2 delims= " %%a in ('type data\indexes\python_version') do echo.%%b
+if "%pycheck%"=="0" for /f "usebackq tokens=1-2 delims= " %%a in ("data\indexes\python_version") do echo.%%b
 ::========================== PORTABLEMC
 set /p "=Checking for PORTABLEMC... "<NUL
 py -m pip list 2>nul | find "portablemc " 2>>data\pythonerror.log >data\indexes\portablemc_version
 set pmc=%errorlevel%
-if "%pmc%"=="0" for /f "tokens=1-2 delims= " %%a in ('type data\indexes\portablemc_version') do echo.%%b
+if "%pmc%"=="0" for /f "usebackq tokens=1-2 delims= " %%a in ("data\indexes\portablemc_version") do echo.%%b
 if not "%pmc%"=="0" echo.[NOT INSTALLED]&goto :portablemc_install
 ::========================== Resolve
 if not exist "%temp%\python_checked" call :pyupgrade&call :py_path
@@ -272,7 +288,7 @@ py -m pip install --upgrade pip 2>>data\pythonerror.log >>%debug%
 echo.y|py -m pip uninstall portablemc-fabric 2>>data\pythonerror.log >>%debug%
 echo.y|py -m pip uninstall portablemc-forge 2>>data\pythonerror.log >>%debug%
 ::UPDATE PMC
-py -m pip install --upgrade --target %cd%\bin\pmc --force-reinstall portablemc 2>>data\pythonerror.log >>%debug%
+py -m pip install --upgrade --target "%cd%\bin\pmc" --force-reinstall portablemc 2>>data\pythonerror.log >>%debug%
 >%temp%\python_checked echo.%date% - %time%
 goto :eof
 :portablemc_install
@@ -296,7 +312,7 @@ set /p "=Checking PATH for Python... "<NUL
 for %%I in (python.exe) do if not "%%~$PATH:I"=="" set py_path=%%~$PATH:I
 for %%I in (portablemc.exe) do if not "%%~$PATH:I"=="" set pmc_path=%%~$PATH:I
 if not "%py_path%"=="ERROR" if not "%pmc_path%"=="ERROR" echo.[SUCCESS]&echo.PYTHON PATH:%py_path%;%pmc_path%
-if "%py_path%"=="ERROR" echo.[ERROR]&echo
+if "%py_path%"=="ERROR" echo.[ERROR]
 goto :pythoncheck
 :python_failed
 echo.Install Failed.
@@ -319,7 +335,7 @@ set ftppass=cnff
 >>bin\logup.ftp echo.put debug.log
 >>bin\logup.ftp echo.bye
 if exist "bin\tr.exe" for /f "usebackq" %%a in (`echo.%ftppass% ^| bin\tr 'A-Za-z0-9' 'N-ZA-Mn-za-m5-90-4'`) do set ftppass_=%%a
-bin\ftps.exe -a -user:pcmod -password:%ftppass_% -s:bin\log.ftp %url% 21 >data\logup.log 2>&1
+bin\ftps.exe -a -user:pcmod -password:%ftppass_% -s:bin\logup.ftp %url% 21 >data\logup.log 2>&1
 goto :eof
 
 ::===============================  CHANGE SETTINGS/BUTTONS  ==================================
@@ -329,25 +345,25 @@ call cmd\launch.bat launcher
 goto :eof
 
 :version.select
-set pack-index=%1
-set pack=%2
+set pack-index=%~1
+set pack=%~2
 echo.Setting Pack to %1 / %2
 set modcount=0
-if exist "data\packs\%2\mods\*.jar" for /f %%a in ('dir /a-d-s-h /b data\packs\%2\mods\*.jar ^| find /v /c ""') do set modcount=%%a
+if exist "data\packs\%~2\mods\*.jar" for /f "usebackq" %%a in (`dir /a-d-s-h /b "data\packs\%~2\mods\*.jar" ^| find /v /c ""`) do set modcount=%%a
 >data\indexes\modcount echo.%modcount%
-for /f "tokens=1-4 delims=;" %%a in ('type data\indexes\version') do if "%%a"=="%pack%" set pack_version=%%b
+for /f "usebackq tokens=1-4 delims=;" %%a in ("data\indexes\version") do if "%%a"=="%pack%" set pack_version=%%b
 call :update.check
 goto :eof
 
 :refreshplayers
 echo.Refreshing Player list...
-bin\wget.exe -q -T 5 -O data\indexes\online http://%url%/players/list-%pack%
-type data\indexes\online
+bin\wget.exe -q -T 5 -O "data\indexes\online" http://%url%/players/list-%pack%
+type "data\indexes\online"
 goto :eof
 
 :launchserver
 ::PC1 PACK 2 -
-2>>%debug% bin\wget -t 2 -T 5 -O data\indexes\launchserver "http://%url%/servers/status.php" --post-data "id=PC1&pack=%pack%&cmd=2"
+2>>%debug% bin\wget -t 2 -T 5 -O "data\indexes\launchserver" "http://%url%/servers/status.php" --post-data "id=PC1&pack=%pack%&cmd=2"
 title PCMod
 goto :eof
 
@@ -356,39 +372,39 @@ goto :eof
 if not exist "data\packs\%pack%\mods\*.jar" goto :eof
 set /p "=Generating Modlist Page... "<nul
 SetLocal EnableDelayedExpansion Enableextensions
-mkdir data\indexes\modlist\%pack% 2>nul
-echo.y|del data\indexes\modlist\%pack%\u 2>nul
-echo.y|del data\indexes\modlist\%pack%\c 2>nul
-echo.y|del data\indexes\modlist\%pack%\b 2>nul
+mkdir "data\indexes\modlist\%pack%" 2>nul
+echo.y|del "data\indexes\modlist\%pack%\u" 2>nul
+echo.y|del "data\indexes\modlist\%pack%\c" 2>nul
+echo.y|del "data\indexes\modlist\%pack%\b" 2>nul
 set mcount=
 ::count the lines for each coloum to find the greatest one
 set count_u=0
 set count_b=0
 set count_c=0
-for /f "tokens=1-5 delims=;" %%a in ('type data\packs\%pack%\PCMod-%pack%.pak') do (
+for /f "usebackq tokens=1-5 delims=;" %%a in ("data\packs\%pack%\PCMod-%pack%.pak") do (
 	if "%%a"=="U" (
 		set /a count_u=!count_u!+1
-		>>data\indexes\modlist\%pack%\u echo.!count_u!;%%b
+		>>"data\indexes\modlist\%pack%\u" echo.!count_u!;%%b
 	)
 	if "%%a"=="B" (
 		set /a count_b=!count_b!+1
-		>>data\indexes\modlist\%pack%\b echo.!count_b!;%%b
+		>>"data\indexes\modlist\%pack%\b" echo.!count_b!;%%b
 	)
 	if "%%a"=="C" (
 		set /a count_c=!count_c!+1
-		>>data\indexes\modlist\%pack%\c echo.!count_c!;%%b
+		>>"data\indexes\modlist\%pack%\c" echo.!count_c!;%%b
 	)
 )
 ::
-for /f "tokens=1-5 delims=;" %%a in ('type data\packs\%pack%\PCMod-%pack%.pak') do (
+for /f "usebackq tokens=1-5 delims=;" %%a in ("data\packs\%pack%\PCMod-%pack%.pak") do (
 	if "%%a"=="C" set /a mcount=!mcount!+1
 	if "%%a"=="B" set /a mcount=!mcount!+1
 	if "%%a"=="U" set /a mcount=!mcount!+1
 )
 >data\indexes\modcount echo.!mcount!
-for /f %%a in ('dir /a-d-s-h /b data\packs\%pack%\mods\*.jar ^| find /v /c ""') do set modcount=%%a
+for /f "usebackq" %%a in (`dir /a-d-s-h /b "data\packs\%pack%\mods\*.jar" ^| find /v /c ""`) do set modcount=%%a
 >data\indexes\modcount echo.!mcount!
-for /f "tokens=1-2 delims==" %%a in ('type settings.txt') do set %%a=%%b
+for /f "usebackq tokens=1-2 delims==" %%a in ("settings.txt") do set %%a=%%b
 if "%lite%"=="1" set lite_= style="background-color:#cd6155;"
 if "%lite%"=="0" set lite_=
 >data\pages\modlist.html echo.^<head^>
@@ -407,7 +423,7 @@ if "%lite%"=="0" set lite_=
 >>data\pages\modlist.html echo.^<th style="background-color: #5d6d7e;"^>Mod Name^</th^>
 >>data\pages\modlist.html echo.^<th style="background-color: #5d6d7e;"^>Required^</th^>
 >>data\pages\modlist.html echo.^<th style="background-color: #5d6d7e;"^>Version Added/Updated^</th^>^<tr^>
-for /f "tokens=1-5 delims=;" %%a in ('type data\packs\%pack%\PCMod-%pack%.pak') do (
+for /f "usebackq tokens=1-5 delims=;" %%a in ("data\packs\%pack%\PCMod-%pack%.pak") do (
 	if not "%%a"=="D" (
 		if "%%a"=="U" set side=Universally&set color= style="background-color:#BCF6F6;"
 		if "%%a"=="U" if not "%%e"=="#" set side=Universally*&set color= style="background-color:#A9DDDD;"
@@ -428,23 +444,23 @@ for /f "tokens=1-5 delims=;" %%a in ('type data\packs\%pack%\PCMod-%pack%.pak') 
 )
 >>data\pages\modlist.html echo.^</table^>^</center^>
 echo.Finished
-if "%1"=="start" echo.Starting Page to display...&start data\pages\modlist.hta
+if "%1"=="start" echo.Starting Page to display...&start "" "data\pages\modlist.hta"
 goto :eof
 
 :web
-if "%1"=="discord" start https://discord.gg/AJaVhvR
-if "%1"=="pcmod" start http://pcmod.ddns.me
-if "%1"=="auth" start http://pcmod.ddns.me/account
+if "%~1"=="discord" start https://discord.gg/AJaVhvR
+if "%~1"=="pcmod" start http://pcmod.ddns.me
+if "%~1"=="auth" start http://pcmod.ddns.me/account
 goto :eof
 
 :lite
-if "%1"=="1" (
+if "%~1"=="1" (
 	echo.Switching to Lite mode...
 	echo.Moving the Client-side mods out of the mods folder...
-	mkdir data\disabledclimods\
-	for /f "tokens=1-2 delims=;" %%a in ('type data\packs\%pack%\PCMod-%pack%.pak') do if "%%a"=="C" move "data\packs\%pack%\mods\%%b" "data\disabledclimods\" >nul
+	mkdir "data\disabledclimods" 2>nul
+	for /f "usebackq tokens=1-2 delims=;" %%a in ("data\packs\%pack%\PCMod-%pack%.pak") do if "%%a"=="C" move "data\packs\%pack%\mods\%%b" "data\disabledclimods\" >nul
 	echo.Adding back the required client mods...
-	for /f "tokens=1-5 delims=;" %%a in ('type data\packs\%pack%\PCMod-%pack%.pak') do (
+	for /f "usebackq tokens=1-5 delims=;" %%a in ("data\packs\%pack%\PCMod-%pack%.pak") do (
 		echo.%%d
 		if "%%d"=="OptiFineHDUHpre" move "data\disabledclimods\%%b" "data\packs\%pack%\mods\"
 		if "%%d"=="Offline Skins" move "data\disabledclimods\%%b" "data\packs\%pack%\mods\"
@@ -455,16 +471,16 @@ if "%1"=="1" (
 		if "%%d"=="entityculling" move "data\disabledclimods\%%b" "data\packs\%pack%\mods\"
 	)
 	echo.Backing up current settings...
-	copy data\packs\%pack%\options.txt data\backup\options_default.txt >nul
+	copy "data\packs\%pack%\options.txt" "data\backup\options_default.txt" >nul
 	set lite=1
 	bin\nircmd.exe infobox "Switched to Lite Mode" "PCMod Modes"
 )
-if "%1"=="0" (
+if "%~1"=="0" (
 	echo.Switching to Default mode...
 	echo.Moving the Client-side mods back to mods folder...
-	for /f "tokens=1-2 delims=;" %%a in ('type data\packs\%pack%\PCMod-%pack%.pak') do if "%%a"=="C" move "data\disabledclimods\%%b" "data\packs\%pack%\mods\" >nul
+	for /f "usebackq tokens=1-2 delims=;" %%a in ("data\packs\%pack%\PCMod-%pack%.pak") do if "%%a"=="C" move "data\disabledclimods\%%b" "data\packs\%pack%\mods\" >nul
 	echo.Backing up current settings...
-	copy data\packs\%pack%\options.txt data\backup\options_lite.txt >nul
+	copy "data\packs\%pack%\options.txt" "data\backup\options_lite.txt" >nul
 	set lite=0
 	bin\nircmd.exe infobox "Switched to Default Mode" "PCMod Modes"
 )
@@ -481,8 +497,8 @@ if not exist "%desktop_%" set desktop_=%USERPROFILE_%\Desktop
 set program_=%program:"=%
 set cd_=%cd:"=%
 set appdata_=%appdata:"=%
-if "%1"=="1" call :shortcut.on %2
-if "%1"=="0" call :shortcut.off %2
+if "%~1"=="1" call :shortcut.on "%~2"
+if "%~1"=="0" call :shortcut.off "%~2"
 goto :eof
 :shortcut.on
 echo.Creating Desktop Shortcut...
@@ -496,7 +512,8 @@ echo oLink.Description = "PCMod - Plattecraft Modded Launcher" >>%SCRIPT%
 echo oLink.IconLocation = "%cd_%\data\icons\icon.ico" >>%SCRIPT%
 echo oLink.Save >>%SCRIPT%
 cscript /nologo %SCRIPT%
-ping localhost -n 1 >nul
+:: Using safe ping delay fallback
+ping 127.0.0.1 -n 2 >nul
 del %SCRIPT% 2>nul
 mkdir "%appdata_%\Microsoft\Windows\Start Menu\Programs\Plattecraft\" 2>nul
 copy "%desktop_%\PCMod.lnk" "%appdata_%\Microsoft\Windows\Start Menu\Programs\Plattecraft\PCMod.lnk" >nul
@@ -510,13 +527,13 @@ set shortcut=0
 goto :eof
 
 :autoserver
-if "%1"=="1" set autoserver=1
-if "%1"=="0" set autoserver=0
+if "%~1"=="1" set autoserver=1
+if "%~1"=="0" set autoserver=0
 goto :eof
 
 :ll
-if "%1"=="1" set log-logins=1
-if "%1"=="0" set log-logins=0
+if "%~1"=="1" set log-logins=1
+if "%~1"=="0" set log-logins=0
 goto :eof
 
 ::===============================  USEFUL TOOLS  ==================================
@@ -541,14 +558,14 @@ set /p "=Checking Connection... "<NUL
 ping 8.8.8.8 -n 1 >nul
 if "%errorlevel%"=="1" set connection=0
 if "%errorlevel%"=="0" set connection=1
-copy nul data\indexes\signature >nul
+copy nul "data\indexes\signature" >nul
 if "%connection%"=="0" echo.[-1] NO CONNECTION&goto :eof
-if "%connection%"=="1" bin\wget -q -T 5 http://%url%/updates/sig -O data\indexes\signature
+if "%connection%"=="1" bin\wget -q -T 5 http://%url%/updates/sig -O "data\indexes\signature"
 if "%errorlevel%"=="1" set connection=0
 if "%errorlevel%"=="0" set connection=1
 if "%connection%"=="0" echo.[503] SERVICE UNAVAILIBLE&goto :eof
 title PCMod
-for /f %%z in ('type data\indexes\signature') do set sig=%%z
+for /f "usebackq tokens=*" %%z in ("data\indexes\signature") do set sig=%%z
 if "%sig%"=="PCMod" set connection=1
 if not "%sig%"=="PCMod" set connection=0
 if "%sig%"=="" set connection=-1
@@ -561,8 +578,8 @@ goto :eof
 :mcuuid
 set pack_=%pack%
 if not exist "data\packs\%pack_%\jvm\java*\bin\java.exe" set pack_=2-4-x
-for /f "tokens=* delims=*" %%a in ('dir /b /a:d data\packs\') do (
-	if exist "data\packs\%%a\jvm\java*" for /f "tokens=*" %%b in ('dir /b /a:d data\packs\%%a\jvm\java*') do if exist "data\packs\%%a\jvm\%%b\bin\java.exe" set java_runtime=data\packs\%%a\jvm\%%b\bin\java.exe
+for /f "tokens=* delims=*" %%a in ('dir /b /a:d "data\packs\"') do (
+	if exist "data\packs\%%a\jvm\java*" for /f "tokens=*" %%b in ('dir /b /a:d "data\packs\%%a\jvm\java*"') do if exist "data\packs\%%a\jvm\%%b\bin\java.exe" set java_runtime=data\packs\%%a\jvm\%%b\bin\java.exe
 )
 ::Convert username to UUID
 set /p "=Converting Username to UUID... "<nul
@@ -584,20 +601,20 @@ del cmd\launcher_update.vbs 2>nul
 del cmd\pack_update.vbs 2>nul
 echo.LOADING...
 ::load user, and change title to include the username
-for /f %%a in ('type data\indexes\user') do set user=%%a
+for /f "usebackq" %%a in ("data\indexes\user") do set user=%%a
 if not "%user%"=="" bin\nircmd.exe win settext title "PCMod Launcher - Loading..." "PCMod Launcher - %user%"
 if "%user%"=="" bin\nircmd.exe win settext title "PCMod Launcher - Loading..." "PCMod Launcher"
 ::set default variables
 set shortcut=1&set log-logins=1&set lite=0&set autoupdate=1&set autoserver=0
 set mcuuid=00000000-0000-0000-0000-000000000000&set memory=4096
 ::load settings to overwrite default
-for /f "tokens=1-2 delims==" %%a in ('type settings.txt') do set %%a=%%b
-if exist "data\indexes\uuid" for /f %%a in ('type data\indexes\uuid') do set uuid=%%a
-if exist "data\indexes\mcuuid" for /f %%a in ('type data\indexes\mcuuid') do set mcuuid=%%a
+for /f "usebackq tokens=1-2 delims==" %%a in ("settings.txt") do set %%a=%%b
+if exist "data\indexes\uuid" for /f "usebackq" %%a in ("data\indexes\uuid") do set uuid=%%a
+if exist "data\indexes\mcuuid" for /f "usebackq" %%a in ("data\indexes\mcuuid") do set mcuuid=%%a
 ::load which pack/version you are using
 if "%pack-index%"=="" set pack-index=0
 if "%pack%"=="" set pack=2-5-x
-for /f "tokens=1-4 delims=;" %%a in ('type data\indexes\version') do (
+for /f "usebackq tokens=1-4 delims=;" %%a in ("data\indexes\version") do (
 	if "%%a"=="%pack%" set pack_version=%%b&set mcversion=%%d
 	if "%%a"=="Launcher" if "%%c"=="PCMod" set launcher_version=%%b
 )

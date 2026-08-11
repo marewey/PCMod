@@ -2,3 +2,5 @@ data/packs/2-4-x/mods/GVP*
 data/packs/2-4-x/mods/UNU Civilian Pack*
 data/packs/2-5-x/mods/UNU Civilian Pack*
 data/packs/2-5-x/mods/Explosion-Overhaul*
+__pycache__/
+*.pyc

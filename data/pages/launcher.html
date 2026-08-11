@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PCMod Launcher</title>
+<style>
+ /* The sidebar menu */
+.sidenav {
+  height: 98%; /* Full-height: remove this if you want "auto" height */
+  width: 200px; /* Set the width of the sidebar */
+  position: absolute;
+  z-index: 1; /* Stay on top */
+  top: 5px; /* Stay at the top */
+  left: 5px;
+  background-color: #2c4569; /* Color */
+  color: #afc9f0; /* Color */
+  overflow-x: hidden; /* Disable horizontal scroll */
+  padding-top: 2px;
+  padding-bottom: 10px;
+}
+.settingnav {
+  height: 98%; /* Full-height: remove this if you want "auto" height */
+  width: 200px; /* Set the width of the sidebar */
+  position: absolute;
+  z-index: 1; /* Stay on top */
+  top: 5px; /* Stay at the top */
+  right: 5px;
+  background-color: #2c4569; /* Black */
+  overflow-x: hidden; /* Disable horizontal scroll */
+  padding-top: 2px;
+  padding-bottom: 10px;
+}
+.loginnav {
+  width: 200px; /* Set the width of the sidebar */
+  position: absolute;
+  z-index: 1; /* Stay on top */
+  bottom: 5px; /* Stay at the top */
+  right: 5px;
+  background-color: #2c4569; /* Black */
+  overflow-x: hidden; /* Disable horizontal scroll */
+  padding-top: 2px;
+  padding-bottom: 5px;
+}
+.playernav {
+  width: 200px; /* Set the width of the sidebar */
+  position: absolute;
+  z-index: 1; /* Stay on top */
+  bottom: 5px; /* Stay at the top */
+  left: 5px;
+  background-color: #2c4569; /* Black */
+  overflow-x: hidden; /* Disable horizontal scroll */
+  padding-top: 2px;
+  padding-bottom: 5px;
+}
+/* The navigation menu links */
+.sidenav button {
+  padding: 6px 16px 6px 16px;
+  text-decoration: none;
+  font-size: 15px;
+  display: block;
+  font: 17px;
+  font-family: 'Nobile', Helvetica, Arial, sans-serif;
+}
+
+/* Style page content */
+.main {
+  margin-top: 20px;
+  margin-left: 200px; /* Same as the width of the sidebar */
+  margin-right: 200px; /* Same as the width of the sidebar */
+  padding: 0px 10px;
+}
+
+/* On smaller screens, where height is less than 450px, change the style of the sidebar (less padding and a smaller font size) */
+@media screen and (max-height: 450px) {
+  .sidenav {padding-top: 15px;}
+  .sidenav a {font-size: 18px;}
+  .playernav {padding-top: 15px;}
+  .playernav a {font-size: 18px;}
+}
+
+/* ======= ORIGINAL ======== */
+body {
+    background: url(../icons/dirt.png) repeat 0 0;
+	background-color:#243855;
+	color:#000000;
+	border-color:#707b7c;
+    overflow: hidden;
+}
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Corben', Georgia, Times, serif;
+}
+p, div {
+    font-family: 'Nobile', Helvetica, Arial, sans-serif;
+}
+button {
+	background-color:#ccd1d1;
+	color:#111112;
+	font: 22px;
+    cursor: pointer;
+}
+input {
+	background-color:#ccd1d1;
+	color:#111112;
+	align: right;
+}
+#title {
+    text-align:center;
+    padding:2px;
+    font-size:15px;
+}
+#content {
+    background-color:#2c4569;
+    color:#afc9f0;
+    text-align:left;
+    padding:10px;
+}
+#menu {
+    background-color:#243855;
+    color:#afc9f0;
+    text-align:left;
+    padding:10px;
+	font: 22px;
+}
+#menu2 {
+    background-color:#243855;
+    color:#afc9f0;
+    text-align:left;
+    padding:10px;
+	font: 22px;
+}
+#menu3 {
+    background-color:#243855;
+    color:#afc9f0;
+    text-align:left;
+    padding:1px;
+	font: 22px;
+}
+#version {
+    text-align:right;
+    padding:1px;
+	font-weight: 600;
+}
+
+input.largerCheckbox {
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+}
+</style>
+</head>
+<body>
+<!-- Side Bar -->
+<div class="sidenav" style="height: 60%;">
+	<table border="0" cellpadding="1px" id="menu" width="100%">
+		<th align="center"><hr>Tasks/Links<hr></th>
+		<tr><td align="center" width="auto">
+		<button style="width: 92%;" id="ML" onclick="openModlist()">Modlist (<span id="modcount">--</span> mods) </button>
+		</td></tr><tr><td align="center" width="auto">
+		<button style="width: 92%;" onclick="openWeb('pcmod')">PCMod website</button>
+		</td></tr><tr><td align="center" width="auto">
+		<button style="width: 92%;" onclick="openWeb('discord')">Join Discord</button>
+		</td></tr><tr><td align="center" width="auto">
+		<button style="width: 92%;" onclick="openWeb('auth')">My Account</button>
+		</td></tr>
+	</table>
+</div>
+
+<div class="playernav" style="height: 38%; top: 61%;">
+	<table width="100%" id="menu3">
+		<th align="center"><hr>Players Online<hr></th>
+		<tr><td>
+		<button style="height:25px;width:100%;font-size:10px" onclick="refreshPlayers()">Refresh</button><hr>
+		</td></tr>
+		<tr><td align="left" style="padding-left:10px;">
+		<p style="width: 100%; height: 110px; font: 14px; font-weight: bolder; margin: 0; overflow-y: auto;" id="online"></p>
+		</td></tr>
+	</table>
+</div>
+
+<div class="settingnav" style="height: 69%;">
+	<table border="0" cellpadding="2px" id="menu2" width="100%">
+		<th align="center" colspan="2"><hr>Settings<hr></th>
+		<tr><td align="left" width="auto">
+		<label for="Shortcut">Shortcut </label>
+		</td><td align="right">
+		<input class="largerCheckbox" title="Creates a shortcut on your desktop." type="checkbox" id="Shortcut" onclick="toggleShortcut()"></span><br>
+		</td></tr><tr><td align="left" width="auto">
+		<label for="AutoServer">Auto Server </label>
+		</td><td align="right">
+		<input class="largerCheckbox" title="Launch into the server." type="checkbox" id="AutoServer" onclick="toggleAutoServer()"><br>
+		</td></tr><tr><td align="left" width="auto">
+		<label for="LL">Log Logins </label>
+		</td><td align="right">
+		<input class="largerCheckbox" title="Keeps track of how often you play." type="checkbox" id="LL" onclick="toggleLogLogins()"><br>
+		</td></tr><tr><td align="left" width="auto">
+		<label for="LT">Lite Mode </label>
+		</td><td align="right">
+		<input class="largerCheckbox" title="Removes client side mods. (for slower computers)." type="checkbox" id="LT" onclick="toggleLiteMode()"><br>
+		</td></tr><tr><td align="left" width="auto">
+		<label for="VERSION-select">Version</label>
+		</td><td align="right">
+		<select title="Select Previous versions of the game." size="1" name="version-select" id="VERSION-select" style="font-size:10px; width:100px;" onchange="changeVersion()">
+		</select><br>
+		</td></tr><tr><td align="left" width="auto">
+		<label for="MEM">Memory</label>
+		</td><td align="right">
+		<input title="Sets Memory Allocated to game, in megabytes." value="4096" type="number" style="font-size:10px; width:70px;" maxlength="5" size="4" id="MEM" onchange="changeMemory()"><br>
+		</td></tr><tr><td colspan="2" align="center" width="auto">
+		<hr><button style="width: 100px; font-size: 11px;" onclick="saveSettingsButton()">Save</button><hr>
+		</td></tr><tr><td colspan="2" align="center" width="auto">
+		<button style="width: 100px; font-size: 11px;" onclick="launchServer()">Launch Server</button><br>
+		</td>
+		</tr>
+	</table>
+</div>
+
+<div class="loginnav" style="height: 29%; top: 70%;">
+	<table border=0 cellpadding="1px" id="menu2" width="100%">
+		<th colspan="2" align="center"><hr>Login<hr></th>
+		<tr><td align="left" style="font-size: 13px;">User</td><td align="left">
+		<input type="text" size="14" id="user" placeholder="Username" value="Loading..." style="font-size:12px;"></td>
+		</tr><tr><td align="left" style="font-size: 13px;">Pass</td><td align="left">
+		<input type="password" size="14" id="pass" placeholder="Password" style="font-size:12px;"></td>
+		</tr><tr><td></td><td colspan="1" align="left">
+		<input type="button" style="width: 110px; font-size: 13px; cursor: pointer;" value="Login" onclick="login()">
+		</td>
+		</tr>
+		<tr><td colspan="2" style="padding-top:2px;"><hr></td></tr>
+	</table>
+</div>
+
+<!-- MAIN PAGE -->
+<div class="main">
+<div id="title">
+<img height="85px" src="../icons/pcmod.png"><br>
+</div>
+<br>
+<div id="content" style="height: 380px;">
+<center>
+<table width="100%" height="100%" border=0><tr>
+<td colspan=2 height="270px">
+<iframe id="news" width="100%" height="100%" title="PCMod News" name="PCMod News" src="news.html"></iframe><br>
+</td></tr><tr>
+<td align="center"><button style="width: 100%; height: 75px; font-size: 24px; font-weight: bold; background-color: #58d68d; color: #111;" onclick="launchGame()"><br>LAUNCH</button></td>
+<td align="center" width="50%"><button style="width: 100%; height: 75px; font-size: 24px; font-weight: bold; background-color: #eb984e; color: #11;" onclick="runUpdate()"><br>UPDATE</button></td>
+</tr></table>
+</center>
+</div>
+<div style="font-size:14px; text-align:right; width:100%; padding:3px; color:#ccd1d1;" id="version">-.-.-</div>
+</div>
+
+<script>
+// Communication Bridge to PyWebView
+function callPython(methodName, ...args) {
+    if (window.pywebview && window.pywebview.api && window.pywebview.api[methodName]) {
+        return window.pywebview.api[methodName](...args);
+    } else {
+        console.warn("PyWebView api not ready yet for method: " + methodName);
+        return Promise.reject("PyWebView not ready");
+    }
+}
+
+// Initialization and settings reading
+window.addEventListener('pywebviewready', function() {
+    console.log("PyWebView is ready!");
+    initLauncher();
+});
+
+function initLauncher() {
+    callPython('init_launcher').then(function(data) {
+        console.log("Launcher initialized with data:", data);
+
+        // 1. Set username
+        document.getElementById('user').value = data.user || "";
+
+        // 2. Load Settings checkboxes & inputs
+        document.getElementById('Shortcut').checked = (data.settings.shortcut === "1");
+        document.getElementById('AutoServer').checked = (data.settings.autoserver === "1");
+        document.getElementById('LL').checked = (data.settings.log_logins === "1");
+        document.getElementById('LT').checked = (data.settings.lite === "1");
+        document.getElementById('MEM').value = data.settings.memory || "4096";
+
+        // 3. Set Mod Count
+        document.getElementById('modcount').innerText = data.modcount || "--";
+
+        // 4. Set Version Text
+        document.getElementById('version').innerText = "Launcher: " + data.launcher_version + " / Pack: " + data.pack_version;
+
+        // 5. Populate Versions Select dropdown
+        var select = document.getElementById('VERSION-select');
+        select.innerHTML = "";
+        data.versions_list.forEach(function(v, idx) {
+            var opt = document.createElement('option');
+            opt.value = idx + " " + v.name;
+            opt.text = v.name;
+            if (v.name === data.settings.pack) {
+                opt.selected = true;
+            }
+            select.add(opt);
+        });
+
+        // 6. Set Online Players
+        document.getElementById('online').innerHTML = data.online_players || "No players online";
+    }).catch(function(err) {
+        console.error("Failed to initialize launcher:", err);
+    });
+}
+
+function openModlist() {
+    callPython('open_modlist');
+}
+
+function openWeb(site) {
+    callPython('open_web', site);
+}
+
+function refreshPlayers() {
+    document.getElementById('online').innerHTML = "Refreshing...";
+    callPython('refresh_players').then(function(html) {
+        document.getElementById('online').innerHTML = html;
+    });
+}
+
+function login() {
+    var u = document.getElementById('user').value;
+    var p = document.getElementById('pass').value;
+    callPython('login', u, p).then(function(res) {
+        if (res.status === "success") {
+            initLauncher();
+        }
+    });
+}
+
+function toggleShortcut() {
+    var val = document.getElementById('Shortcut').checked ? "1" : "0";
+    callPython('set_setting', 'shortcut', val);
+}
+
+function toggleAutoServer() {
+    var val = document.getElementById('AutoServer').checked ? "1" : "0";
+    callPython('set_setting', 'autoserver', val);
+}
+
+function toggleLogLogins() {
+    var val = document.getElementById('LL').checked ? "1" : "0";
+    callPython('set_setting', 'log-logins', val);
+}
+
+function toggleLiteMode() {
+    var val = document.getElementById('LT').checked ? "1" : "0";
+    callPython('set_lite_mode', val).then(function() {
+        initLauncher();
+    });
+}
+
+function changeMemory() {
+    var val = document.getElementById('MEM').value;
+    callPython('set_memory', val).then(function() {
+        initLauncher();
+    });
+}
+
+function changeVersion() {
+    var select = document.getElementById('VERSION-select');
+    var val = select.value; // e.g. "0 2-5-x"
+    callPython('set_version_select', val).then(function() {
+        initLauncher();
+    });
+}
+
+function saveSettingsButton() {
+    callPython('save_settings_btn').then(function() {
+        alert("Settings saved successfully!");
+    });
+}
+
+function launchServer() {
+    callPython('launch_server').then(function() {
+        alert("Server Status Requested!");
+    });
+}
+
+function launchGame() {
+    callPython('launch_game');
+}
+
+function runUpdate() {
+    callPython('run_update');
+}
+</script>
+</body>
+</html>
