@@ -526,8 +526,18 @@ class PCModAPI:
                 try: os.remove(start_menu_lnk)
                 except Exception: pass
 
+    def show_message(self, title, message):
+        safe_msg = message.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "")
+        if active_window:
+            active_window.evaluate_js(f"alert('{safe_msg}');")
+
+    def show_confirmation(self, title, message):
+        safe_msg = message.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "")
+        if active_window:
+            return active_window.evaluate_js(f"confirm('{safe_msg}');")
+        return False
+
     def set_lite_mode(self, val):
-        global active_window
         self.settings["lite"] = val
         self.save_settings()
 
@@ -574,8 +584,7 @@ class PCModAPI:
                             shutil.move(src, dst)
                         except Exception:
                             pass
-            if active_window:
-                active_window.create_message_dialog("PCMod Modes", "Switched to Lite Mode successfully.")
+            self.show_message("PCMod Modes", "Switched to Lite Mode successfully.")
         else:
             # Switch to default mode: move all disabled client-side mods back
             for filename in os.listdir(disabled_dir):
@@ -586,8 +595,7 @@ class PCModAPI:
                         shutil.move(src, dst)
                     except Exception:
                         pass
-            if active_window:
-                active_window.create_message_dialog("PCMod Modes", "Switched to Default Mode successfully.")
+            self.show_message("PCMod Modes", "Switched to Default Mode successfully.")
 
     def set_memory(self, val):
         self.settings["memory"] = val
@@ -606,37 +614,30 @@ class PCModAPI:
             self.get_mod_count()
 
     def save_settings_btn(self):
-        global active_window
         self.save_settings()
-        if active_window:
-            active_window.create_message_dialog("PCMod Settings", "Settings saved successfully!")
+        self.show_message("PCMod Settings", "Settings saved successfully!")
 
     def launch_server(self):
-        global active_window
         if self.connection:
             try:
                 url = f"http://{self.url}/servers/status.php"
                 data = urllib.parse.urlencode({'id': 'PC1', 'pack': self.pack, 'cmd': '2'}).encode('utf-8')
                 req = urllib.request.Request(url, data=data, headers={'User-Agent': 'Mozilla/5.0'})
                 urllib.request.urlopen(req, timeout=5)
-                if active_window:
-                    active_window.create_message_dialog("PCMod", "Server launch requested successfully.")
+                self.show_message("PCMod", "Server launch requested successfully.")
             except Exception as e:
                 print("Launch server request failed:", e)
-                if active_window:
-                    active_window.create_message_dialog("PCMod Error", "Server launch request failed.")
+                self.show_message("PCMod Error", "Server launch request failed.")
 
     def login(self, username, password):
-        global active_window
         res = self.login_auth_flow(username, password)
-        if active_window:
-            if res["status"] == "success":
-                active_window.create_message_dialog("PCMod Login", "Logged In Successfully.")
+        if res["status"] == "success":
+            self.show_message("PCMod Login", "Logged In Successfully.")
+        else:
+            if res["auth"] == "401.auth":
+                self.show_message("PCMod Error", "Password was incorrect. Try again.\nTo reset password, go to pcmod.ddns.me/account")
             else:
-                if res["auth"] == "401.auth":
-                    active_window.create_message_dialog("PCMod Error", "Password was incorrect. Try again.\nTo reset password, go to pcmod.ddns.me/account")
-                else:
-                    active_window.create_message_dialog("PCMod Error", f"Login failed. Return code: {res['auth']}")
+                self.show_message("PCMod Error", f"Login failed. Return code: {res['auth']}")
         return res
 
     def login_auth_flow(self, username, password):
@@ -885,17 +886,14 @@ class PCModAPI:
 
                 ftp.quit()
                 print("Crash report upload completed!")
-                if active_window:
-                    active_window.create_message_dialog("PCMod Error", "Minecraft has crashed. The crashreport was successfully sent to the server for examination.")
+                self.show_message("PCMod Error", "Minecraft has crashed. The crashreport was successfully sent to the server for examination.")
             except Exception as e:
                 print("FTP Crash upload failed:", e)
 
     def run_update(self):
-        global active_window
         print("Checking for updates natively...")
         if not self.connection:
-            if active_window:
-                active_window.create_message_dialog("PCMod Update", "No internet connection detected. Skipping update checks.")
+            self.show_message("PCMod Update", "No internet connection detected. Skipping update checks.")
             return
 
         versions_list, launcher_version, pack_version = self.get_versions_info()
@@ -906,8 +904,7 @@ class PCModAPI:
             urllib.request.urlretrieve(f"http://{self.url}/version", tmp_ver_file)
         except Exception as e:
             print("Failed to download version index:", e)
-            if active_window:
-                active_window.create_message_dialog("PCMod Update", "Unable to download version index from server.")
+            self.show_message("PCMod Update", "Unable to download version index from server.")
             return
 
         pack_update = None
@@ -936,14 +933,12 @@ class PCModAPI:
                 msg += f"New Pack Update ({self.pack} -> {pack_update}) is available!\n"
             msg += "\nWould you like to start the update process now?"
 
-            if active_window:
-                res = active_window.create_confirmation_dialog("PCMod Update", msg)
-                if res:
-                    os.system("cmd\\settings.bat update empty")
+            res = self.show_confirmation("PCMod Update", msg)
+            if res:
+                os.system("cmd\\settings.bat update empty")
         else:
             print("All up to date.")
-            if active_window:
-                active_window.create_message_dialog("PCMod Update", "No updates found. You are completely up to date!")
+            self.show_message("PCMod Update", "No updates found. You are completely up to date!")
 
     def skinget(self):
         if not self.connection:
