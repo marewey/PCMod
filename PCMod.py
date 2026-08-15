@@ -564,12 +564,20 @@ class PCModAPI:
     def show_message(self, title, message):
         safe_msg = message.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "")
         if active_window:
-            active_window.evaluate_js(f"alert('{safe_msg}');")
+            try:
+                active_window.evaluate_js(f"alert('{safe_msg}');")
+            except Exception as e:
+                self.log(f"Message dialog notice ({title}): {message}")
+        else:
+            self.log(f"Message dialog notice ({title}): {message}")
 
     def show_confirmation(self, title, message):
         safe_msg = message.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "")
         if active_window:
-            return active_window.evaluate_js(f"confirm('{safe_msg}');")
+            try:
+                return active_window.evaluate_js(f"confirm('{safe_msg}');")
+            except Exception as e:
+                self.log(f"Confirmation dialog notice ({title}): {message}")
         return False
 
     def set_lite_mode(self, val):
@@ -891,6 +899,23 @@ class PCModAPI:
         except Exception as e:
             print("Login logger failed:", e)
 
+    def get_ftp_credentials(self):
+        ftp_user = "pcmod"
+        ftp_pass_raw = ""
+        settings_bat = os.path.join("cmd", "settings.bat")
+        if os.path.exists(settings_bat):
+            try:
+                with open(settings_bat, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        if line.strip().startswith("set ftppass="):
+                            ftp_pass_raw = line.strip().split("=", 1)[1]
+                            break
+            except Exception:
+                pass
+        if ftp_pass_raw:
+            return ftp_user, self.rot13_5_decode(ftp_pass_raw)
+        return ftp_user, ""
+
     def handle_crash_upload(self, crash_file):
         global active_window
         crash_reports_dir = os.path.join("data", "packs", self.pack, "crash-reports")
@@ -904,14 +929,13 @@ class PCModAPI:
         except Exception:
             pass
 
-        ftppass_enc = "cpzbqsgc"
-        ftppass = self.rot13_5_decode(ftppass_enc)
+        ftpuser, ftppass = self.get_ftp_credentials()
 
-        if self.connection:
+        if self.connection and ftppass:
             print("Uploading crash report to server...")
             try:
                 ftp = FTP(self.url, timeout=10)
-                ftp.login(user="pcmod", password=ftppass)
+                ftp.login(user=ftpuser, password=ftppass)
 
                 try:
                     ftp.cwd("logins")
@@ -985,6 +1009,15 @@ class PCModAPI:
         except Exception as e:
             print("Skinget error:", e)
 
+def set_app_user_model_id():
+    if platform.system().lower() == "windows":
+        try:
+            import ctypes
+            myappid = "Plattecraft.PCMod.Launcher.2"
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+        except Exception as e:
+            print("Error setting AppUserModelID:", e)
+
 def set_class_icon(hwnd, h_icon_small, h_icon_big):
     try:
         import ctypes
@@ -1052,6 +1085,7 @@ def start_launcher():
         print(f"Error: Launcher HTML file not found at {launcher_html}")
         return
 
+    set_app_user_model_id()
     api = PCModAPI()
     window = webview.create_window(
         title="PCMod Launcher",
