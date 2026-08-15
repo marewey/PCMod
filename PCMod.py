@@ -53,6 +53,7 @@ class PCModAPI:
         self.log(f"PCMod Initializing for user: {self.user}")
         self.check_net()
         self.apply_console_visibility(self.settings.get("showconsole", "0"))
+        set_window_icon()
 
     def log(self, msg):
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -691,8 +692,7 @@ class PCModAPI:
             try:
                 self.log(f"Encrypting {auth_file} using xcode.exe for user '{username}'...")
                 p = subprocess.Popen([xcode_path, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                out, err = p.communicate(input=f"{username}\r\n".encode('utf-8'))
-                self.log(f"xcode encryption output: {out.decode('utf-8', errors='ignore').strip()}")
+                p.communicate(input=f"{username}\r\n".encode('utf-8'))
             except Exception as e:
                 self.log(f"xcode encryption error: {e}")
 
@@ -991,23 +991,36 @@ def set_window_icon():
         if os.path.exists(icon_path):
             try:
                 import ctypes
-                h_icon = ctypes.windll.user32.LoadImageW(
-                    0, icon_path, 1, 0, 0, 0x0010 | 0x0080
-                )
-                if h_icon:
-                    def enum_windows_cb(hwnd, extra):
-                        length = ctypes.windll.user32.GetWindowTextLengthW(hwnd)
-                        buff = ctypes.create_unicode_buffer(length + 1)
-                        ctypes.windll.user32.GetWindowTextW(hwnd, buff, length + 1)
-                        if "PCMod Launcher" in buff.value:
-                            ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, h_icon)
-                            ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, h_icon)
-                        return True
+                # Load small (16x16) and big (32x32) icons from file
+                # IMAGE_ICON = 1, LR_LOADFROMFILE = 0x0010
+                h_icon_small = ctypes.windll.user32.LoadImageW(0, icon_path, 1, 16, 16, 0x0010)
+                h_icon_big = ctypes.windll.user32.LoadImageW(0, icon_path, 1, 32, 32, 0x0010)
 
-                    WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
-                    ctypes.windll.user32.EnumWindows(WNDENUMPROC(enum_windows_cb), 0)
+                # 1. Apply to console window if open
+                hwnd_console = ctypes.windll.kernel32.GetConsoleWindow()
+                if hwnd_console:
+                    if h_icon_small:
+                        ctypes.windll.user32.SendMessageW(hwnd_console, 0x0080, 0, h_icon_small)
+                    if h_icon_big:
+                        ctypes.windll.user32.SendMessageW(hwnd_console, 0x0080, 1, h_icon_big)
+
+                # 2. Apply to all windows belonging to current process ID (launcher GUI)
+                current_pid = os.getpid()
+
+                def enum_windows_cb(hwnd, extra):
+                    process_id = ctypes.c_ulong()
+                    ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(process_id))
+                    if process_id.value == current_pid:
+                        if h_icon_small:
+                            ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, h_icon_small) # WM_SETICON, ICON_SMALL
+                        if h_icon_big:
+                            ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, h_icon_big)   # WM_SETICON, ICON_BIG
+                    return True
+
+                WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+                ctypes.windll.user32.EnumWindows(WNDENUMPROC(enum_windows_cb), 0)
             except Exception as e:
-                print("Error setting icon:", e)
+                print("Error setting window icon:", e)
 
 def start_launcher():
     global active_window
