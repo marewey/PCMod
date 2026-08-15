@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../icons/icon.ico" type="image/x-icon">
+<link rel="shortcut icon" href="../icons/icon.ico" type="image/x-icon">
 <title>PCMod Launcher</title>
 <style>
  /* The sidebar menu */
@@ -198,6 +200,10 @@ input.largerCheckbox {
 		</td><td align="right">
 		<input class="largerCheckbox" title="Removes client side mods. (for slower computers)." type="checkbox" id="LT" onclick="toggleLiteMode()"><br>
 		</td></tr><tr><td align="left" width="auto">
+		<label for="ShowConsole">Console </label>
+		</td><td align="right">
+		<input class="largerCheckbox" title="Show/Hide the python console window." type="checkbox" id="ShowConsole" onclick="toggleShowConsole()"><br>
+		</td></tr><tr><td align="left" width="auto">
 		<label for="VERSION-select">Version</label>
 		</td><td align="right">
 		<select title="Select Previous versions of the game." size="1" name="version-select" id="VERSION-select" style="font-size:10px; width:100px;" onchange="changeVersion()">
@@ -267,6 +273,7 @@ function initLauncher() {
         document.getElementById('AutoServer').checked = (data.settings.autoserver === "1");
         document.getElementById('LL').checked = (data.settings.log_logins === "1");
         document.getElementById('LT').checked = (data.settings.lite === "1");
+        document.getElementById('ShowConsole').checked = (data.settings.showconsole === "1");
         document.getElementById('MEM').value = data.settings.memory || "4096";
 
         // 3. Set Mod Count
@@ -329,6 +336,13 @@ function refreshPlayers() {
         window.pywebview.api.refresh_players().then(function(html) {
             document.getElementById('online').innerHTML = html;
         });
+    }
+}
+
+function toggleShowConsole() {
+    var val = document.getElementById('ShowConsole').checked ? "1" : "0";
+    if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_setting('showconsole', val);
     }
 }
 

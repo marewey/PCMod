@@ -40,6 +40,7 @@ class PCModAPI:
             "lite": "0",
             "log-logins": "1",
             "shortcut": "1",
+            "showconsole": "0",
             "memory": "4096",
             "pack-index": "0",
             "pack": "2-5-x",
@@ -49,7 +50,33 @@ class PCModAPI:
         # Load user and core vars
         self.load_user_info()
         self.load_settings()
+        self.log(f"PCMod Initializing for user: {self.user}")
         self.check_net()
+        self.apply_console_visibility(self.settings.get("showconsole", "0"))
+
+    def log(self, msg):
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        formatted = f"[{timestamp}] {msg}"
+        print(formatted)
+        try:
+            log_file = os.path.join("data", "init.log")
+            os.makedirs(os.path.dirname(log_file), exist_ok=True)
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(formatted + "\n")
+        except Exception as e:
+            print("Failed to write to init.log:", e)
+
+    def apply_console_visibility(self, show_val):
+        if platform.system().lower() == "windows":
+            try:
+                import ctypes
+                hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+                if hwnd:
+                    # 5 = SW_SHOW, 0 = SW_HIDE
+                    ctypes.windll.user32.ShowWindow(hwnd, 5 if str(show_val) == "1" else 0)
+                    self.log(f"Console visibility set to: {show_val}")
+            except Exception as e:
+                self.log(f"Error adjusting console visibility: {e}")
 
     def load_user_info(self):
         user_file = os.path.join("data", "indexes", "user")
@@ -465,9 +492,12 @@ class PCModAPI:
     def set_setting(self, key, value):
         self.settings[key] = value
         self.save_settings()
+        self.log(f"Setting updated: {key} = {value}")
 
         if key == "shortcut":
             self.manage_shortcut(value)
+        elif key == "showconsole":
+            self.apply_console_visibility(value)
 
     def get_windows_desktop(self):
         if platform.system().lower() != "windows":
@@ -630,7 +660,9 @@ class PCModAPI:
                 self.show_message("PCMod Error", "Server launch request failed.")
 
     def login(self, username, password):
+        self.log(f"Login attempt initiated for user '{username}'")
         res = self.login_auth_flow(username, password)
+        self.log(f"Login auth flow result: {res}")
         if res["status"] == "success":
             self.show_message("PCMod Login", "Logged In Successfully.")
         else:
@@ -642,6 +674,8 @@ class PCModAPI:
 
     def login_auth_flow(self, username, password):
         md5_hash = hashlib.md5(password.encode('utf-8')).hexdigest()
+        self.log(f"Computed password MD5 hash: '{md5_hash}'")
+
         auth_file = os.path.join("data", "indexes", "auth")
         os.makedirs(os.path.dirname(auth_file), exist_ok=True)
 
@@ -651,25 +685,36 @@ class PCModAPI:
         xcode_path = os.path.join("bin", "xcode.exe")
         if os.path.exists(xcode_path) and os.name == 'nt':
             try:
+                self.log(f"Encrypting {auth_file} using xcode.exe for user '{username}'...")
                 p = subprocess.Popen([xcode_path, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                p.communicate(input=f"{username}\r\n".encode('utf-8'))
-            except Exception:
-                pass
+                out, err = p.communicate(input=f"{username}\r\n".encode('utf-8'))
+                self.log(f"xcode encryption output: {out.decode('utf-8', errors='ignore').strip()}")
+            except Exception as e:
+                self.log(f"xcode encryption error: {e}")
 
         token = self.decode_auth_token(username)
+        self.log(f"Decoded token from file: '{token}'")
+        if not token:
+            token = md5_hash
+            self.log(f"Fallback token used: '{token}'")
+
         return_auth = "404.auth"
 
         if self.connection:
             try:
-                url = f"http://{self.url}/commands/authp.php"
-                data = urllib.parse.urlencode({'x': token, 'u': username, 'z': 'auth'}).encode('utf-8')
-                req = urllib.request.Request(url, data=data, headers={'User-Agent': 'Mozilla/5.0'})
+                auth_url = f"http://{self.url}/commands/authp.php"
+                post_data = {'x': token, 'u': username, 'z': 'auth'}
+                self.log(f"Submitting auth POST to '{auth_url}' with data: {post_data}")
+                data = urllib.parse.urlencode(post_data).encode('utf-8')
+                req = urllib.request.Request(auth_url, data=data, headers={'User-Agent': 'Mozilla/5.0'})
                 with urllib.request.urlopen(req, timeout=5) as resp:
                     return_auth = resp.read().decode('utf-8', errors='ignore').strip()
+                self.log(f"Server auth response: '{return_auth}'")
             except Exception as e:
-                print("Auth call error:", e)
+                self.log(f"Auth HTTP call failed: {e}")
                 return_auth = "408.auth"
         else:
+            self.log("No internet connection available for auth check.")
             return_auth = "408.auth"
 
         if return_auth in ["200.auth", "404.auth"]:
@@ -932,6 +977,30 @@ class PCModAPI:
         except Exception as e:
             print("Skinget error:", e)
 
+def set_window_icon():
+    if platform.system().lower() == "windows":
+        icon_path = os.path.abspath(os.path.join("data", "icons", "icon.ico"))
+        if os.path.exists(icon_path):
+            try:
+                import ctypes
+                h_icon = ctypes.windll.user32.LoadImageW(
+                    0, icon_path, 1, 0, 0, 0x0010 | 0x0080
+                )
+                if h_icon:
+                    def enum_windows_cb(hwnd, extra):
+                        length = ctypes.windll.user32.GetWindowTextLengthW(hwnd)
+                        buff = ctypes.create_unicode_buffer(length + 1)
+                        ctypes.windll.user32.GetWindowTextW(hwnd, buff, length + 1)
+                        if "PCMod Launcher" in buff.value:
+                            ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, h_icon)
+                            ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, h_icon)
+                        return True
+
+                    WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+                    ctypes.windll.user32.EnumWindows(WNDENUMPROC(enum_windows_cb), 0)
+            except Exception as e:
+                print("Error setting icon:", e)
+
 def start_launcher():
     global active_window
     if not webview:
@@ -954,7 +1023,10 @@ def start_launcher():
     )
     active_window = window
 
-    webview.start()
+    def on_loaded():
+        set_window_icon()
+
+    webview.start(on_loaded)
 
 if __name__ == "__main__":
     start_launcher()
