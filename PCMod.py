@@ -1090,54 +1090,68 @@ def set_class_icon(hwnd, h_icon_small, h_icon_big):
 
 def set_window_icon():
     global active_window
-    if platform.system().lower() == "windows":
-        icon_path = os.path.abspath(os.path.join("data", "icons", "icon.ico"))
-        if os.path.exists(icon_path):
-            try:
-                import ctypes
-                # Load small (16x16) and big (32x32) icons from file
-                # IMAGE_ICON = 1, LR_LOADFROMFILE = 0x0010
-                h_icon_small = ctypes.windll.user32.LoadImageW(0, icon_path, 1, 16, 16, 0x0010)
-                h_icon_big = ctypes.windll.user32.LoadImageW(0, icon_path, 1, 32, 32, 0x0010)
+    if platform.system().lower() != "windows":
+        return
 
-                # 1. Apply to console window if open
-                hwnd_console = ctypes.windll.kernel32.GetConsoleWindow()
-                if hwnd_console:
-                    if h_icon_small:
-                        ctypes.windll.user32.SendMessageW(hwnd_console, 0x0080, 0, h_icon_small)
-                    if h_icon_big:
-                        ctypes.windll.user32.SendMessageW(hwnd_console, 0x0080, 1, h_icon_big)
-                    set_class_icon(hwnd_console, h_icon_small, h_icon_big)
-                    set_window_appid_property(hwnd_console, APP_USER_MODEL_ID)
+    icon_path = os.path.abspath(os.path.join("data", "icons", "icon.ico"))
+    if os.path.exists(icon_path):
+        try:
+            import ctypes
+            # Load small (16x16) and big (32x32) icons from file
+            # IMAGE_ICON = 1, LR_LOADFROMFILE = 0x0010
+            h_icon_small = ctypes.windll.user32.LoadImageW(0, icon_path, 1, 16, 16, 0x0010)
+            h_icon_big = ctypes.windll.user32.LoadImageW(0, icon_path, 1, 32, 32, 0x0010)
 
-                # 2. Apply to native pywebview Form if available
-                if active_window and hasattr(active_window, "native") and active_window.native:
-                    try:
-                        import clr
+            # 1. Apply to console window if open
+            hwnd_console = ctypes.windll.kernel32.GetConsoleWindow()
+            if hwnd_console:
+                if h_icon_small:
+                    ctypes.windll.user32.SendMessageW(hwnd_console, 0x0080, 0, h_icon_small)
+                if h_icon_big:
+                    ctypes.windll.user32.SendMessageW(hwnd_console, 0x0080, 1, h_icon_big)
+                set_class_icon(hwnd_console, h_icon_small, h_icon_big)
+                set_window_appid_property(hwnd_console, APP_USER_MODEL_ID)
+
+            # 2. Apply to native pywebview Form on WinForms GUI thread
+            if active_window and hasattr(active_window, "native") and active_window.native:
+                try:
+                    form = active_window.native
+                    if hasattr(form, "InvokeRequired") and form.InvokeRequired:
+                        import System
                         import System.Drawing
-                        active_window.native.Icon = System.Drawing.Icon(icon_path)
-                    except Exception:
-                        pass
+                        def apply_icon_cb():
+                            try:
+                                form.Icon = System.Drawing.Icon(icon_path)
+                                form.ShowIcon = True
+                            except Exception:
+                                pass
+                        form.BeginInvoke(System.Action(apply_icon_cb))
+                    else:
+                        import System.Drawing
+                        form.Icon = System.Drawing.Icon(icon_path)
+                        form.ShowIcon = True
+                except Exception as e:
+                    print("WinForms icon assignment notice:", e)
 
-                # 3. Apply to all windows belonging to current process ID (launcher GUI)
-                current_pid = os.getpid()
+            # 3. Apply to all windows belonging to current process ID (launcher GUI)
+            current_pid = os.getpid()
 
-                def enum_windows_cb(hwnd, extra):
-                    process_id = ctypes.c_ulong()
-                    ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(process_id))
-                    if process_id.value == current_pid:
-                        if h_icon_small:
-                            ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, h_icon_small) # WM_SETICON, ICON_SMALL
-                        if h_icon_big:
-                            ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, h_icon_big)   # WM_SETICON, ICON_BIG
-                        set_class_icon(hwnd, h_icon_small, h_icon_big)
-                        set_window_appid_property(hwnd, APP_USER_MODEL_ID)
-                    return True
+            def enum_windows_cb(hwnd, extra):
+                process_id = ctypes.c_ulong()
+                ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(process_id))
+                if process_id.value == current_pid:
+                    if h_icon_small:
+                        ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, h_icon_small) # WM_SETICON, ICON_SMALL
+                    if h_icon_big:
+                        ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, h_icon_big)   # WM_SETICON, ICON_BIG
+                    set_class_icon(hwnd, h_icon_small, h_icon_big)
+                    set_window_appid_property(hwnd, APP_USER_MODEL_ID)
+                return True
 
-                WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
-                ctypes.windll.user32.EnumWindows(WNDENUMPROC(enum_windows_cb), 0)
-            except Exception as e:
-                print("Error setting window icon:", e)
+            WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+            ctypes.windll.user32.EnumWindows(WNDENUMPROC(enum_windows_cb), 0)
+        except Exception as e:
+            print("Error setting window icon:", e)
 
 def start_launcher():
     global active_window
