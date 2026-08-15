@@ -160,8 +160,12 @@ class PCModAPI:
                 self.connection = False
 
     def init_launcher(self):
+        self.log(f"[START: {datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}]")
+        self.log(f"Running in '{os.getcwd()}'")
         self.check_net()
-        # Initialize calculations
+        self.log(f"Connection: {1 if self.connection else 0}")
+        self.log("########### LOAD ############")
+        self.log("Setting Default Variables...")
         self.calculate_default_memory_if_needed()
         self.init_downloads()
 
@@ -171,6 +175,12 @@ class PCModAPI:
         versions_list, launcher_version, pack_version = self.get_versions_info()
         # Get online players list
         online_players = self.get_online_players_html()
+
+        self.log(f" --Set User: {self.user}")
+        self.log(f" --Set Memory: {self.settings.get('memory', '4096')}mb")
+        self.log(f" --Set MCVersion: {self.pack}")
+        self.log(f" --Set MCUUID: {self.mcuuid}")
+        self.log(f" --Set Gamedir: {os.path.abspath(os.path.join('data', 'packs', self.pack))}")
 
         return {
             "user": self.user,
@@ -673,16 +683,10 @@ class PCModAPI:
                 self.show_message("PCMod Error", "Server launch request failed.")
 
     def login(self, username, password):
-        self.log(f"Login attempt initiated for user '{username}'")
+        self.log("########### LOGIN ###########")
+        self.log(f"Authorizing User ({username})...")
         res = self.login_auth_flow(username, password)
-        self.log(f"Login auth flow result: {res}")
-        if res["status"] == "success":
-            self.show_message("PCMod Login", "Logged In Successfully.")
-        else:
-            if res["auth"] == "401.auth":
-                self.show_message("PCMod Error", "Password was incorrect. Try again.\nTo reset password, go to pcmod.ddns.me/account")
-            else:
-                self.show_message("PCMod Error", f"Login failed. Return code: {res['auth']}")
+        self.log(f"AUTH RETURN: {res.get('auth', 'null')}")
         return res
 
     def login_auth_flow(self, username, password):
@@ -745,8 +749,8 @@ class PCModAPI:
 
     def launch_game(self):
         global active_window
-        # Starts portablemc and detaches session
-        print("Launching the game...")
+        self.log("########### LAUNCH ##########")
+        self.log("Starting Crashreport Catcher...")
 
         # Step 1: skinget
         self.skinget()
@@ -814,14 +818,12 @@ class PCModAPI:
             if os.path.exists(pmc_local):
                 portablemc_cmd = [sys.executable, pmc_local] if not pmc_local.endswith(".exe") else [pmc_local]
             else:
-                # Install it via pip dynamically as redundancy
                 try:
                     subprocess.run([sys.executable, "-m", "pip", "install", "portablemc"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 except Exception:
                     pass
                 portablemc_cmd = [sys.executable, "-m", "portablemc"]
 
-        # Command
         work_dir = os.path.abspath(os.path.join("data", "packs", self.pack))
         cmd = portablemc_cmd + [
             "--work-dir", work_dir,
@@ -832,14 +834,39 @@ class PCModAPI:
             m_version
         ]
 
-        print("Executing command:", " ".join(cmd))
+        self.log(f"LAUNCHING... (\"{work_dir}\" {m_version})")
+        self.log("Executing command: " + " ".join(cmd))
 
         try:
-            # Run the process
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            proc.communicate() # wait for launch exit
+            # Stream portablemc stdout/stderr in real time to console and logs
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                universal_newlines=True
+            )
+
+            launch_log_path = os.path.join("data", "launch.log")
+            os.makedirs(os.path.dirname(launch_log_path), exist_ok=True)
+
+            with open(launch_log_path, "a", encoding="utf-8") as llog:
+                for line in proc.stdout:
+                    clean_line = line.rstrip()
+                    print(clean_line)
+                    llog.write(clean_line + "\n")
+                    try:
+                        with open(os.path.join("data", "init.log"), "a", encoding="utf-8") as ilog:
+                            ilog.write(clean_line + "\n")
+                    except Exception:
+                        pass
+
+            proc.wait()
         except Exception as e:
-            print("Launch failed:", e)
+            self.log(f"Launch failed: {e}")
+
+        self.log("EXITING...")
 
         # Post launch exit
         if active_window:
@@ -849,7 +876,7 @@ class PCModAPI:
         final_crashes = set(os.listdir(crash_reports_dir)) if os.path.exists(crash_reports_dir) else set()
         new_crashes = final_crashes - initial_crashes
         if new_crashes:
-            print("Crash detected!")
+            self.log(f"Crash detected! New report: {list(new_crashes)[0]}")
             self.handle_crash_upload(list(new_crashes)[0])
 
         if self.settings.get("log-logins", "1") == "1":
@@ -983,11 +1010,13 @@ class PCModAPI:
     def skinget(self):
         if not self.connection:
             return
-        print("Checking/Getting skins...")
+        self.log("---=== SKIN DOWNLOADER ===---")
         try:
             skindex_file = os.path.join("data", "indexes", "skindex")
             os.makedirs(os.path.dirname(skindex_file), exist_ok=True)
+            self.log("Getting skindex... ")
             urllib.request.urlretrieve(f"http://{self.url}/skins/skin.index", skindex_file)
+            self.log("skindex DONE")
 
             skins = {}
             with open(skindex_file, "r", encoding="utf-8", errors="ignore") as f:
@@ -999,15 +1028,19 @@ class PCModAPI:
             skins_dir = os.path.join("data", "packs", self.pack, "cachedImages", "skins")
             os.makedirs(skins_dir, exist_ok=True)
 
+            downloaded = 0
             for skin_name, version in skins.items():
-                # Sanitize skin_name to prevent directory traversal vulnerability
                 safe_skin_name = os.path.basename(skin_name)
                 dest = os.path.join(skins_dir, f"{safe_skin_name}.png")
                 if not os.path.exists(dest):
-                    print(f"Downloading skin: {safe_skin_name}")
+                    self.log(f"Getting skin for '{safe_skin_name}'...")
                     urllib.request.urlretrieve(f"http://{self.url}/skins/{urllib.parse.quote(skin_name)}", dest)
+                    downloaded += 1
+            if downloaded == 0:
+                self.log("No Skins Downloaded.")
         except Exception as e:
-            print("Skinget error:", e)
+            self.log(f"Skinget error: {e}")
+        self.log("---===##### DONE ######===---")
 
 APP_USER_MODEL_ID = "Plattecraft.PCMod.Launcher.2"
 

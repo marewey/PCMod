@@ -232,7 +232,7 @@ input.largerCheckbox {
 		<input type="button" style="width: 110px; font-size: 13px; cursor: pointer;" value="Login" onclick="login()">
 		</td>
 		</tr>
-		<tr><td colspan="2" style="padding-top:2px;"><hr></td></tr>
+		<tr><td colspan="2" style="padding-top:2px;"><hr><div id="login-status" style="font-size: 11px; text-align: center; color: #afc9f0;"></div></td></tr>
 	</table>
 </div>
 
@@ -349,10 +349,29 @@ function toggleShowConsole() {
 function login() {
     var u = document.getElementById('user').value;
     var p = document.getElementById('pass').value;
+    var statusElem = document.getElementById('login-status');
+    if (statusElem) {
+        statusElem.style.color = "#afc9f0";
+        statusElem.innerHTML = "Logging in...";
+    }
     if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.login(u, p).then(function(res) {
-            if (res && res.status === "success") {
-                initLauncher();
+            if (res) {
+                if (statusElem) {
+                    if (res.status === "success") {
+                        statusElem.style.color = "#a3e4d7";
+                        statusElem.innerHTML = "Logged In Successfully.";
+                    } else if (res.auth === "401.auth") {
+                        statusElem.style.color = "#f5b7b1";
+                        statusElem.innerHTML = "Password incorrect. Try again.";
+                    } else {
+                        statusElem.style.color = "#f5b7b1";
+                        statusElem.innerHTML = "Login failed: " + res.auth;
+                    }
+                }
+                if (res.status === "success") {
+                    initLauncher();
+                }
             }
         });
     }
