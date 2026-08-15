@@ -51,6 +51,7 @@ class PCModAPI:
         self.load_user_info()
         self.load_settings()
         self.log(f"PCMod Initializing for user: {self.user}")
+        set_console_title(self.user)
         self.check_net()
         self.apply_console_visibility(self.settings.get("showconsole", "0"))
         set_window_icon()
@@ -742,6 +743,7 @@ class PCModAPI:
             with open(user_file, "w", encoding="utf-8") as f:
                 f.write(username)
             self.user = username
+            set_console_title(self.user)
             self.get_mcuuid()
             return {"status": "success", "auth": return_auth}
         else:
@@ -1044,6 +1046,15 @@ class PCModAPI:
 
 APP_USER_MODEL_ID = "Plattecraft.PCMod.Launcher.2"
 
+def set_console_title(username):
+    if platform.system().lower() == "windows":
+        try:
+            import ctypes
+            title = f"PCMod Console - {username}" if username else "PCMod Console"
+            ctypes.windll.kernel32.SetConsoleTitleW(title)
+        except Exception as e:
+            print("Error setting console title:", e)
+
 def set_app_user_model_id():
     if platform.system().lower() == "windows":
         try:
@@ -1203,7 +1214,7 @@ def start_launcher():
         title="PCMod Launcher",
         url=f"file:///{launcher_html}",
         width=1100,
-        height=655,
+        height=760,
         resizable=True,
         js_api=api
     )
