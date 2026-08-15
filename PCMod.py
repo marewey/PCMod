@@ -1009,14 +1009,67 @@ class PCModAPI:
         except Exception as e:
             print("Skinget error:", e)
 
+APP_USER_MODEL_ID = "Plattecraft.PCMod.Launcher.2"
+
 def set_app_user_model_id():
     if platform.system().lower() == "windows":
         try:
             import ctypes
-            myappid = "Plattecraft.PCMod.Launcher.2"
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
         except Exception as e:
             print("Error setting AppUserModelID:", e)
+
+def set_window_appid_property(hwnd, appid_str):
+    if platform.system().lower() != "windows":
+        return
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class PROPVARIANT(ctypes.Structure):
+            _fields_ = [
+                ("vt", wintypes.WORD),
+                ("wReserved1", wintypes.WORD),
+                ("wReserved2", wintypes.WORD),
+                ("wReserved3", wintypes.WORD),
+                ("pwszVal", wintypes.LPCWSTR)
+            ]
+
+        class PROPERTYKEY(ctypes.Structure):
+            _fields_ = [
+                ("fmtid", ctypes.c_byte * 16),
+                ("pid", wintypes.DWORD)
+            ]
+
+        # GUID {9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3}
+        guid_bytes = b"\x55\x28\x4c\x9f\x79\x9f\x39\x4b\xa8\xd0\xe1\xd4\x2d\xe1\xd5\xf3"
+        pkey = PROPERTYKEY((ctypes.c_byte * 16).from_buffer_copy(guid_bytes), 5)
+
+        # IID_IPropertyStore GUID {886d8e0b-d521-4707-80c4-60a7170d64f0}
+        IID_IPropertyStore = (ctypes.c_byte * 16).from_buffer_copy(
+            b"\x0b\x8e\x6d\x88\x21\xd5\x07\x47\x80\xc4\x60\xa7\x17\x0d\x64\xf0"
+        )
+
+        store = ctypes.c_void_p()
+        hr = ctypes.windll.shell32.SHGetPropertyStoreForWindow(
+            hwnd, ctypes.byref(IID_IPropertyStore), ctypes.byref(store)
+        )
+        if hr == 0 and store:
+            pv = PROPVARIANT()
+            pv.vt = 31 # VT_LPWSTR
+            pv.pwszVal = appid_str
+
+            vtbl = ctypes.cast(ctypes.cast(store, ctypes.POINTER(ctypes.c_void_p))[0], ctypes.POINTER(ctypes.c_void_p))
+            set_value_func = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(PROPERTYKEY), ctypes.POINTER(PROPVARIANT))(vtbl[6])
+            set_value_func(store, ctypes.byref(pkey), ctypes.byref(pv))
+
+            commit_func = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p)(vtbl[7])
+            commit_func(store)
+
+            release_func = ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)(vtbl[2])
+            release_func(store)
+    except Exception as e:
+        print("Error setting property store AppID:", e)
 
 def set_class_icon(hwnd, h_icon_small, h_icon_big):
     try:
@@ -1036,6 +1089,7 @@ def set_class_icon(hwnd, h_icon_small, h_icon_big):
         pass
 
 def set_window_icon():
+    global active_window
     if platform.system().lower() == "windows":
         icon_path = os.path.abspath(os.path.join("data", "icons", "icon.ico"))
         if os.path.exists(icon_path):
@@ -1054,8 +1108,18 @@ def set_window_icon():
                     if h_icon_big:
                         ctypes.windll.user32.SendMessageW(hwnd_console, 0x0080, 1, h_icon_big)
                     set_class_icon(hwnd_console, h_icon_small, h_icon_big)
+                    set_window_appid_property(hwnd_console, APP_USER_MODEL_ID)
 
-                # 2. Apply to all windows belonging to current process ID (launcher GUI)
+                # 2. Apply to native pywebview Form if available
+                if active_window and hasattr(active_window, "native") and active_window.native:
+                    try:
+                        import clr
+                        import System.Drawing
+                        active_window.native.Icon = System.Drawing.Icon(icon_path)
+                    except Exception:
+                        pass
+
+                # 3. Apply to all windows belonging to current process ID (launcher GUI)
                 current_pid = os.getpid()
 
                 def enum_windows_cb(hwnd, extra):
@@ -1067,6 +1131,7 @@ def set_window_icon():
                         if h_icon_big:
                             ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, h_icon_big)   # WM_SETICON, ICON_BIG
                         set_class_icon(hwnd, h_icon_small, h_icon_big)
+                        set_window_appid_property(hwnd, APP_USER_MODEL_ID)
                     return True
 
                 WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
