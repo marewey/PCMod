@@ -271,7 +271,7 @@ function initLauncher() {
         // 2. Load Settings checkboxes & inputs
         document.getElementById('Shortcut').checked = (data.settings.shortcut === "1");
         document.getElementById('AutoServer').checked = (data.settings.autoserver === "1");
-        document.getElementById('LL').checked = (data.settings.log_logins === "1");
+        document.getElementById('LL').checked = (data.settings['log-logins'] === "1" || data.settings.log_logins === "1");
         document.getElementById('LT').checked = (data.settings.lite === "1");
         document.getElementById('ShowConsole').checked = (data.settings.showconsole === "1");
         document.getElementById('MEM').value = data.settings.memory || "4096";

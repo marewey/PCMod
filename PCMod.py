@@ -530,13 +530,17 @@ class PCModAPI:
             icon_path = os.path.abspath(os.path.join("data", "icons", "icon.ico"))
 
             # PowerShell script to create shortcut robustly without VBScript blocking
+            safe_lnk = shortcut_lnk.replace("'", "''")
+            safe_target = target_path.replace("'", "''")
+            safe_working = working_dir.replace("'", "''")
+            safe_icon = icon_path.replace("'", "''")
             ps_cmd = f"""
             $WshShell = New-Object -ComObject WScript.Shell
-            $Shortcut = $WshShell.CreateShortcut('{shortcut_lnk}')
-            $Shortcut.TargetPath = '{target_path}'
-            $Shortcut.WorkingDirectory = '{working_dir}'
+            $Shortcut = $WshShell.CreateShortcut('{safe_lnk}')
+            $Shortcut.TargetPath = '{safe_target}'
+            $Shortcut.WorkingDirectory = '{safe_working}'
             $Shortcut.Description = 'PCMod - Plattecraft Modded Launcher'
-            $Shortcut.IconLocation = '{icon_path}'
+            $Shortcut.IconLocation = '{safe_icon}'
             $Shortcut.Save()
             """
             try:
@@ -697,6 +701,10 @@ class PCModAPI:
         if not token:
             token = md5_hash
             self.log(f"Fallback token used: '{token}'")
+
+        if not token.startswith("\\"):
+            token = "\\" + token
+            self.log(f"Prepended leading backslash for server auth match: '{token}'")
 
         return_auth = "404.auth"
 
