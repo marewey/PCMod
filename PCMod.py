@@ -985,6 +985,23 @@ class PCModAPI:
         except Exception as e:
             print("Skinget error:", e)
 
+def set_class_icon(hwnd, h_icon_small, h_icon_big):
+    try:
+        import ctypes
+        # GCLP_HICON = -14, GCLP_HICONSM = -34
+        if hasattr(ctypes.windll.user32, "SetClassLongPtrW"):
+            if h_icon_big:
+                ctypes.windll.user32.SetClassLongPtrW(hwnd, -14, h_icon_big)
+            if h_icon_small:
+                ctypes.windll.user32.SetClassLongPtrW(hwnd, -34, h_icon_small)
+        else:
+            if h_icon_big:
+                ctypes.windll.user32.SetClassLongW(hwnd, -14, h_icon_big)
+            if h_icon_small:
+                ctypes.windll.user32.SetClassLongW(hwnd, -34, h_icon_small)
+    except Exception:
+        pass
+
 def set_window_icon():
     if platform.system().lower() == "windows":
         icon_path = os.path.abspath(os.path.join("data", "icons", "icon.ico"))
@@ -1003,6 +1020,7 @@ def set_window_icon():
                         ctypes.windll.user32.SendMessageW(hwnd_console, 0x0080, 0, h_icon_small)
                     if h_icon_big:
                         ctypes.windll.user32.SendMessageW(hwnd_console, 0x0080, 1, h_icon_big)
+                    set_class_icon(hwnd_console, h_icon_small, h_icon_big)
 
                 # 2. Apply to all windows belonging to current process ID (launcher GUI)
                 current_pid = os.getpid()
@@ -1015,6 +1033,7 @@ def set_window_icon():
                             ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 0, h_icon_small) # WM_SETICON, ICON_SMALL
                         if h_icon_big:
                             ctypes.windll.user32.SendMessageW(hwnd, 0x0080, 1, h_icon_big)   # WM_SETICON, ICON_BIG
+                        set_class_icon(hwnd, h_icon_small, h_icon_big)
                     return True
 
                 WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
