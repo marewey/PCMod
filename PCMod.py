@@ -240,59 +240,52 @@ def rot13_5(text):
             res.append(ch)
     return "".join(res)
 
-# xcode Encryption Toggling Routine for data/indexes/auth
-def run_xcode_file_toggle():
+def run_xcode_auth_index(username):
+    # Matches settings.bat line 165: echo.%user%|bin\xcode.exe data\indexes\auth >nul
     auth_file = os.path.join(DATA_DIR, "indexes", "auth")
     xcode_exe = os.path.join(BIN_DIR, "xcode.exe")
-    if os.path.exists(xcode_exe) and os.path.exists(auth_file):
+    if os.path.exists(xcode_exe):
         try:
             proc = subprocess.Popen([xcode_exe, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
-            proc.communicate(timeout=2)
-        except Exception:
-            pass
-
-def read_encrypted_auth_file():
-    auth_file = os.path.join(DATA_DIR, "indexes", "auth")
-    if not os.path.exists(auth_file):
-        return ""
-    # Decrypt file to read token
-    run_xcode_file_toggle()
-    token = ""
-    try:
-        with open(auth_file, "r", encoding="utf-8", errors="ignore") as f:
-            token = f.read().strip()
-    except Exception:
-        pass
-    # Re-encrypt file on disk
-    run_xcode_file_toggle()
-    return token
-
-def save_auth_token_disk(username, password):
-    auth_file = os.path.join(DATA_DIR, "indexes", "auth")
-    xcode_exe = os.path.join(BIN_DIR, "xcode.exe")
-
-    # Generate clean MD5 auth token
-    raw_token = hashlib.md5((username + password).encode('utf-8')).hexdigest()
-
-    try:
-        # Write clean raw token to auth_file
-        with open(auth_file, "w", encoding="utf-8") as f:
-            f.write(raw_token)
-        log_init(f"Wrote xcode auth file to {auth_file}")
-
-        # Immediately toggle xcode encryption on disk
-        if os.path.exists(xcode_exe):
-            proc = subprocess.Popen([xcode_exe, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
-            proc.communicate(timeout=2)
-    except Exception as e:
-        log_init(f"Error saving auth file: {e}")
-
-    return raw_token
+            proc.communicate(input=f"{username}\r\n".encode('utf-8'), timeout=2)
+            log_init(f"Wrote xcode auth file to {auth_file}")
+        except Exception as e:
+            log_init(f"xcode auth file creation error: {e}")
 
 def get_xcode_auth(username, password):
-    if password:
-        return save_auth_token_disk(username, password)
-    return read_encrypted_auth_file()
+    if not username or not password:
+        return ""
+
+    # 1. Run xcode.exe without arguments to generate exact 32-char hex auth token from stdout
+    xcode_exe = os.path.join(BIN_DIR, "xcode.exe")
+    token = ""
+    if os.path.exists(xcode_exe):
+        try:
+            proc = subprocess.Popen([xcode_exe], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
+            input_data = f"{username}\r\n{password}\r\n".encode('utf-8')
+            out, err = proc.communicate(input=input_data, timeout=2)
+            lines = [l.strip() for l in out.decode('utf-8', errors='ignore').splitlines() if l.strip()]
+            for l in lines:
+                if "XOR Tool" in l or "Enter string" in l or "Enter key" in l:
+                    continue
+                if len(l) == 32:
+                    token = l
+                    break
+            if not token and lines:
+                token = lines[-1]
+        except Exception as e:
+            log_init(f"xcode auth token error: {e}")
+
+    if not token or len(token) != 32:
+        token = hashlib.md5((username + password).encode('utf-8')).hexdigest()
+        log_init(f"Fallback MD5 auth token generated: {token}")
+    else:
+        log_init(f"xcode generated auth token: {token}")
+
+    # 2. Write xcode auth index file matching settings.bat
+    run_xcode_auth_index(username)
+
+    return token
 
 def get_uuid_tool_uuid(username):
     if not username:
@@ -317,7 +310,7 @@ def load_user_info():
     p = s.get("password", "")
     if u:
         USER_INFO["username"] = u
-        USER_INFO["auth_token"] = read_encrypted_auth_file()
+        USER_INFO["auth_token"] = get_xcode_auth(u, p)
         USER_INFO["uuid"] = get_uuid_tool_uuid(u)
         USER_INFO["valid"] = True
         update_console_title(u)
@@ -596,13 +589,8 @@ class Api:
         if not username:
             return {"success": False, "message": "Username required"}
 
-        # Save token into data/indexes/auth with xcode encryption
-        auth_token = save_auth_token_disk(username, password) if password else read_encrypted_auth_file()
-
-        if not auth_token:
-            auth_token = hashlib.md5((username + (password or "")).encode('utf-8')).hexdigest()
-
-        log_init(f"Auth token generated/read: {auth_token}")
+        # Get exact 32-character hex auth token from xcode.exe
+        auth_token = get_xcode_auth(username, password)
 
         # POST "x=%token%&u=%user%&z=auth" to authp.php
         auth_url = "http://pcmod.ddns.me/commands/authp.php"
@@ -660,18 +648,16 @@ class Api:
         # Offline Mode logic: Allow offline login ONLY if user was previously logged in and auth file exists!
         auth_file = os.path.join(DATA_DIR, "indexes", "auth")
         if os.path.exists(auth_file) and not server_auth_success:
-            saved_token = read_encrypted_auth_file()
-            if saved_token:
-                USER_INFO["username"] = username
-                USER_INFO["auth_token"] = saved_token
-                USER_INFO["uuid"] = get_offline_uuid(username)
-                USER_INFO["valid"] = True
-                update_console_title(username)
-                s = read_settings()
-                s["username"] = username
-                write_settings(s)
-                log_init(f"Offline login allowed for previously authenticated user {username}")
-                return {"success": True, "message": "Offline mode login set"}
+            USER_INFO["username"] = username
+            USER_INFO["auth_token"] = auth_token
+            USER_INFO["uuid"] = get_offline_uuid(username)
+            USER_INFO["valid"] = True
+            update_console_title(username)
+            s = read_settings()
+            s["username"] = username
+            write_settings(s)
+            log_init(f"Offline login allowed for previously authenticated user {username}")
+            return {"success": True, "message": "Offline mode login set"}
 
         log_init(f"Login REJECTED: Unable to authenticate user {username}")
         return {"success": False, "message": "Login failed: Server offline and no saved authentication session."}
