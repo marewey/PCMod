@@ -311,7 +311,7 @@ class Api:
             log_init(f"Setting updated: {k}={v}")
         return True
 
-    def set_lite_mode((self, *args, **kwargs):
+    def set_lite_mode(self, *args, **kwargs):
         val = args[0] if args else "0"
         s = read_settings()
         s["lite"] = str(val)
