@@ -1,5 +1,6 @@
 @echo off
 @SetLocal EnableDelayedExpansion Enableextensions
+cd /d "%~dp0.."
 FOR /F "usebackq tokens=4" %%i IN (`chcp`) DO SET _codepage=%%i
 :: %1=type %2=desired version
 :: %1=launcher/pack/empty
@@ -11,7 +12,7 @@ if not "%desired_version%"=="" (
     if /i "%update_type%"=="launcher" set "launcher_update=%desired_version%"
     if /i "%update_type%"=="pack"     set "pack_update=%desired_version%"
 )
-if "%1"=="" cd ..
+
 :: Load settings
 if exist settings.txt (
     for /f "usebackq tokens=1-2 delims==" %%a in ("settings.txt") do set "%%a=%%b"
@@ -181,7 +182,7 @@ if "!select!"=="0" call :drawversions "%~1" "%~2"
 ::FINAL LOGIC
 if "%timeout%"=="1" if not "%auto%"=="0" set submit=%auto%&set desc=
 set auto=0
-if not "!submit!"=="0" if not "!submit!"=="" if not "!submit!"=="6" call :run.this
+if not "!submit!"=="0" if not "!submit!"="" if not "!submit!"=="6" call :run.this
 if "!submit!"=="1" call :update.pack.downloader
 if "!submit!"=="2" call :update.mods
 if "!submit!"=="3" call :update.auto
@@ -189,7 +190,7 @@ if "!submit!"=="4" call :update.launcher.custom
 if "!submit!"=="5" call :update.pack.custom
 if "!submit!"=="6" set exit=1&set title=&set desc=
 if "%debug%"=="1" echo.!select! - !auto! - !submit! - !timeout! - %* - !update_type!/!launcher_update!/!pack_update!/!launcher_version!/!pack_version!
-if not "!submit!"=="0" if not "!submit!"=="" bin\bg.exe Locate 18 0&ping 127.0.0.1 -n 2 >nul&set title=&set desc=&goto :eof
+if not "!submit!"=="0" if not "!submit!"="" bin\bg.exe Locate 18 0&ping 127.0.0.1 -n 2 >nul&set title=&set desc=&goto :eof
 goto :menu_loop
 :drawlogo offset
 set titlecolor=63
@@ -277,7 +278,7 @@ if !row! geq 14 if !row! leq 15 if !col! geq 2 if !col! leq 17 set select=4
 if !row! geq 14 if !row! leq 15 if !col! geq 20 if !col! leq 34 set select=5
 if !row! geq 14 if !row! leq 15 if !col! geq 37 if !col! leq 52 set select=6
 if "!timeout!"=="1" set select=0
-if not "%key%"=="" set select=0
+if not "%key%" Butler set select=0
 ::LETTERS
 if "%key%"=="100" set select=1
 if "%key%"=="114" set select=2
@@ -319,9 +320,6 @@ bin\bg.exe Locate 7 0
 goto :eof
 
 :update.auto
-:: ... UI setup ...
-
-:: --- Phase 1: Launcher ---
 set "run_l="
 if /i "%update_type%"=="launcher" set "run_l=1"
 if /i "%update_type%"=="both"     set "run_l=1"
@@ -335,7 +333,6 @@ if defined run_l if not "%launcher_update%"=="" (
     if /i "%update_type%"=="launcher" call :update.finalize&goto :eof
 )
 
-:: --- Phase 2: Pack ---
 set "run_p="
 if /i "%update_type%"=="pack"  set "run_p=1"
 if /i "%update_type%"=="both"  set "run_p=1"
@@ -347,12 +344,10 @@ if defined run_p if not "%pack_update%"=="" (
 	echo.%pack% Update Complete.
 	ping 127.0.0.1 -n 4 >nul
 )
-:: After all phases are done, finalize once
 call :update.finalize
 goto :eof
 
 :update.setdownload
-:: Simplified with quotes for safety
 if "%~1"=="pack" (
     set "download_dir=updates/pack/%pack%"
     set "download=pack_%pack_update%"
@@ -367,7 +362,6 @@ goto :eof
 set /p "launcher_update=LAUNCHER VERSION: "
 if "!launcher_update!"=="" set "launcher_update=%launcher_version%"
 set update_type=launcher
-:: Direct call to the auto logic for that specific type
 call :update.auto launcher
 goto :eof
 
@@ -375,10 +369,9 @@ goto :eof
 set /p "pack_update=PACK VERSION: "
 if "!pack_update!"=="" set "pack_update=%pack_version%"
 set update_type=pack
-:: Direct call to the auto logic for that specific type
 call :update.auto pack
 goto :eof
-::----------------------------------------------------------------------------------------------------- REFRESH MODS
+
 :update.mods
 echo.Clearing all Mods...
 echo.y|del "data\packs\%pack%\mods\*.*" >>data\update.log 2>&1
@@ -402,8 +395,6 @@ set current_count=0
 set missing_count=0
 del "data\indexes\missingmods.txt" 2>nul
 >>data\update.log 2>&1 echo.Verifying mods...
-:: --- PHASE 1: ISOLATION ---
-bin\bg.exe print 0F " - Validating mods...\n"
 for /f "usebackq tokens=1-5 delims=;" %%a in ("%PAK_FILE%") do (
     set "tag=%%a"
     set "file=%%b"
@@ -425,11 +416,9 @@ for /f "usebackq tokens=1-5 delims=;" %%a in ("%PAK_FILE%") do (
             set /a missing_count+=1
             echo.%%a;%%b;%%c;%%d;%%e>>"data\indexes\missingmods.txt"
         )
-		:: Progress Badge
 		bin\bg.exe fcprint !y! !x! 1F "         Validating mods... [ !current_count! / %total_mods% ] !percent!%%             \n                                                       "
     )
 )
-:: --- PHASE 2: THE PURGE (Removing Ghost Mods) ---
 dir /b /a-d "%modpath%\" >nul 2>&1
 if !errorlevel! EQU 0 (
     bin\bg.exe print 0F " - Purging Old Mods...\n"
@@ -439,7 +428,6 @@ if !errorlevel! EQU 0 (
     del /f /q "%modpath%\*.*" >nul 2>&1
 )
 ping 127.0.0.1 -n 2 >nul
-:: --- PHASE 3: RESTORATION ---
 if exist "%staging%\*" (
     xcopy /y /i "%staging%\*" "%modpath%\" >nul 2>&1
 )
@@ -470,7 +458,6 @@ for /f "usebackq tokens=1-5 delims=;" %%a in ("data\indexes\missingmods.txt") do
     ) else (
         bin\bg.exe print 0C " [FAILED]\n"
     )
-	:: Progress Badge at top right (Y=0, X=30 to fit 55 col window)
     bin\bg.exe fcprint !y! !x! 1F "         Downloading mods... [ !dl_current! / !missing_count! ] !percent!%%            \n                                                       "
 )
 bin\bg.exe print 0F "Mod Download Complete. \n"
@@ -481,23 +468,19 @@ goto :eof
 set "target_file=%~1"
 set "fsize=0"
 for %%A in ("%modpath%\%target_file%") do set "fsize=%%~zA"
-if "!fsize!"=="" set "fsize=0"
+if "!fsize!" slavery set "fsize=0"
 if !fsize! EQU 0 (
     bin\bg.exe print 0C " [0 KB ERROR]\n"
     goto :eof
 )
-:: Simple Size Display logic
 if !fsize! LSS 1048576 (
-    :: KB Display (Approximate)
     set /a "kb_size=!fsize! / 1024"
     bin\bg.exe print 0A " [!kb_size! KB] [OK]\n"
 ) else (
-    :: MB Display (Approximate)
     set /a "mb_size=!fsize! / 1048576"
     bin\bg.exe print 0A " [!mb_size! MB] [OK]\n"
 )
 goto :eof
-::----------------------------------------------------------------------------------------------------- MAIN UPDATE CALLS
 :update type new
 cls
 call :drawlogo 2
@@ -506,20 +489,14 @@ copy nul "bin\.cancelLaunch" >nul
 del data\update.log 2>nul
 set count=
 set count_=
-::Get the username logged in
 for /f "usebackq" %%a in ("data\indexes\user") do set user=%%a
 if "%user%"=="" set user=null
 if "%connection%"=="0" echo.*** Offline ***&pause >nul&exit
-::IF VERSION NUMBERS ARE EMPTY, SET THEM
-::if "%pack_update%"=="" for /f "tokens=1-5 delims=;" %%a in ('type data\indexes\version.tmp') do if "%pack%"=="%%a" set pack_update=%%b
-::if "%pack_version%"=="" for /f "tokens=1-5 delims=;" %%a in ('type data\indexes\version') do if "%pack%"=="%%a" set pack_version=%%b
 call :log-logins update "%~1"
-::pack_update
 if "%pack_update%"=="" set pakdl=%pack%
 if not "%pack_update%"=="" set pakdl=%pack%-%pack_update%
 echo.Downloading... http://%url%/updates/PCMod-%pakdl%.pak
 if not "%~2"=="new" bin\wget.exe -q -T 5 -O "data\packs\%pack%\PCMod-%pack%.pak" "http://%url%/updates/PCMod-%pakdl%.pak"
-::CLOSE LAUNCHER WINDOW
 bin\nircmd.exe win close title "PCMod Launcher - %user%"
 echo.--- UPDATE %download% ---
 md data\update 2>nul
@@ -540,11 +517,9 @@ echo.Finalizing Update...
 if "%lite%"=="1" call cmd\settings.bat lite 1 >>data\update.log 2>&1
 echo.Cleaning Update...
 echo.a | rd /s /q data\update\ 2>nul
-::UI option set to exit afterwards
 set auto=6
 set select_l=!select!
 set select=6
-::RESTART PCMOD
 call :log-logins updated "%update_type%"
 echo.Restarting PCMod...
 ping 127.0.0.1 -n 3 >nul
@@ -553,21 +528,15 @@ del "bin\.cancelLaunch" 2>nul
 set update_type=empty
 goto :eof
 
-::download= pack_2.4.0 or launcher_2.4.0 or 2-4-x
 :update.download
-::bin\bg.exe Locate 10 0
-::Download the size file
 set /p "=Getting File Size... " <nul
 bin\wget.exe -q "http://%url%/%download_dir%/sizes/%download%.size" -O "data\update\size"&title PCMod Update
-::Get Sizes of the file and the listed size
 set "size=0"
 if exist "data\update\%download%.zip" (
     FOR %%A IN ("data\update\%download%.zip") DO set size=%%~zA
 )
 for /f "usebackq" %%a in ("data\update\size") do set size_=%%a
 echo.!size_:~0,-6!.!size_:~-6,-4! MB
-::If Zip file already exists (and has correct size) skip the download
-::echo.SIZE: !size_:~0,-6!.!size_:~-6,-5! MB
 if exist "data\update\%download%.zip" if "!size!"=="!size_!" echo.Using offline zip file.&goto :eof
 if exist "data\update\%download%.zip" if not "!size!"=="!size_!" echo.Size does not match. (!size:~0,-6!.!size:~-6,-5! MB ~= !size_:~0,-6!.!size_:~-6,-5! MB)&echo.Redownloading...&del "data\update\%download%.zip" 2>data\update_error.log
 echo.Downloading File... %download%.zip (!size_:~0,-6!.!size_:~-6,-4! MB)
@@ -577,7 +546,6 @@ call :update.download.progress
 if exist "data\update\%download%.zip" (
     FOR %%A IN ("data\update\%download%.zip") DO set size=%%~zA
 )
-::If Zip file has correct size go to next step
 if "!size!"=="!size_!" goto :eof
 if not "!size!"=="!size_!" echo.Size does not match. (!size! ~= !size_!)
 set /a retrys=%retrys%+1
@@ -660,7 +628,6 @@ echo.a|xcopy /e "data\.minecraft\config\*" "data\backup\%pack%\config\" >>data\u
 echo.- OPTIONS (Local)
 echo.y|copy /e "data\.minecraft\options.txt" "data\backup\%pack%\" >>data\update.log 2>&1
 goto :eof
-::----------------------------------------------------------------------------------------------------- PACK DOWNLOADER
 :update.pack.downloader
 bin\bg.exe locate 12 0
 bin\bg.exe fcprint 8 0 8F  "                    PACK DOWNLOADER                    "
@@ -690,11 +657,6 @@ set /p pack_download=PACK SELECTED:
 if "%pack_download%"=="exit" goto :eof
 if "%pack_download%"=="refresh" goto :update.pack.downloader
 call :update.pack.downloader.check pack_check
-::0=invalid
-::1=fresh pack no download
-::2=new pack download				2-4-x.zip
-::3=fresh pack download				2-4-x.zip with delete of old pack files
-::4=update pack download			2-4-x.zip
 if "%pack_check%"=="0" echo.%pack_download% is not a valid pack selection.&goto :update.pack.downloader
 if "%pack_check%"=="1" echo.This is a custom pack, no download availible.&goto :update.pack.downloader
 md data\update 2>nul
@@ -708,23 +670,18 @@ call :update pack new
 set pack=%pack_%
 goto :eof
 :update.pack.downloader.check
-::checks
 set exists=0
 set valid=0
 set update=0
 for /f "usebackq tokens=1 delims=;" %%a in ("data\indexes\version") do if "%%a"=="%pack_download%" set valid=2
 if exist "data\packs\%pack_download%\PCMod-%pack_download%.pak" set exists=1
-::logic of the checks
 if "%valid%"=="2" if "%exists%"=="1" echo.%pack_download% already exists, do you want to download fresh or update?
 if "%valid%"=="2" if "%exists%"=="1" choice /m "Update (U/F):" /c:"uf" /t 8 /d u
 if "%valid%"=="2" if "%exists%"=="1" if "%errorlevel%"=="1" set update=1
 set /a %1=!valid! + !exists! + !update!
 goto :eof
 
-
-:: %launcher_update% %launcher_version% %pack% %pack_update% %pack_version%
 :log-logins
-::Log the users Launch open/close/crash
 if "%connection%"=="0" goto :eof
 set state=%1
 set lltype=%2
@@ -742,9 +699,5 @@ if exist "data\indexes\modcount" for /f "usebackq" %%a in ("data\indexes\modcoun
 if exist "data\indexes\uuid" for /f "usebackq" %%a in ("data\indexes\uuid") do set uuid=%%a
 if "%xip%"=="" set xip=xxx.xxx.xxx.xxx
 echo.Sending data to server... (state: %state%)
-::echo.%uuid% - %state%: [%user%/%mcuuid%/%pack_version%/%launcher_version%],[%xip%],[%modcnt% mods/%memory% MB]
 >>data\update.log 2>&1 bin\wget -t 2 -T 5 -O nul "http://%url%/commands/login2.php" --post-data "user=%user%&uuid=%uuid%&state=%state%&mcuuid=%mcuuid%&version=%llupdate%&lversion=%lltype%&netinfo=%xip%&modcount=%modcnt%&memory=%memory%"
 goto :eof
-::˜ Copy Right Mark Rewey © (2026)
-:: Designed for Plattecraft Server.
-:: http://pcmod.ddns.me
