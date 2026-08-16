@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="../icons/icon.ico" type="image/x-icon">
   <title>PCMod Client</title>
   <style>
     :root {
@@ -153,7 +154,7 @@
     }
 
     .logo-header img {
-      max-height: 52px;
+      max-height: 58px;
       filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.6));
     }
 
@@ -231,6 +232,14 @@
       transform: translateY(-2px);
       box-shadow: 0 8px 25px rgba(59, 130, 246, 0.5);
       background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+    }
+
+    .version-footer {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: right;
+      width: 100%;
+      padding-top: 2px;
     }
 
     /* Right Sidebar (Settings & Login) */
@@ -341,10 +350,10 @@
     <div class="main-content" style="grid-column: 1;">
       <div class="panel left-sidebar" style="width: 100%; height: 100%;">
         <div class="panel-title">Tasks / Links</div>
-        <button class="nav-btn" onclick="openModlist()" id="modlistBtn">Modlist<br>(-- mods)</button>
-        <button class="nav-btn" onclick="pywebview.api.open_link('http://pcmod.ddns.me/modpack')">PCMod Website</button>
-        <button class="nav-btn" onclick="pywebview.api.open_link('https://discord.gg/plattecraft')">Join Discord</button>
-        <button class="nav-btn" onclick="pywebview.api.open_link('http://pcmod.ddns.me/account')">My Account</button>
+        <button class="nav-btn" onclick="openModlist()" id="modlistBtn">Modlist<br>(<span id="modcount">--</span> mods)</button>
+        <button class="nav-btn" onclick="openWeb('pcmod')">PCMod Website</button>
+        <button class="nav-btn" onclick="openWeb('discord')">Join Discord</button>
+        <button class="nav-btn" onclick="openWeb('auth')">My Account</button>
 
         <div style="margin-top: 10px; border-top: 1px solid var(--card-border); padding-top: 10px; flex: 1; display: flex; flex-direction: column;">
           <div class="panel-title" style="margin-bottom: 8px;">Players Online</div>
@@ -359,17 +368,19 @@
     <!-- Middle Column: Logo, News & Main Actions -->
     <div class="main-content" style="grid-column: 2;">
       <div class="logo-header">
-        <img src="../head.png" alt="PCMod Client">
+        <img src="data/head.png" alt="PCMod Client" onerror="this.src='data/logo.png'">
       </div>
 
       <div class="panel news-card">
-        <iframe src="about:blank" class="news-iframe" id="newsIframe"></iframe>
+        <iframe src="news.html" class="news-iframe" id="newsIframe"></iframe>
       </div>
 
       <div class="action-bar">
         <button class="btn-launch" onclick="launchGame()">LAUNCH</button>
         <button class="btn-update" onclick="updateGame()">UPDATE</button>
       </div>
+
+      <div class="version-footer" id="versionFooter">Launcher: 2.5 / Pack: 2.5.2</div>
     </div>
 
     <!-- Right Column: Settings & Account Login -->
@@ -379,38 +390,38 @@
 
         <div class="setting-row">
           <label for="shortcut">Shortcut</label>
-          <input type="checkbox" id="shortcut" onchange="saveSettings()">
+          <input type="checkbox" id="shortcut" onchange="toggleShortcut()">
         </div>
         <div class="setting-row">
           <label for="autoserver">Auto Server</label>
-          <input type="checkbox" id="autoserver" onchange="saveSettings()">
+          <input type="checkbox" id="autoserver" onchange="toggleAutoServer()">
         </div>
         <div class="setting-row">
           <label for="loglogins">Log Logins</label>
-          <input type="checkbox" id="loglogins" onchange="saveSettings()">
+          <input type="checkbox" id="loglogins" onchange="toggleLogLogins()">
         </div>
         <div class="setting-row">
           <label for="litemode">Lite Mode</label>
-          <input type="checkbox" id="litemode" onchange="saveSettings()">
+          <input type="checkbox" id="litemode" onchange="toggleLiteMode()">
         </div>
         <div class="setting-row">
           <label for="showconsole">Console</label>
-          <input type="checkbox" id="showconsole" onchange="saveSettings()">
+          <input type="checkbox" id="showconsole" onchange="toggleShowConsole()">
         </div>
         <div class="setting-row" style="margin-top: 4px;">
           <label for="selver">Version</label>
-          <select id="selver" onchange="saveSettings()">
+          <select id="selver" onchange="changeVersion()">
             <option value="">Default</option>
           </select>
         </div>
         <div class="setting-row">
           <label for="maxram">Memory</label>
-          <input type="number" id="maxram" value="4096" step="512" min="1024" onchange="saveSettings()">
+          <input type="number" id="maxram" value="4096" step="512" min="1024" onchange="changeMemory()">
         </div>
 
         <div style="display: flex; gap: 8px; margin-top: 6px;">
-          <button class="btn-secondary" onclick="saveSettings()">Save</button>
-          <button class="btn-secondary" onclick="pywebview.api.launch_server()">Launch Server</button>
+          <button class="btn-secondary" onclick="saveSettingsButton()">Save</button>
+          <button class="btn-secondary" onclick="launchServer()">Launch Server</button>
         </div>
 
         <div class="login-section">
@@ -431,100 +442,219 @@
   </div>
 
   <script>
+    var isInitialized = false;
+
+    function initLauncher() {
+      if (!window.pywebview || !window.pywebview.api) return;
+      window.pywebview.api.init_launcher().then(function(data) {
+        if (!data) return;
+
+        // 1. User
+        if (data.user) {
+          document.getElementById('username').value = data.user;
+        }
+
+        // 2. Settings Checkboxes
+        if (data.settings) {
+          document.getElementById('shortcut').checked = (data.settings.shortcut === "1");
+          document.getElementById('autoserver').checked = (data.settings.autoserver === "1");
+          document.getElementById('loglogins').checked = (data.settings.log_logins === "1" || data.settings['log-logins'] === "1");
+          document.getElementById('litemode').checked = (data.settings.lite === "1");
+          document.getElementById('showconsole').checked = (data.settings.showconsole === "1");
+          if (data.settings.memory) {
+            document.getElementById('maxram').value = data.settings.memory;
+          }
+        }
+
+        // 3. Mod count
+        if (data.modcount !== undefined) {
+          document.getElementById('modcount').innerText = data.modcount;
+        }
+
+        // 4. Version footer
+        if (data.launcher_version && data.pack_version) {
+          document.getElementById('versionFooter').innerText = "Launcher: " + data.launcher_version + " / Pack: " + data.pack_version;
+        }
+
+        // 5. Version dropdown select
+        if (data.versions_list && data.versions_list.length > 0) {
+          var select = document.getElementById('selver');
+          select.innerHTML = "";
+          for (var i = 0; i < data.versions_list.length; i++) {
+            var v = data.versions_list[i];
+            var opt = document.createElement('option');
+            opt.value = i + " " + v.name;
+            opt.text = v.name;
+            if (v.name === (data.settings ? data.settings.pack : '')) {
+              opt.selected = true;
+            }
+            select.add(opt);
+          }
+        }
+
+        // 6. Online players
+        if (data.online_players) {
+          document.getElementById('playerList').innerHTML = data.online_players;
+        }
+
+        // 7. News iframe
+        if (data.news_url) {
+          document.getElementById('newsIframe').src = data.news_url;
+        }
+      });
+    }
+
+    var initInterval = setInterval(function() {
+      if (window.pywebview && window.pywebview.api && !isInitialized) {
+        clearInterval(initInterval);
+        isInitialized = true;
+        initLauncher();
+      }
+    }, 100);
+
     window.addEventListener('pywebviewready', function() {
-      loadSettings();
-      refreshPlayers();
-      updateModlistCount();
-      loadNews();
+      clearInterval(initInterval);
+      if (!isInitialized) {
+        isInitialized = true;
+        initLauncher();
+      }
     });
 
-    async function loadNews() {
-      const newsUrl = await pywebview.api.get_news_url();
-      const iframe = document.getElementById('newsIframe');
-      if (newsUrl) {
-        iframe.src = newsUrl;
+    function toggleShortcut() {
+      var val = document.getElementById('shortcut').checked ? "1" : "0";
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_setting('shortcut', val);
       }
     }
 
-    async function loadSettings() {
-      const s = await pywebview.api.get_settings();
-      if (s) {
-        document.getElementById('shortcut').checked = (s.shortcut === 'true');
-        document.getElementById('autoserver').checked = (s.autoserver === 'true');
-        document.getElementById('loglogins').checked = (s.loglogins === 'true');
-        document.getElementById('litemode').checked = (s.litemode === 'true');
-        document.getElementById('showconsole').checked = (s.showconsole === 'true');
-        if (s.maxram) document.getElementById('maxram').value = s.maxram;
-        if (s.username) document.getElementById('username').value = s.username;
-        if (s.password) document.getElementById('password').value = s.password;
+    function toggleAutoServer() {
+      var val = document.getElementById('autoserver').checked ? "1" : "0";
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_setting('autoserver', val);
       }
     }
 
-    async function saveSettings() {
-      const s = {
-        shortcut: document.getElementById('shortcut').checked ? 'true' : 'false',
-        autoserver: document.getElementById('autoserver').checked ? 'true' : 'false',
-        loglogins: document.getElementById('loglogins').checked ? 'true' : 'false',
-        litemode: document.getElementById('litemode').checked ? 'true' : 'false',
-        showconsole: document.getElementById('showconsole').checked ? 'true' : 'false',
-        maxram: document.getElementById('maxram').value,
-        selver: document.getElementById('selver').value,
+    function toggleLogLogins() {
+      var val = document.getElementById('loglogins').checked ? "1" : "0";
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_setting('log-logins', val);
+      }
+    }
+
+    function toggleLiteMode() {
+      var val = document.getElementById('litemode').checked ? "1" : "0";
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_lite_mode(val).then(function() {
+          initLauncher();
+        });
+      }
+    }
+
+    function toggleShowConsole() {
+      var val = document.getElementById('showconsole').checked ? "1" : "0";
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_setting('showconsole', val);
+      }
+    }
+
+    function changeMemory() {
+      var val = document.getElementById('maxram').value;
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_memory(val).then(function() {
+          initLauncher();
+        });
+      }
+    }
+
+    function changeVersion() {
+      var select = document.getElementById('selver');
+      var val = select.value;
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_version_select(val).then(function() {
+          initLauncher();
+        });
+      }
+    }
+
+    function saveSettingsButton() {
+      var s = {
+        shortcut: document.getElementById('shortcut').checked ? "1" : "0",
+        autoserver: document.getElementById('autoserver').checked ? "1" : "0",
+        log_logins: document.getElementById('loglogins').checked ? "1" : "0",
+        lite: document.getElementById('litemode').checked ? "1" : "0",
+        showconsole: document.getElementById('showconsole').checked ? "1" : "0",
+        memory: document.getElementById('maxram').value,
         username: document.getElementById('username').value,
         password: document.getElementById('password').value
       };
-      await pywebview.api.save_settings(s);
-    }
-
-    async function updateModlistCount() {
-      const count = await pywebview.api.get_mod_count();
-      const btn = document.getElementById('modlistBtn');
-      if (btn) {
-        btn.innerHTML = `Modlist<br>(${count} mods)`;
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.save_settings(s).then(function() {
+          initLauncher();
+        });
       }
     }
 
-    async function openModlist() {
-      await pywebview.api.open_modlist();
-    }
-
-    async function refreshPlayers() {
-      const listDiv = document.getElementById('playerList');
-      listDiv.innerText = 'Refreshing...';
-      const res = await pywebview.api.get_players_online();
-      if (res && res.players && res.players.length > 0) {
-        listDiv.innerHTML = res.players.map(p => `<div>• ${p}</div>`).join('');
-      } else if (res && res.status) {
-        listDiv.innerText = res.status;
-      } else {
-        listDiv.innerText = 'No players online';
+    function refreshPlayers() {
+      document.getElementById('playerList').innerText = 'Refreshing...';
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.refresh_players().then(function(html) {
+          document.getElementById('playerList').innerHTML = (html && html.trim() !== "") ? html : "No Players Online";
+        });
       }
     }
 
-    async function performLogin() {
-      const u = document.getElementById('username').value;
-      const p = document.getElementById('password').value;
-      const msgDiv = document.getElementById('loginMsg');
+    function performLogin() {
+      var u = document.getElementById('username').value;
+      var p = document.getElementById('password').value;
+      var msgDiv = document.getElementById('loginMsg');
       msgDiv.style.display = 'block';
       msgDiv.style.color = '#eab308';
       msgDiv.innerText = 'Logging in...';
-      await saveSettings();
-      const res = await pywebview.api.verify_login(u, p);
-      if (res.success) {
-        msgDiv.style.color = '#10b981';
-        msgDiv.innerText = 'Login successful!';
-      } else {
-        msgDiv.style.color = '#ef4444';
-        msgDiv.innerText = res.message || 'Login failed';
+
+      saveSettingsButton();
+
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.verify_login(u, p).then(function(res) {
+          if (res && res.success) {
+            msgDiv.style.color = '#10b981';
+            msgDiv.innerText = 'Login successful!';
+            initLauncher();
+          } else {
+            msgDiv.style.color = '#ef4444';
+            msgDiv.innerText = (res && res.message) ? res.message : 'Login failed';
+          }
+        });
       }
     }
 
-    async function launchGame() {
-      await saveSettings();
-      await pywebview.api.launch_game();
+    function openModlist() {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.open_modlist();
+      }
     }
 
-    async function updateGame() {
-      await pywebview.api.update_game();
+    function openWeb(site) {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.open_web(site);
+      }
+    }
+
+    function launchGame() {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.launch_game();
+      }
+    }
+
+    function updateGame() {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.update_game();
+      }
+    }
+
+    function launchServer() {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.launch_server();
+      }
     }
   </script>
 </body>
