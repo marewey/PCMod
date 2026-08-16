@@ -93,8 +93,7 @@ def get_default_settings():
         "showconsole": "1",
         "pack": "2-5-x",
         "memory": "4096",
-        "username": "",
-        "password": ""
+        "username": ""
     }
 
 def read_settings():
@@ -106,7 +105,8 @@ def read_settings():
                     line = line.strip()
                     if line and "=" in line:
                         k, v = line.split("=", 1)
-                        settings[k.strip()] = v.strip()
+                        if k.strip().lower() != "password":  # Security: never read passwords from settings.txt
+                            settings[k.strip()] = v.strip()
             log_init(f"Read settings.txt successfully: {settings}")
         except Exception as e:
             log_init(f"Error reading settings.txt: {e}")
@@ -118,10 +118,12 @@ def write_settings(settings):
     try:
         lines = []
         for k, v in settings.items():
+            if k.lower() == "password": # Security: NEVER store passwords in settings.txt
+                continue
             lines.append(f"{k}={v}\n")
         with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
             f.writelines(lines)
-        log_init(f"Wrote settings.txt successfully: {settings}")
+        log_init(f"Wrote settings.txt successfully (sanitized passwords)")
 
         if OS_NAME == "win32" and "showconsole" in settings:
             try:
@@ -249,7 +251,7 @@ def load_user_info():
         USER_INFO["uuid"] = get_uuid_tool_uuid(u)
         USER_INFO["valid"] = True
         update_console_title(u)
-        log_init(f"Loaded user info successfully: User={u} | UUID={USER_INFO['uuid']} | AuthToken={USER_INFO['auth_token']}")
+        log_init(f"Loaded user info successfully: User={u} | UUID={USER_INFO['uuid']}")
 
 load_user_info()
 
@@ -404,7 +406,7 @@ class Api:
         return True
 
     def open_link(self, *args, **kwargs):
-        url = args[0] if args else "http://pcmod.ddns.me/modpack"
+        url = args[0] if args else "http://pcmod.ddns.me"
         log_init(f"Opening browser URL: {url}")
         import webbrowser
         webbrowser.open(url)
@@ -412,9 +414,9 @@ class Api:
 
     def open_web(self, *args, **kwargs):
         site = args[0] if args else "pcmod"
-        url = "http://pcmod.ddns.me/modpack"
+        url = "http://pcmod.ddns.me"
         if site == "discord":
-            url = "https://discord.com/invite/plattecraft"
+            url = "https://discord.gg/AJaVhvR"
         elif site == "auth":
             url = "http://pcmod.ddns.me/account"
         log_init(f"open_web invoked for site '{site}' -> {url}")
@@ -450,8 +452,9 @@ class Api:
 
     def get_players_online(self, *args, **kwargs):
         pack = get_pack_name()
-        url = f"http://pcmod.ddns.me/modpack/online.php?pack=list-{pack}"
-        log_init(f"Fetching online players list: {url}")
+        # Correct Batch URL format: http://pcmod.ddns.me/players/list-%pack%
+        url = f"http://pcmod.ddns.me/players/list-{pack}"
+        log_init(f"Fetching online players list from batch-specified URL: {url}")
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         try:
             ctx = ssl.create_default_context()
@@ -519,7 +522,6 @@ class Api:
                     update_console_title(username)
                     s = read_settings()
                     s["username"] = username
-                    s["password"] = password
                     write_settings(s)
                     log_init(f"Login SUCCESSFUL for {username}")
                     return {"success": True, "message": "Login successful!"}
@@ -535,7 +537,6 @@ class Api:
             update_console_title(username)
             s = read_settings()
             s["username"] = username
-            s["password"] = password
             write_settings(s)
             log_init(f"Offline login configured for user {username} (UUID: {USER_INFO['uuid']})")
             return {"success": True, "message": "Offline mode login set"}
@@ -677,7 +678,7 @@ def main():
         "PCMod Client",
         url=f"file://{html_path}",
         js_api=api,
-        width=980,
+        width=1040,
         height=690,
         resizable=False
     )

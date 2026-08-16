@@ -57,7 +57,7 @@
     }
 
     .app-container {
-      width: 960px;
+      width: 1020px;
       height: 650px;
       padding: 16px;
       display: grid;
@@ -151,10 +151,13 @@
       text-align: center;
       margin-bottom: 0px;
       flex-shrink: 0;
+      width: 100%;
     }
 
     .logo-header img {
-      max-height: 58px;
+      max-height: 80px;
+      max-width: 100%;
+      object-fit: contain;
       filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.6));
     }
 
@@ -277,8 +280,7 @@
 
     .login-section {
       margin-top: auto;
-      border-top: 1px solid var(--card-border);
-      padding-top: 10px;
+      padding-top: 8px;
     }
 
     .input-field {
@@ -338,7 +340,7 @@
 
     .login-msg {
       font-size: 11px;
-      margin-top: 6px;
+      margin-bottom: 8px;
       text-align: center;
       display: none;
     }
@@ -425,17 +427,19 @@
         </div>
 
         <div class="login-section">
-          <div class="panel-title" style="margin-bottom: 6px;">Login</div>
-          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-            <span style="font-size: 12px; color: var(--text-muted); width: 35px;">User</span>
-            <input type="text" class="input-field" id="username" placeholder="Username" style="margin-bottom: 0;">
-          </div>
-          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
-            <span style="font-size: 12px; color: var(--text-muted); width: 35px;">Pass</span>
-            <input type="password" class="input-field" id="password" placeholder="Password" style="margin-bottom: 0;">
-          </div>
-          <button class="btn-login" onclick="performLogin()">Login</button>
           <div class="login-msg" id="loginMsg"></div>
+          <div style="border-top: 1px solid var(--card-border); padding-top: 8px;">
+            <div class="panel-title" style="margin-bottom: 6px;">Login</div>
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+              <span style="font-size: 12px; color: var(--text-muted); width: 35px;">User</span>
+              <input type="text" class="input-field" id="username" placeholder="Username" style="margin-bottom: 0;">
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+              <span style="font-size: 12px; color: var(--text-muted); width: 35px;">Pass</span>
+              <input type="password" class="input-field" id="password" placeholder="Password" style="margin-bottom: 0;">
+            </div>
+            <button class="btn-login" onclick="performLogin()">Login</button>
+          </div>
         </div>
       </div>
     </div>
@@ -577,8 +581,7 @@
         lite: document.getElementById('litemode').checked ? "1" : "0",
         showconsole: document.getElementById('showconsole').checked ? "1" : "0",
         memory: document.getElementById('maxram').value,
-        username: document.getElementById('username').value,
-        password: document.getElementById('password').value
+        username: document.getElementById('username').value
       };
       if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.save_settings(s).then(function() {
