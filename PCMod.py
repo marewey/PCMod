@@ -52,9 +52,10 @@ if OS_NAME == "win32":
         user32 = ctypes.windll.user32
         kernel32 = ctypes.windll.kernel32
 
+        # Explicit AppUserModelID to group console window and client GUI into 1 taskbar icon stack
         try:
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("PCMod.Client.1.0")
-            log_init("SetCurrentProcessExplicitAppUserModelID set successfully")
+            log_init("SetCurrentProcessExplicitAppUserModelID set successfully: PCMod.Client.1.0")
         except Exception as e:
             log_init(f"SetCurrentProcessExplicitAppUserModelID warning: {e}")
 
@@ -69,7 +70,7 @@ if OS_NAME == "win32":
                     user32.SendMessageW(console_hwnd, WM_SETICON, ICON_SMALL, hicon_small)
                 if hicon_big:
                     user32.SendMessageW(console_hwnd, WM_SETICON, ICON_BIG, hicon_big)
-                log_init("Console window icon applied")
+                log_init("Console window icon applied successfully")
     except Exception as e:
         log_init(f"Console title/icon setup error: {e}")
 
@@ -706,7 +707,7 @@ def main():
         "PCMod Client",
         url=f"file://{html_path}",
         js_api=api,
-        width=1080,
+        width=1160,
         height=690,
         resizable=False
     )
