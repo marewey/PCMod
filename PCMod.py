@@ -706,7 +706,7 @@ def main():
         "PCMod Client",
         url=f"file://{html_path}",
         js_api=api,
-        width=1040,
+        width=1080,
         height=690,
         resizable=False
     )
