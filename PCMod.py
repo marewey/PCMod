@@ -96,7 +96,7 @@ def get_default_settings():
         "username": ""
     }
 
-def read_settings():
+def read_settings(log_event=False):
     settings = get_default_settings()
     if os.path.exists(SETTINGS_FILE):
         try:
@@ -107,6 +107,8 @@ def read_settings():
                         k, v = line.split("=", 1)
                         if k.strip().lower() not in ["password", "debug"]:
                             settings[k.strip()] = v.strip()
+            if log_event:
+                log_init(f"Read settings.txt successfully: {settings}")
         except Exception:
             pass
     return settings
@@ -120,6 +122,7 @@ def write_settings(settings):
             lines.append(f"{k}={v}\n")
         with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
             f.writelines(lines)
+        log_init("Wrote settings.txt successfully")
 
         if OS_NAME == "win32" and "showconsole" in settings:
             try:
@@ -133,7 +136,7 @@ def write_settings(settings):
     except Exception:
         pass
 
-init_settings = read_settings()
+init_settings = read_settings(log_event=True)
 if OS_NAME == "win32" and str(init_settings.get("showconsole", "1")).strip() in ["0", "false", "False"]:
     try:
         import ctypes
@@ -256,9 +259,11 @@ def get_xcode_auth(username, password):
     if not username or not password:
         return ""
 
-    # 1. Run xcode.exe without arguments to generate exact 32-char hex auth token from stdout
+    # MD5 hash of password
+    raw_hash = hashlib.md5(password.encode('utf-8')).hexdigest()
+
+    # Try xcode.exe if present
     xcode_exe = os.path.join(BIN_DIR, "xcode.exe")
-    token = ""
     if os.path.exists(xcode_exe):
         try:
             proc = subprocess.Popen([xcode_exe], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
@@ -269,23 +274,18 @@ def get_xcode_auth(username, password):
                 if "XOR Tool" in l or "Enter string" in l or "Enter key" in l:
                     continue
                 if len(l) == 32:
-                    token = l
+                    raw_hash = l
                     break
-            if not token and lines:
-                token = lines[-1]
-        except Exception as e:
-            log_init(f"xcode auth token error: {e}")
+        except Exception:
+            pass
 
-    if not token or len(token) != 32:
-        token = hashlib.md5((username + password).encode('utf-8')).hexdigest()
-        log_init(f"Fallback MD5 auth token generated: {token}")
-    else:
-        log_init(f"xcode generated auth token: {token}")
-
-    # 2. Write xcode auth index file matching settings.bat
+    log_init(f"Auth token generated: {raw_hash}")
     run_xcode_auth_index(username)
 
-    return token
+    # Ensure leading backslash as required by authp.php protocol (\hash)
+    if not raw_hash.startswith("\\"):
+        return f"\\{raw_hash}"
+    return raw_hash
 
 def get_uuid_tool_uuid(username):
     if not username:
@@ -589,7 +589,7 @@ class Api:
         if not username:
             return {"success": False, "message": "Username required"}
 
-        # Get exact 32-character hex auth token from xcode.exe
+        # Calculate auth token with leading backslash (\hash)
         auth_token = get_xcode_auth(username, password)
 
         # POST "x=%token%&u=%user%&z=auth" to authp.php
@@ -612,7 +612,6 @@ class Api:
                 body = resp.read().decode('utf-8', errors='ignore').strip()
                 log_init(f"Auth server response: {body}")
 
-                # Check for strict 401.auth password failure
                 if "401.auth" in body or "incorrect" in body.lower():
                     log_init(f"Login REJECTED: Password incorrect for {username} ({body})")
                     return {"success": False, "message": "Password was incorrect. Try again."}
@@ -701,11 +700,8 @@ class Api:
         except Exception:
             pass
 
-        pmc_script = os.path.join(BIN_DIR, "pmc", "portablemc")
-        if not os.path.exists(pmc_script) and os.path.exists(os.path.join(BIN_DIR, "pmc", "portablemc.py")):
-            pmc_script = os.path.join(BIN_DIR, "pmc", "portablemc.py")
-
-        cmd = [sys.executable, pmc_script, "--main-dir", DATA_DIR, "--work-dir", os.path.join(DATA_DIR, "packs", pack), "start", f"fabric:{pack}", "-u", username, "-i", mcuuid, "-jvm-args", f"-Xmx{maxram}M"]
+        # Execution using PYTHONPATH=bin/pmc and python -m portablemc to prevent http.py import shadowing!
+        cmd = [sys.executable, "-m", "portablemc", "--main-dir", DATA_DIR, "--work-dir", os.path.join(DATA_DIR, "packs", pack), "start", f"fabric:{pack}", "-u", username, "-i", mcuuid, "-jvm-args", f"-Xmx{maxram}M"]
 
         if autoserver:
             port = "25565"
@@ -717,12 +713,20 @@ class Api:
 
         log_init(f"Executing PMC command: {' '.join(cmd)}")
 
+        # Prepare environment with bin/pmc in PYTHONPATH
+        proc_env = os.environ.copy()
+        pmc_dir = os.path.join(BIN_DIR, "pmc")
+        if "PYTHONPATH" in proc_env:
+            proc_env["PYTHONPATH"] = pmc_dir + os.pathsep + proc_env["PYTHONPATH"]
+        else:
+            proc_env["PYTHONPATH"] = pmc_dir
+
         try:
             launch_log = os.path.join(DATA_DIR, "launch.log")
             with open(launch_log, "a", encoding="utf-8") as lf:
                 lf.write(f"\n=== PMC Launch {datetime.now()} ===\n")
 
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            proc = subprocess.Popen(cmd, env=proc_env, cwd=BASE_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
 
             def stream_output(process):
                 with open(launch_log, "a", encoding="utf-8") as lf:
