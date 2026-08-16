@@ -382,7 +382,7 @@
         <button class="btn-update" onclick="updateGame()">UPDATE</button>
       </div>
 
-      <div class="version-footer" id="versionFooter">Launcher: 2.5 / Pack: 2.5.2</div>
+      <div class="version-footer" id="versionFooter">Launcher: 1.2a / Pack: 2.5.3a</div>
     </div>
 
     <!-- Right Column: Settings & Account Login -->
@@ -421,8 +421,9 @@
           <input type="number" id="maxram" value="4096" step="512" min="1024" onchange="changeMemory()">
         </div>
 
-        <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
-          <button class="btn-secondary" onclick="saveSettingsButton()">Save</button>
+        <hr style="border: none; border-top: 1px solid var(--card-border); margin: 8px 0 8px 0;">
+
+        <div style="display: flex; flex-direction: column; gap: 6px;">
           <button class="btn-secondary" onclick="launchServer()">Launch Server</button>
         </div>
 
@@ -573,23 +574,6 @@
       }
     }
 
-    function saveSettingsButton() {
-      var s = {
-        shortcut: document.getElementById('shortcut').checked ? "1" : "0",
-        autoserver: document.getElementById('autoserver').checked ? "1" : "0",
-        log_logins: document.getElementById('loglogins').checked ? "1" : "0",
-        lite: document.getElementById('litemode').checked ? "1" : "0",
-        showconsole: document.getElementById('showconsole').checked ? "1" : "0",
-        memory: document.getElementById('maxram').value,
-        username: document.getElementById('username').value
-      };
-      if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.save_settings(s).then(function() {
-          initLauncher();
-        });
-      }
-    }
-
     function refreshPlayers() {
       document.getElementById('playerList').innerText = 'Refreshing...';
       if (window.pywebview && window.pywebview.api) {
@@ -606,8 +590,6 @@
       msgDiv.style.display = 'block';
       msgDiv.style.color = '#eab308';
       msgDiv.innerText = 'Logging in...';
-
-      saveSettingsButton();
 
       if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.verify_login(u, p).then(function(res) {
