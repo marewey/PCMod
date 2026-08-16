@@ -58,10 +58,10 @@
     .app-container {
       width: 960px;
       height: 650px;
-      padding: 20px;
+      padding: 16px;
       display: grid;
-      grid-template-columns: 220px 1fr 220px;
-      gap: 16px;
+      grid-template-columns: 210px 1fr 210px;
+      gap: 14px;
       position: relative;
       z-index: 1;
     }
@@ -72,7 +72,7 @@
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid var(--card-border);
       border-radius: 14px;
-      padding: 16px;
+      padding: 14px;
       display: flex;
       flex-direction: column;
       box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -89,14 +89,14 @@
       letter-spacing: 1.2px;
       color: #38bdf8;
       text-transform: uppercase;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
       text-align: center;
       text-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
     }
 
     /* Left Sidebar */
     .left-sidebar {
-      gap: 12px;
+      gap: 10px;
     }
 
     .nav-btn {
@@ -141,17 +141,19 @@
     .main-content {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 12px;
       align-items: center;
+      height: 100%;
     }
 
     .logo-header {
       text-align: center;
-      margin-bottom: 2px;
+      margin-bottom: 0px;
+      flex-shrink: 0;
     }
 
     .logo-header img {
-      max-height: 58px;
+      max-height: 52px;
       filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.6));
     }
 
@@ -160,21 +162,25 @@
       width: 100%;
       overflow: hidden;
       padding: 0;
+      display: flex;
+      flex-direction: column;
     }
 
     .news-iframe {
       width: 100%;
-      height: 315px;
+      height: 100%;
       border: none;
       border-radius: 12px;
       background: rgba(0, 0, 0, 0.4);
+      flex: 1;
     }
 
     .action-bar {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 16px;
+      gap: 14px;
       width: 100%;
+      flex-shrink: 0;
     }
 
     .btn-launch {
@@ -229,14 +235,14 @@
 
     /* Right Sidebar (Settings & Login) */
     .right-sidebar {
-      gap: 10px;
+      gap: 8px;
     }
 
     .setting-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       font-size: 13px;
       color: var(--text-main);
     }
@@ -263,7 +269,7 @@
     .login-section {
       margin-top: auto;
       border-top: 1px solid var(--card-border);
-      padding-top: 12px;
+      padding-top: 10px;
     }
 
     .input-field {
@@ -336,11 +342,11 @@
       <div class="panel left-sidebar" style="width: 100%; height: 100%;">
         <div class="panel-title">Tasks / Links</div>
         <button class="nav-btn" onclick="openModlist()" id="modlistBtn">Modlist<br>(-- mods)</button>
-        <button class="nav-btn" onclick="pywebview.api.open_link('http://plattecraft.com/modpack')">PCMod Website</button>
+        <button class="nav-btn" onclick="pywebview.api.open_link('http://pcmod.ddns.me/modpack')">PCMod Website</button>
         <button class="nav-btn" onclick="pywebview.api.open_link('https://discord.gg/plattecraft')">Join Discord</button>
-        <button class="nav-btn" onclick="pywebview.api.open_link('http://plattecraft.com/account')">My Account</button>
+        <button class="nav-btn" onclick="pywebview.api.open_link('http://pcmod.ddns.me/account')">My Account</button>
 
-        <div style="margin-top: 12px; border-top: 1px solid var(--card-border); padding-top: 12px; flex: 1; display: flex; flex-direction: column;">
+        <div style="margin-top: 10px; border-top: 1px solid var(--card-border); padding-top: 10px; flex: 1; display: flex; flex-direction: column;">
           <div class="panel-title" style="margin-bottom: 8px;">Players Online</div>
           <button class="nav-btn" style="padding: 6px; font-size: 12px;" onclick="refreshPlayers()">Refresh</button>
           <div class="player-list" id="playerList">
@@ -353,11 +359,11 @@
     <!-- Middle Column: Logo, News & Main Actions -->
     <div class="main-content" style="grid-column: 2;">
       <div class="logo-header">
-        <img src="../head.png" alt="PlatteCraft Client">
+        <img src="../head.png" alt="PCMod Client">
       </div>
 
       <div class="panel news-card">
-        <iframe src="http://plattecraft.com/modpack/update_old.php" class="news-iframe" id="newsIframe"></iframe>
+        <iframe src="about:blank" class="news-iframe" id="newsIframe"></iframe>
       </div>
 
       <div class="action-bar">
@@ -402,13 +408,13 @@
           <input type="number" id="maxram" value="4096" step="512" min="1024" onchange="saveSettings()">
         </div>
 
-        <div style="display: flex; gap: 8px; margin-top: 8px;">
+        <div style="display: flex; gap: 8px; margin-top: 6px;">
           <button class="btn-secondary" onclick="saveSettings()">Save</button>
           <button class="btn-secondary" onclick="pywebview.api.launch_server()">Launch Server</button>
         </div>
 
         <div class="login-section">
-          <div class="panel-title" style="margin-bottom: 8px;">Login</div>
+          <div class="panel-title" style="margin-bottom: 6px;">Login</div>
           <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
             <span style="font-size: 12px; color: var(--text-muted); width: 35px;">User</span>
             <input type="text" class="input-field" id="username" placeholder="Username" style="margin-bottom: 0;">
@@ -429,7 +435,16 @@
       loadSettings();
       refreshPlayers();
       updateModlistCount();
+      loadNews();
     });
+
+    async function loadNews() {
+      const newsUrl = await pywebview.api.get_news_url();
+      const iframe = document.getElementById('newsIframe');
+      if (newsUrl) {
+        iframe.src = newsUrl;
+      }
+    }
 
     async function loadSettings() {
       const s = await pywebview.api.get_settings();
