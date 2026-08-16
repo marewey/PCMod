@@ -157,7 +157,7 @@ input.largerCheckbox {
 	<table border="0" cellpadding="1px" id="menu" width="100%">
 		<th align="center"><hr>Tasks/Links<hr></th>
 		<tr><td align="center" width="auto">
-		<button style="width: 92%;" id="ML" onclick="openModlist()">Modlist (<span id="modcount">--</span> mods) </button>
+		<button style="width: 92%; font-size: 14px; line-height: 1.2;" id="ML" onclick="openModlist()">Modlist<br>(<span id="modcount">--</span> mods)</button>
 		</td></tr><tr><td align="center" width="auto">
 		<button style="width: 92%;" onclick="openWeb('pcmod')">PCMod website</button>
 		</td></tr><tr><td align="center" width="auto">
@@ -242,10 +242,10 @@ input.largerCheckbox {
 <img height="85px" src="../icons/pcmod.png"><br>
 </div>
 <br>
-<div id="content" style="height: 480px;">
+<div id="content" style="height: 420px;">
 <center>
 <table width="100%" height="100%" border=0><tr>
-<td colspan=2 height="375px">
+<td colspan=2 height="315px">
 <iframe id="news" width="100%" height="100%" title="PCMod News" name="PCMod News" src="news.html"></iframe><br>
 </td></tr><tr>
 <td align="center"><button style="width: 100%; height: 75px; font-size: 24px; font-weight: bold;" onclick="launchGame()">LAUNCH</button></td>
@@ -334,7 +334,7 @@ function refreshPlayers() {
     document.getElementById('online').innerHTML = "Refreshing...";
     if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.refresh_players().then(function(html) {
-            document.getElementById('online').innerHTML = html;
+            document.getElementById('online').innerHTML = (html && html.trim() !== "") ? html : "No Players Online";
         });
     }
 }

@@ -106,6 +106,9 @@ class PCModAPI:
             with open(uuid_file, "w", encoding="utf-8") as f:
                 f.write(self.uuid_val)
 
+        # Calculate mcuuid on user info load
+        self.get_mcuuid()
+
     def load_settings(self):
         settings_file = "settings.txt"
         if os.path.exists(settings_file):
@@ -294,6 +297,7 @@ class PCModAPI:
 
     def get_online_players_html(self):
         online_file = os.path.join("data", "indexes", "online")
+        html = ""
         if self.connection:
             try:
                 url = f"http://{self.url}/players/list-{self.pack}"
@@ -303,17 +307,20 @@ class PCModAPI:
                     os.makedirs(os.path.dirname(online_file), exist_ok=True)
                     with open(online_file, "w", encoding="utf-8") as f:
                         f.write(html)
-                    return html
             except Exception:
                 pass
         # Fallback to local
-        if os.path.exists(online_file):
+        if not html and os.path.exists(online_file):
             try:
                 with open(online_file, "r", encoding="utf-8", errors="ignore") as f:
-                    return f.read()
+                    html = f.read().strip()
             except Exception:
                 pass
-        return "Offline/No Connection"
+
+        if not html or html == "" or html == "<br>":
+            return "No Players Online"
+
+        return html
 
     def get_offline_uuid(self, username):
         val = hashlib.md5(f"OfflinePlayer:{username}".encode('utf-8')).digest()
@@ -664,8 +671,9 @@ class PCModAPI:
             self.settings["pack"] = self.pack
             self.save_settings()
 
-            # Recalculate mod count
+            # Recalculate mod count and refresh online player list for new pack
             self.get_mod_count()
+            self.get_online_players_html()
 
     def save_settings_btn(self):
         self.save_settings()
@@ -1214,7 +1222,7 @@ def start_launcher():
         title="PCMod Launcher",
         url=f"file:///{launcher_html}",
         width=1100,
-        height=760,
+        height=690,
         resizable=True,
         js_api=api
     )
