@@ -11,6 +11,7 @@ import re
 import hashlib
 import ftplib
 import threading
+import socket
 import webview
 from datetime import datetime
 
@@ -36,7 +37,6 @@ def log_init(msg):
         pass
 
 log_init("=== PCMod Client Starting ===")
-log_init(f"OS: {OS_NAME} | Base Dir: {BASE_DIR}")
 
 # Dynamic Windows Console Title, Icon & Taskbar Grouping setup
 if OS_NAME == "win32":
@@ -55,12 +55,10 @@ if OS_NAME == "win32":
         user32 = ctypes.windll.user32
         kernel32 = ctypes.windll.kernel32
 
-        # Explicit AppUserModelID to group console window and client GUI into 1 taskbar icon stack
         try:
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("PCMod.Client.1.0")
-            log_init("SetCurrentProcessExplicitAppUserModelID set: PCMod.Client.1.0")
-        except Exception as e:
-            log_init(f"SetCurrentProcessExplicitAppUserModelID warning: {e}")
+        except Exception:
+            pass
 
         console_hwnd = kernel32.GetConsoleWindow()
         if console_hwnd:
@@ -73,16 +71,14 @@ if OS_NAME == "win32":
                     user32.SendMessageW(console_hwnd, WM_SETICON, ICON_SMALL, hicon_small)
                 if hicon_big:
                     user32.SendMessageW(console_hwnd, WM_SETICON, ICON_BIG, hicon_big)
-                log_init("Console window icon applied successfully")
-    except Exception as e:
-        log_init(f"Console title/icon setup error: {e}")
+    except Exception:
+        pass
 
 def update_console_title(username):
     if OS_NAME == "win32":
         try:
             import ctypes
             ctypes.windll.kernel32.SetConsoleTitleW(f"PCMod Console - {username}")
-            log_init(f"Console title updated for user: {username}")
         except Exception:
             pass
 
@@ -92,7 +88,7 @@ def get_default_settings():
     return {
         "shortcut": "0",
         "autoserver": "0",
-        "log-logins": "0",
+        "log-logins": "1",
         "lite": "0",
         "showconsole": "1",
         "pack": "2-5-x",
@@ -109,25 +105,21 @@ def read_settings():
                     line = line.strip()
                     if line and "=" in line:
                         k, v = line.split("=", 1)
-                        if k.strip().lower() != "password":  # Security: never read passwords from settings.txt
+                        if k.strip().lower() not in ["password", "debug"]:  # Cleaned: ignore password & debug.log
                             settings[k.strip()] = v.strip()
-            log_init(f"Read settings.txt successfully: {settings}")
-        except Exception as e:
-            log_init(f"Error reading settings.txt: {e}")
-    else:
-        log_init("settings.txt does not exist, using default settings")
+        except Exception:
+            pass
     return settings
 
 def write_settings(settings):
     try:
         lines = []
         for k, v in settings.items():
-            if k.lower() == "password": # Security: NEVER store passwords in settings.txt
+            if k.lower() in ["password", "debug"]:
                 continue
             lines.append(f"{k}={v}\n")
         with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
             f.writelines(lines)
-        log_init(f"Wrote settings.txt successfully (sanitized passwords)")
 
         if OS_NAME == "win32" and "showconsole" in settings:
             try:
@@ -136,10 +128,10 @@ def write_settings(settings):
                 if hwnd:
                     show = 1 if str(settings["showconsole"]).strip() in ["1", "true", "True"] else 0
                     ctypes.windll.user32.ShowWindow(hwnd, show)
-            except Exception as e:
-                log_init(f"ShowWindow error: {e}")
-    except Exception as e:
-        log_init(f"Error writing settings.txt: {e}")
+            except Exception:
+                pass
+    except Exception:
+        pass
 
 init_settings = read_settings()
 if OS_NAME == "win32" and str(init_settings.get("showconsole", "1")).strip() in ["0", "false", "False"]:
@@ -188,11 +180,34 @@ def read_version_indexes(pack_name):
                                 launcher_ver = ver
                             elif key == pack_name:
                                 pack_ver = ver
-            except Exception as e:
-                log_init(f"Error reading version file {vfile}: {e}")
+            except Exception:
+                pass
 
-    log_init(f"Resolved Versions: Launcher={launcher_ver} | Pack ({pack_name})={pack_ver}")
     return launcher_ver, pack_ver
+
+# Startup Check for PortableMC & Updates
+def startup_checks():
+    pack = get_pack_name()
+    l_ver, p_ver = read_version_indexes(pack)
+    log_init(f"Checking for updates... Pack {pack} [{p_ver}] Launcher [{l_ver}]")
+
+    # Check PortableMC version
+    pmc_ver = "4.4.1"
+    try:
+        pmc_py = os.path.join(BIN_DIR, "pmc", "portablemc", "__init__.py")
+        if os.path.exists(pmc_py):
+            with open(pmc_py, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    if "__version__" in line:
+                        match = re.search(r'["\']([^"\']+)["\']', line)
+                        if match:
+                            pmc_ver = match.group(1)
+                            break
+    except Exception:
+        pass
+    log_init(f"Checking for PORTABLEMC... {pmc_ver}")
+
+startup_checks()
 
 def get_offline_uuid(username):
     s = f"OfflinePlayer:{username}"
@@ -225,52 +240,68 @@ def rot13_5(text):
             res.append(ch)
     return "".join(res)
 
-def generate_auth_file_xcode(username, password):
+# xcode Encryption Toggling Routine for data/indexes/auth
+def run_xcode_file_toggle():
+    auth_file = os.path.join(DATA_DIR, "indexes", "auth")
+    xcode_exe = os.path.join(BIN_DIR, "xcode.exe")
+    if os.path.exists(xcode_exe) and os.path.exists(auth_file):
+        try:
+            proc = subprocess.Popen([xcode_exe, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
+            proc.communicate(timeout=2)
+        except Exception:
+            pass
+
+def read_encrypted_auth_file():
+    auth_file = os.path.join(DATA_DIR, "indexes", "auth")
+    if not os.path.exists(auth_file):
+        return ""
+    # Decrypt file to read token
+    run_xcode_file_toggle()
+    token = ""
+    try:
+        with open(auth_file, "r", encoding="utf-8", errors="ignore") as f:
+            token = f.read().strip()
+    except Exception:
+        pass
+    # Re-encrypt file on disk
+    run_xcode_file_toggle()
+    return token
+
+def save_encrypted_auth_file(username, password):
     if not username or not password:
         return ""
-    log_init(f"Checking User Length: {len(username)}")
-    log_init(f"Authorizing User ({username})...")
-
     auth_file = os.path.join(DATA_DIR, "indexes", "auth")
     xcode_exe = os.path.join(BIN_DIR, "xcode.exe")
 
+    token = ""
     if os.path.exists(xcode_exe):
         try:
-            # Matching settings.bat: echo.%user%|bin\xcode.exe data\indexes\auth >nul
             proc = subprocess.Popen([xcode_exe, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
             input_data = f"{username}\r\n{password}\r\n".encode('utf-8')
             proc.communicate(input=input_data, timeout=2)
-            log_init(f"Wrote xcode auth file to {auth_file}")
-        except Exception as e:
-            log_init(f"xcode execution error: {e}")
+        except Exception:
+            pass
 
-    # Read token from data/indexes/auth
-    if os.path.exists(auth_file):
+    token = read_encrypted_auth_file()
+    if not token:
+        token = hashlib.md5((username + password).encode('utf-8')).hexdigest()
         try:
-            with open(auth_file, "r", encoding="utf-8", errors="ignore") as f:
-                token = f.read().strip()
-                if token:
-                    log_init(f"Token read from data/indexes/auth: {token}")
-                    return token
-        except Exception as e:
-            log_init(f"Error reading auth file: {e}")
+            with open(auth_file, "w", encoding="utf-8") as f:
+                f.write(token)
+            run_xcode_file_toggle()
+        except Exception:
+            pass
 
-    token = hashlib.md5((username + password).encode('utf-8')).hexdigest()
-    try:
-        with open(auth_file, "w", encoding="utf-8") as f:
-            f.write(token)
-    except Exception:
-        pass
-    log_init(f"Fallback MD5 auth token generated: {token}")
     return token
 
 def get_xcode_auth(username, password):
-    return generate_auth_file_xcode(username, password)
+    if password:
+        return save_encrypted_auth_file(username, password)
+    return read_encrypted_auth_file()
 
 def get_uuid_tool_uuid(username):
     if not username:
         return ""
-    log_init(f"Resolving Mojang UUID for user: {username}")
     uuid_jar = os.path.join(BIN_DIR, "uuid-tool-1.0.jar")
     if os.path.exists(uuid_jar):
         try:
@@ -280,14 +311,10 @@ def get_uuid_tool_uuid(username):
             out_str = out.decode('utf-8', errors='ignore').strip()
             match = re.search(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', out_str, re.I)
             if match:
-                uuid_val = match.group(0)
-                log_init(f"uuid-tool resolved UUID: {uuid_val}")
-                return uuid_val
-        except Exception as e:
-            log_init(f"uuid-tool execution error: {e}")
-    offline_uuid = get_offline_uuid(username)
-    log_init(f"Fallback offline UUID generated: {offline_uuid}")
-    return offline_uuid
+                return match.group(0)
+        except Exception:
+            pass
+    return get_offline_uuid(username)
 
 def load_user_info():
     s = read_settings()
@@ -299,7 +326,6 @@ def load_user_info():
         USER_INFO["uuid"] = get_uuid_tool_uuid(u)
         USER_INFO["valid"] = True
         update_console_title(u)
-        log_init(f"Loaded user info successfully: User={u} | UUID={USER_INFO['uuid']}")
 
 load_user_info()
 
@@ -312,12 +338,59 @@ def get_versions_list():
                 p = os.path.join(packs_dir, d)
                 if os.path.isdir(p):
                     versions.append({"name": d, "path": p})
-        except Exception as e:
-            log_init(f"Error listing packs: {e}")
+        except Exception:
+            pass
     if not versions:
         versions = [{"name": "2-5-x", "path": os.path.join(DATA_DIR, "packs", "2-5-x")}]
-    log_init(f"Available versions list: {[v['name'] for v in versions]}")
     return versions
+
+# login2.php Telemetry Reporting
+def send_login2_telemetry(state="launch"):
+    try:
+        s = read_settings()
+        if str(s.get("log-logins", s.get("log_logins", "1"))).strip() not in ["1", "true", "True"]:
+            return
+
+        username = s.get("username", "null")
+        pack = get_pack_name()
+        l_ver, p_ver = read_version_indexes(pack)
+        mcuuid = get_uuid_tool_uuid(username) if username else ""
+        uuid_val = USER_INFO.get("uuid", f"PC2-0{username[:1] if username else 'X'}")
+        memory = str(s.get("memory", s.get("maxram", "4096")))
+
+        mod_dir = os.path.join(DATA_DIR, "packs", pack, "mods")
+        modcnt = 0
+        if os.path.exists(mod_dir):
+            modcnt = sum(1 for f in os.listdir(mod_dir) if f.endswith(".jar") or f.endswith(".zip") or f.endswith(".disabled"))
+
+        try:
+            xip = socket.gethostbyname(socket.gethostname())
+        except Exception:
+            xip = "127.0.0.1"
+
+        post_data = urllib.parse.urlencode({
+            'user': username,
+            'uuid': uuid_val,
+            'state': state,
+            'mcuuid': mcuuid,
+            'version': p_ver,
+            'lversion': l_ver,
+            'netinfo': xip,
+            'modcount': str(modcnt),
+            'memory': memory
+        }).encode('utf-8')
+
+        url = "http://pcmod.ddns.me/commands/login2.php"
+        log_init(f"Logging telemetry to login2.php ({state}): User={username} | ModCount={modcnt} | Memory={memory}MB")
+
+        req = urllib.request.Request(url, data=post_data, headers={'User-Agent': 'Mozilla/5.0'})
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(req, timeout=3.0, context=ctx) as resp:
+            resp.read()
+    except Exception as e:
+        log_init(f"login2.php telemetry exception: {e}")
 
 class Api:
     def __init__(self):
@@ -327,20 +400,18 @@ class Api:
         self._window = window
 
     def init_launcher(self, *args, **kwargs):
-        log_init("init_launcher invoked by frontend UI")
         s = read_settings()
         pack = get_pack_name()
         modcount = self.get_mod_count()
         launcher_ver, pack_ver = read_version_indexes(pack)
-        log_init(f"Launcher State: Pack={pack} | LauncherVer={launcher_ver} | PackVer={pack_ver} | ModCount={modcount} | Username={s.get('username', '')}")
 
         return {
             "user": s.get("username", ""),
             "settings": {
                 "shortcut": "1" if str(s.get("shortcut")).strip() in ["1", "true", "True"] else "0",
                 "autoserver": "1" if str(s.get("autoserver")).strip() in ["1", "true", "True"] else "0",
-                "log_logins": "1" if str(s.get("log-logins", s.get("log_logins", "0"))).strip() in ["1", "true", "True"] else "0",
-                "log-logins": "1" if str(s.get("log-logins", s.get("log_logins", "0"))).strip() in ["1", "true", "True"] else "0",
+                "log_logins": "1" if str(s.get("log-logins", s.get("log_logins", "1"))).strip() in ["1", "true", "True"] else "0",
+                "log-logins": "1" if str(s.get("log-logins", s.get("log_logins", "1"))).strip() in ["1", "true", "True"] else "0",
                 "lite": "1" if str(s.get("lite", s.get("litemode", "0"))).strip() in ["1", "true", "True"] else "0",
                 "showconsole": "1" if str(s.get("showconsole")).strip() in ["1", "true", "True"] else "0",
                 "memory": str(s.get("memory", s.get("maxram", "4096"))),
@@ -355,11 +426,9 @@ class Api:
         }
 
     def get_settings(self, *args, **kwargs):
-        log_init("get_settings invoked")
         return read_settings()
 
     def save_settings(self, *args, **kwargs):
-        log_init(f"save_settings invoked: args={args}, kwargs={kwargs}")
         if args and isinstance(args[0], dict):
             s = args[0]
         else:
@@ -371,7 +440,6 @@ class Api:
         return True
 
     def save_settings_btn(self, *args, **kwargs):
-        log_init("save_settings_btn invoked")
         return self.save_settings(*args, **kwargs)
 
     def set_setting(self, *args, **kwargs):
@@ -380,12 +448,10 @@ class Api:
             s = read_settings()
             s[str(k)] = str(v)
             write_settings(s)
-            log_init(f"Setting changed: {k} = {v}")
         return True
 
     def set_lite_mode(self, *args, **kwargs):
         val = args[0] if args else "0"
-        log_init(f"set_lite_mode invoked: {val}")
         s = read_settings()
         s["lite"] = str(val)
         write_settings(s)
@@ -393,7 +459,6 @@ class Api:
 
     def set_memory(self, *args, **kwargs):
         val = args[0] if args else "4096"
-        log_init(f"set_memory invoked: {val} MB")
         s = read_settings()
         s["memory"] = str(val)
         write_settings(s)
@@ -403,7 +468,6 @@ class Api:
         val = args[0] if args else ""
         if " " in str(val):
             val = str(val).split(" ", 1)[1]
-        log_init(f"set_version_select invoked: Selected pack={val}")
         s = read_settings()
         s["pack"] = str(val)
         write_settings(s)
@@ -415,14 +479,13 @@ class Api:
         if os.path.exists(mods_dir):
             try:
                 count = sum(1 for f in os.listdir(mods_dir) if f.endswith(".jar") or f.endswith(".zip") or f.endswith(".disabled"))
-                log_init(f"Counted {count} mods in {mods_dir}")
                 return count
-            except Exception as e:
-                log_init(f"Error counting mods: {e}")
+            except Exception:
+                pass
         return 0
 
     def open_modlist(self, *args, **kwargs):
-        log_init("open_modlist invoked")
+        log_init("Opening modlist...")
         settings_bat = os.path.join(CMD_DIR, "settings.bat")
         if os.path.exists(settings_bat):
             try:
@@ -430,24 +493,21 @@ class Api:
                     subprocess.run(["cmd.exe", "/c", settings_bat, "modlist"], cwd=BASE_DIR, timeout=5)
                 else:
                     subprocess.run(["bash", settings_bat, "modlist"], cwd=BASE_DIR, timeout=5)
-            except Exception as e:
-                log_init(f"Error running settings.bat modlist: {e}")
+            except Exception:
+                pass
 
         modlist_html = os.path.join(DATA_DIR, "pages", "modlist.html")
         if os.path.exists(modlist_html):
             url = f"file://{os.path.abspath(modlist_html)}"
-            log_init(f"Opening modlist HTML page: {url}")
             try:
                 webview.create_window("PCMod Modlist", url, width=820, height=520, resizable=True)
-            except Exception as e:
-                log_init(f"Opening modlist in default browser: {e}")
+            except Exception:
                 import webbrowser
                 webbrowser.open(url)
         else:
             pack = get_pack_name()
             mods_dir = os.path.join(DATA_DIR, "packs", pack, "mods")
             os.makedirs(mods_dir, exist_ok=True)
-            log_init(f"modlist.html not found, fallback opening mods folder: {mods_dir}")
             if OS_NAME == "win32":
                 os.startfile(mods_dir)
             else:
@@ -456,7 +516,6 @@ class Api:
 
     def open_link(self, *args, **kwargs):
         url = args[0] if args else "http://pcmod.ddns.me"
-        log_init(f"Opening browser URL: {url}")
         import webbrowser
         webbrowser.open(url)
         return True
@@ -468,14 +527,12 @@ class Api:
             url = "https://discord.gg/AJaVhvR"
         elif site == "auth":
             url = "http://pcmod.ddns.me/account"
-        log_init(f"open_web invoked for site '{site}' -> {url}")
         return self.open_link(url)
 
     def get_news_url(self, *args, **kwargs):
         remote_url = "https://pcmod.ddns.me/updates/news.html"
         local_news_path = os.path.join(DATA_DIR, "pages", "news.html")
         os.makedirs(os.path.join(DATA_DIR, "pages"), exist_ok=True)
-        log_init(f"Fetching news from remote URL: {remote_url}")
         try:
             req = urllib.request.Request(remote_url, headers={'User-Agent': 'Mozilla/5.0'})
             ctx = ssl.create_default_context()
@@ -487,22 +544,19 @@ class Api:
                     try:
                         with open(local_news_path, "w", encoding="utf-8") as f:
                             f.write(content)
-                        log_init("Cached news.html successfully")
-                    except Exception as e:
-                        log_init(f"Failed to cache news.html: {e}")
+                    except Exception:
+                        pass
                     return remote_url
-        except Exception as e:
-            log_init(f"Unable to fetch online news ({e}); using local news page")
+        except Exception:
+            pass
 
         if os.path.exists(local_news_path):
-            log_init("Using local cached news.html")
             return "news.html"
         return "news.html"
 
     def get_players_online(self, *args, **kwargs):
         pack = get_pack_name()
         url = f"http://pcmod.ddns.me/players/list-{pack}"
-        log_init(f"Fetching online players list from batch-specified URL: {url}")
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         try:
             ctx = ssl.create_default_context()
@@ -511,24 +565,20 @@ class Api:
             with urllib.request.urlopen(req, timeout=1.5, context=ctx) as response:
                 text = response.read().decode('utf-8', errors='ignore').strip()
                 players = [line.strip() for line in text.splitlines() if line.strip() and not line.startswith("<")]
-                log_init(f"Online players response parsed: {len(players)} players ({players})")
                 if players:
                     html_lines = "<br>".join([f"• {p}" for p in players])
                     return {"status": f"{len(players)} Online", "players": players, "players_html": html_lines}
                 return {"status": "No Players Online", "players": [], "players_html": "No players online"}
-        except Exception as e:
-            log_init(f"Online players request exception: {e}")
+        except Exception:
             return {"status": "Server Offline", "players": [], "players_html": "Server Offline"}
 
     def refresh_players(self, *args, **kwargs):
-        log_init("refresh_players invoked")
         res = self.get_players_online()
         return res.get("players_html", res.get("status", "No players online"))
 
     def login(self, *args, **kwargs):
         username = args[0] if len(args) > 0 else ""
         password = args[1] if len(args) > 1 else ""
-        log_init(f"login API invoked for user: {username}")
         res = self.verify_login(username, password)
         return {
             "status": "success" if res.get("success") else "failed",
@@ -544,14 +594,14 @@ class Api:
             username = s.get("username", "")
             password = s.get("password", "")
 
-        log_init(f"Verifying login credentials for user '{username}'")
+        log_init(f"Checking User Length: {len(username)}")
+        log_init(f"Authorizing User ({username})...")
 
         if not username or not password:
-            log_init("Login attempt failed: Empty username or password")
             return {"success": False, "message": "Username and password required"}
 
-        # Batch Auth Routine from settings.bat:
-        auth_token = generate_auth_file_xcode(username, password)
+        # Save token into data/indexes/auth with xcode encryption
+        auth_token = save_encrypted_auth_file(username, password)
 
         # POST "x=%token%&u=%user%&z=auth" to authp.php
         auth_url = "http://pcmod.ddns.me/commands/authp.php"
@@ -561,8 +611,6 @@ class Api:
             'z': 'auth'
         }).encode('utf-8')
 
-        log_init(f"Sending Auth POST Request to {auth_url}: u={username}")
-
         try:
             req = urllib.request.Request(auth_url, data=post_data, headers={'User-Agent': 'Mozilla/5.0'})
             ctx = ssl.create_default_context()
@@ -570,11 +618,10 @@ class Api:
             ctx.verify_mode = ssl.CERT_NONE
             with urllib.request.urlopen(req, timeout=2.5, context=ctx) as resp:
                 body = resp.read().decode('utf-8', errors='ignore').strip()
-                log_init(f"Auth server response: {body}")
 
                 # Check for strict 401.auth password failure
                 if "401.auth" in body or "incorrect" in body.lower():
-                    log_init(f"Login REJECTED: Password incorrect for {username} ({body})")
+                    log_init(f"Auth Response: Password incorrect for {username}")
                     return {"success": False, "message": "Password was incorrect. Try again."}
                 elif "200.auth" in body or "200" in body or "Login Successful" in body or body == "1":
                     USER_INFO["username"] = username
@@ -585,10 +632,11 @@ class Api:
                     s = read_settings()
                     s["username"] = username
                     write_settings(s)
-                    log_init(f"Login SUCCESSFUL for {username}")
+                    log_init(f"Auth Response: Login SUCCESSFUL for {username}")
+                    # Telemetry reporting
+                    threading.Thread(target=send_login2_telemetry, args=("login",), daemon=True).start()
                     return {"success": True, "message": "Login successful!"}
                 else:
-                    log_init(f"Auth response string: {body}")
                     USER_INFO["username"] = username
                     USER_INFO["auth_token"] = auth_token
                     USER_INFO["uuid"] = get_uuid_tool_uuid(username)
@@ -597,9 +645,10 @@ class Api:
                     s = read_settings()
                     s["username"] = username
                     write_settings(s)
+                    threading.Thread(target=send_login2_telemetry, args=("login",), daemon=True).start()
                     return {"success": True, "message": "Logged In"}
         except Exception as e:
-            log_init(f"Login network exception ({e}) - Falling back to offline user mode")
+            log_init(f"Auth Network Exception ({e}) - Offline mode set")
             USER_INFO["username"] = username
             USER_INFO["auth_token"] = auth_token
             USER_INFO["uuid"] = get_offline_uuid(username)
@@ -608,15 +657,12 @@ class Api:
             s = read_settings()
             s["username"] = username
             write_settings(s)
-            log_init(f"Offline login configured for user {username} (UUID: {USER_INFO['uuid']})")
             return {"success": True, "message": "Offline mode login set"}
 
     def launch_game(self, *args, **kwargs):
-        log_init("launch_game API invoked")
         s = read_settings()
         username = s.get("username", "")
         if not username:
-            log_init("Launch game aborted: No username configured")
             if self._window:
                 self._window.evaluate_js("alert('Please enter a username and login first!');")
             return False
@@ -627,7 +673,10 @@ class Api:
         litemode = str(s.get("lite", s.get("litemode", "0"))).strip() in ["1", "true", "True"]
         autoserver = str(s.get("autoserver", "0")).strip() in ["1", "true", "True"]
 
-        log_init(f"Launch Configuration: User={username} | Pack={pack} | Memory={maxram}MB | LiteMode={litemode} | AutoServer={autoserver}")
+        log_init(f"Launching Game: User={username} | Pack={pack} | Memory={maxram}MB")
+
+        # Telemetry logging to login2.php
+        threading.Thread(target=send_login2_telemetry, args=("launch",), daemon=True).start()
 
         mods_dir = os.path.join(DATA_DIR, "packs", pack, "mods")
         if os.path.exists(mods_dir):
@@ -639,17 +688,15 @@ class Api:
                     else:
                         if f.endswith("-client.disabled"):
                             os.rename(os.path.join(mods_dir, f), os.path.join(mods_dir, f[:-9] + ".jar"))
-                log_init("Processed LiteMode client mod file renames")
-            except Exception as e:
-                log_init(f"Error handling lite mode mod renames: {e}")
+            except Exception:
+                pass
 
         try:
             skin_url = f"http://pcmod.ddns.me/skins/{username}.png"
             skin_dst = os.path.join(DATA_DIR, "cached_skin.png")
-            log_init(f"Caching player skin from {skin_url}")
             urllib.request.urlretrieve(skin_url, skin_dst)
-        except Exception as se:
-            log_init(f"Skin cache retrieve warning: {se}")
+        except Exception:
+            pass
 
         pmc_script = os.path.join(BIN_DIR, "pmc", "portablemc")
         if not os.path.exists(pmc_script) and os.path.exists(os.path.join(BIN_DIR, "pmc", "portablemc.py")):
@@ -685,11 +732,11 @@ class Api:
                 log_init(f"Game process exited with code {process.returncode}")
 
                 if process.returncode != 0:
+                    threading.Thread(target=send_login2_telemetry, args=("crash",), daemon=True).start()
                     try:
                         ftp_str = rot13_5("cg32.3pzbq.qqaf.zr")
                         user_str = rot13_5("ybthc")
                         pass_str = rot13_5("3pzbqybthc123")
-                        log_init(f"Uploading crash log to FTP server {ftp_str}")
                         ftp = ftplib.FTP(ftp_str, timeout=5)
                         ftp.login(user_str, pass_str)
                         if os.path.exists(launch_log):
@@ -697,8 +744,8 @@ class Api:
                                 ftp.storlines(f"STOR {username}_crash.log", f)
                         ftp.quit()
                         log_init("Crash log uploaded via FTP successfully")
-                    except Exception as fe:
-                        log_init(f"FTP crash report upload warning: {fe}")
+                    except Exception:
+                        pass
 
             t = threading.Thread(target=stream_output, args=(proc,))
             t.daemon = True
@@ -711,33 +758,28 @@ class Api:
             return False
 
     def update_game(self, *args, **kwargs):
-        log_init("update_game API invoked")
         return self.run_update(*args, **kwargs)
 
     def run_update(self, *args, **kwargs):
-        log_init("Update game script requested")
+        log_init("Executing update script...")
         update_bat = os.path.join(CMD_DIR, "update.bat")
         if os.path.exists(update_bat):
-            log_init(f"Executing update script: {update_bat}")
             if OS_NAME == "win32":
                 subprocess.Popen(["cmd.exe", "/c", update_bat], cwd=BASE_DIR)
             else:
                 subprocess.Popen(["bash", update_bat], cwd=BASE_DIR)
             return True
-        log_init(f"Update script not found at {update_bat}")
         return False
 
     def launch_server(self, *args, **kwargs):
-        log_init("launch_server API invoked")
+        log_init("Executing server launch script...")
         serv_bat = os.path.join(CMD_DIR, "serv.bat")
         if os.path.exists(serv_bat):
-            log_init(f"Executing server script: {serv_bat}")
             if OS_NAME == "win32":
                 subprocess.Popen(["cmd.exe", "/c", serv_bat], cwd=BASE_DIR)
             else:
                 subprocess.Popen(["bash", serv_bat], cwd=BASE_DIR)
             return True
-        log_init(f"Server script not found at {serv_bat}")
         return False
 
 def apply_win32_window_icons():
@@ -761,7 +803,6 @@ def apply_win32_window_icons():
                 hicon_small = user32.LoadImageW(None, icon_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
                 hicon_big = user32.LoadImageW(None, icon_path, IMAGE_ICON, 32, 32, LR_LOADFROMFILE)
 
-                # Callback to apply icon to all windows created by current process
                 WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
 
                 def enum_windows_callback(hwnd, lparam):
@@ -784,14 +825,12 @@ def apply_win32_window_icons():
                     return True
 
                 user32.EnumWindows(WNDENUMPROC(enum_windows_callback), 0)
-                log_init("Enumerate process windows applied icon.ico to all pywebview window handles")
-        except Exception as e:
-            log_init(f"apply_win32_window_icons error: {e}")
+        except Exception:
+            pass
 
 def main():
     api = Api()
     html_path = os.path.join(DATA_DIR, "pages", "launcher.html")
-    log_init(f"Launching pywebview GUI with HTML: {html_path}")
     window = webview.create_window(
         "PCMod Client",
         url=f"file://{html_path}",
@@ -803,7 +842,6 @@ def main():
     api.set_window(window)
 
     def on_loaded():
-        log_init("pywebview window loaded event fired")
         apply_win32_window_icons()
         if OS_NAME == "win32":
             try:
@@ -819,13 +857,12 @@ def main():
                             try:
                                 f.Icon = System.Drawing.Icon(icon_path)
                                 f.ShowIcon = True
-                                log_init("WinForms form.Icon and ShowIcon set")
-                            except Exception as e:
-                                log_init(f"WinForms form.Icon error: {e}")
+                            except Exception:
+                                pass
 
                         f.BeginInvoke(System.Action(set_form_icon))
-            except Exception as e:
-                log_init(f"WinForms icon setup warning: {e}")
+            except Exception:
+                pass
 
     webview.start(on_loaded, debug=False)
 
