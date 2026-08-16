@@ -194,7 +194,6 @@ def startup_checks():
     l_ver, p_ver = read_version_indexes(pack)
     log_init(f"Checking for updates... Pack {pack} [{p_ver}] Launcher [{l_ver}]")
 
-    # Check PortableMC version
     pmc_ver = "4.4.1"
     try:
         pmc_py = os.path.join(BIN_DIR, "pmc", "portablemc", "__init__.py")
@@ -244,7 +243,6 @@ def rot13_5(text):
     return "".join(res)
 
 def run_xcode_auth_index(username):
-    # Matches settings.bat line 165: echo.%user%|bin\xcode.exe data\indexes\auth >nul
     auth_file = os.path.join(DATA_DIR, "indexes", "auth")
     xcode_exe = os.path.join(BIN_DIR, "xcode.exe")
     if os.path.exists(xcode_exe):
@@ -259,10 +257,8 @@ def get_xcode_auth(username, password):
     if not username or not password:
         return ""
 
-    # MD5 hash of password
     raw_hash = hashlib.md5(password.encode('utf-8')).hexdigest()
 
-    # Try xcode.exe if present
     xcode_exe = os.path.join(BIN_DIR, "xcode.exe")
     if os.path.exists(xcode_exe):
         try:
@@ -282,7 +278,6 @@ def get_xcode_auth(username, password):
     log_init(f"Auth token generated: {raw_hash}")
     run_xcode_auth_index(username)
 
-    # Ensure leading backslash as required by authp.php protocol (\hash)
     if not raw_hash.startswith("\\"):
         return f"\\{raw_hash}"
     return raw_hash
@@ -332,8 +327,8 @@ def get_versions_list():
         versions = [{"name": "2-5-x", "path": os.path.join(DATA_DIR, "packs", "2-5-x")}]
     return versions
 
-# login2.php Telemetry Reporting
-def send_login2_telemetry(state="launch"):
+# login2.php Telemetry Reporting matching exact backend states: in, out, launcher, update, updated, crash
+def send_login2_telemetry(state="launcher"):
     try:
         s = read_settings()
         if str(s.get("log-logins", s.get("log_logins", "1"))).strip() not in ["1", "true", "True"]:
@@ -356,12 +351,14 @@ def send_login2_telemetry(state="launch"):
         except Exception:
             xip = "127.0.0.1"
 
+        versioning = f"{pack}/{p_ver}"
+
         post_data = urllib.parse.urlencode({
             'user': username,
             'uuid': uuid_val,
-            'state': state,
+            'state': state, # Exact backend state: in, out, launcher, update, updated, crash
             'mcuuid': mcuuid,
-            'version': p_ver,
+            'version': versioning,
             'lversion': l_ver,
             'netinfo': xip,
             'modcount': str(modcnt),
@@ -369,7 +366,7 @@ def send_login2_telemetry(state="launch"):
         }).encode('utf-8')
 
         url = "http://pcmod.ddns.me/commands/login2.php"
-        log_init(f"Sending data to server... (state: {state})")
+        log_init(f"Sending telemetry data to server... (state: {state})")
 
         req = urllib.request.Request(url, data=post_data, headers={'User-Agent': 'Mozilla/5.0'})
         ctx = ssl.create_default_context()
@@ -379,6 +376,38 @@ def send_login2_telemetry(state="launch"):
             resp.read()
     except Exception as e:
         log_init(f"login2.php telemetry exception: {e}")
+
+# Helper for desktop shortcut creation matching cmd/settings.bat shortcut option
+def toggle_desktop_shortcut(enable):
+    if OS_NAME == "win32":
+        try:
+            desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+            shortcut_path = os.path.join(desktop, "PCMod Client.lnk")
+            if enable:
+                target = sys.executable
+                icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
+                vbs_script = (
+                    f'Set ws = WScript.CreateObject("WScript.Shell")\n'
+                    f'Set sc = ws.CreateShortcut("{shortcut_path}")\n'
+                    f'sc.TargetPath = "{target}"\n'
+                    f'sc.Arguments = "{os.path.abspath(__file__)}"\n'
+                    f'sc.WorkingDirectory = "{BASE_DIR}"\n'
+                    f'sc.IconLocation = "{icon_path}"\n'
+                    f'sc.Save\n'
+                )
+                vbs_file = os.path.join(DATA_DIR, "create_shortcut.vbs")
+                with open(vbs_file, "w", encoding="utf-8") as f:
+                    f.write(vbs_script)
+                subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5)
+                if os.path.exists(vbs_file):
+                    os.remove(vbs_file)
+                log_init("Created desktop shortcut: PCMod Client.lnk")
+            else:
+                if os.path.exists(shortcut_path):
+                    os.remove(shortcut_path)
+                    log_init("Removed desktop shortcut: PCMod Client.lnk")
+        except Exception as e:
+            log_init(f"Desktop shortcut error: {e}")
 
 class Api:
     def __init__(self):
@@ -436,6 +465,8 @@ class Api:
             s = read_settings()
             s[str(k)] = str(v)
             write_settings(s)
+            if str(k) == "shortcut":
+                toggle_desktop_shortcut(str(v) in ["1", "true", "True"])
         return True
 
     def set_lite_mode(self, *args, **kwargs):
@@ -626,7 +657,8 @@ class Api:
                     s["username"] = username
                     write_settings(s)
                     log_init(f"Login SUCCESSFUL for {username}")
-                    threading.Thread(target=send_login2_telemetry, args=("login",), daemon=True).start()
+                    # Telemetry reporting with 'in' state
+                    threading.Thread(target=send_login2_telemetry, args=("in",), daemon=True).start()
                     return {"success": True, "message": "Login successful!"}
                 else:
                     log_init(f"Login status string: {body}")
@@ -639,7 +671,7 @@ class Api:
                     s = read_settings()
                     s["username"] = username
                     write_settings(s)
-                    threading.Thread(target=send_login2_telemetry, args=("login",), daemon=True).start()
+                    threading.Thread(target=send_login2_telemetry, args=("in",), daemon=True).start()
                     return {"success": True, "message": "Logged In"}
         except Exception as e:
             log_init(f"Auth Network Exception ({e})")
@@ -677,8 +709,8 @@ class Api:
 
         log_init(f"Launching Game: User={username} | Pack={pack} | Memory={maxram}MB")
 
-        # Telemetry logging to login2.php
-        threading.Thread(target=send_login2_telemetry, args=("launch",), daemon=True).start()
+        # Telemetry logging with 'launcher' state
+        threading.Thread(target=send_login2_telemetry, args=("launcher",), daemon=True).start()
 
         mods_dir = os.path.join(DATA_DIR, "packs", pack, "mods")
         if os.path.exists(mods_dir):
@@ -713,7 +745,6 @@ class Api:
 
         log_init(f"Executing PMC command: {' '.join(cmd)}")
 
-        # Prepare environment with bin/pmc in PYTHONPATH
         proc_env = os.environ.copy()
         pmc_dir = os.path.join(BIN_DIR, "pmc")
         if "PYTHONPATH" in proc_env:
@@ -769,12 +800,14 @@ class Api:
 
     def run_update(self, *args, **kwargs):
         log_init("Executing update script...")
+        threading.Thread(target=send_login2_telemetry, args=("update",), daemon=True).start()
         update_bat = os.path.join(CMD_DIR, "update.bat")
         if os.path.exists(update_bat):
             if OS_NAME == "win32":
                 subprocess.Popen(["cmd.exe", "/c", update_bat], cwd=BASE_DIR)
             else:
                 subprocess.Popen(["bash", update_bat], cwd=BASE_DIR)
+            threading.Thread(target=send_login2_telemetry, args=("updated",), daemon=True).start()
             return True
         return False
 
@@ -871,6 +904,10 @@ def main():
             except Exception:
                 pass
 
+    def on_closing():
+        threading.Thread(target=send_login2_telemetry, args=("out",), daemon=True).start()
+
+    window.events.closing += on_closing
     webview.start(on_loaded, debug=False)
 
 if __name__ == "__main__":
