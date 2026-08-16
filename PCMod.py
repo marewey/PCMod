@@ -371,16 +371,36 @@ class Api:
         return 0
 
     def open_modlist(self, *args, **kwargs):
-        pack = get_pack_name()
-        mods_dir = os.path.join(DATA_DIR, "packs", pack, "mods")
-        os.makedirs(mods_dir, exist_ok=True)
-        log_init(f"Opening modlist folder: {mods_dir}")
-        if OS_NAME == "win32":
-            os.startfile(mods_dir)
-        elif OS_NAME == "darwin":
-            subprocess.Popen(["open", mods_dir])
+        log_init("open_modlist invoked")
+        settings_bat = os.path.join(CMD_DIR, "settings.bat")
+        if os.path.exists(settings_bat):
+            try:
+                if OS_NAME == "win32":
+                    subprocess.run(["cmd.exe", "/c", settings_bat, "modlist"], cwd=BASE_DIR, timeout=5)
+                else:
+                    subprocess.run(["bash", settings_bat, "modlist"], cwd=BASE_DIR, timeout=5)
+            except Exception as e:
+                log_init(f"Error running settings.bat modlist: {e}")
+
+        modlist_html = os.path.join(DATA_DIR, "pages", "modlist.html")
+        if os.path.exists(modlist_html):
+            url = f"file://{os.path.abspath(modlist_html)}"
+            log_init(f"Opening modlist HTML page: {url}")
+            try:
+                webview.create_window("PCMod Modlist", url, width=820, height=520, resizable=True)
+            except Exception as e:
+                log_init(f"Opening modlist in default browser: {e}")
+                import webbrowser
+                webbrowser.open(url)
         else:
-            subprocess.Popen(["xdg-open", mods_dir])
+            pack = get_pack_name()
+            mods_dir = os.path.join(DATA_DIR, "packs", pack, "mods")
+            os.makedirs(mods_dir, exist_ok=True)
+            log_init(f"modlist.html not found, fallback opening mods folder: {mods_dir}")
+            if OS_NAME == "win32":
+                os.startfile(mods_dir)
+            else:
+                subprocess.Popen(["open" if OS_NAME=="darwin" else "xdg-open", mods_dir])
         return True
 
     def open_link(self, *args, **kwargs):
@@ -394,7 +414,7 @@ class Api:
         site = args[0] if args else "pcmod"
         url = "http://pcmod.ddns.me/modpack"
         if site == "discord":
-            url = "https://discord.gg/plattecraft"
+            url = "https://discord.com/invite/plattecraft"
         elif site == "auth":
             url = "http://pcmod.ddns.me/account"
         log_init(f"open_web invoked for site '{site}' -> {url}")
