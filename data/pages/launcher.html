@@ -368,7 +368,7 @@
     <!-- Middle Column: Logo, News & Main Actions -->
     <div class="main-content" style="grid-column: 2;">
       <div class="logo-header">
-        <img src="data/head.png" alt="PCMod Client" onerror="this.src='data/logo.png'">
+        <img src="../icons/pcmod.png" alt="PCMod Client" id="logoImg">
       </div>
 
       <div class="panel news-card">
@@ -492,15 +492,8 @@
           }
         }
 
-        // 6. Online players
-        if (data.online_players) {
-          document.getElementById('playerList').innerHTML = data.online_players;
-        }
-
-        // 7. News iframe
-        if (data.news_url) {
-          document.getElementById('newsIframe').src = data.news_url;
-        }
+        // 6. Refresh players online asynchronously without blocking UI
+        refreshPlayers();
       });
     }
 

@@ -10,6 +10,7 @@ import subprocess
 import re
 import hashlib
 import ftplib
+import threading
 import webview
 from datetime import datetime
 
@@ -190,7 +191,7 @@ def get_xcode_auth(username, password):
         try:
             proc = subprocess.Popen([xcode_exe], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
             input_data = f"{username}\r\n{password}\r\n".encode('utf-8')
-            out, err = proc.communicate(input=input_data, timeout=5)
+            out, err = proc.communicate(input=input_data, timeout=2)
             lines = [l.strip() for l in out.decode('utf-8', errors='ignore').splitlines() if l.strip()]
             for l in lines:
                 if "XOR Tool" in l or "Enter string" in l or "Enter key" in l:
@@ -211,7 +212,7 @@ def get_uuid_tool_uuid(username):
         try:
             proc = subprocess.Popen(["java", "-jar", uuid_jar], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
             input_data = f"{username}\r\n".encode('utf-8')
-            out, err = proc.communicate(input=input_data, timeout=5)
+            out, err = proc.communicate(input=input_data, timeout=2)
             out_str = out.decode('utf-8', errors='ignore').strip()
             match = re.search(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', out_str, re.I)
             if match:
@@ -261,9 +262,8 @@ class Api:
         s = read_settings()
         pack = get_pack_name()
         modcount = self.get_mod_count()
-        online_res = self.get_players_online()
-        online_str = online_res.get("players_html", online_res.get("status", "No players online"))
 
+        # Fast non-blocking return for initialization
         return {
             "user": s.get("username", ""),
             "settings": {
@@ -280,8 +280,8 @@ class Api:
             "launcher_version": "2.5",
             "pack_version": pack,
             "versions_list": get_versions_list(),
-            "online_players": online_str,
-            "news_url": self.get_news_url()
+            "online_players": "Loading...",
+            "news_url": "news.html"
         }
 
     def get_settings(self, *args, **kwargs):
@@ -381,7 +381,7 @@ class Api:
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=3, context=ctx) as resp:
+            with urllib.request.urlopen(req, timeout=1.5, context=ctx) as resp:
                 content = resp.read().decode('utf-8', errors='ignore')
                 if content and len(content) > 10:
                     try:
@@ -396,8 +396,8 @@ class Api:
         if os.path.exists(local_news_path):
             local_url = f"file://{local_news_path}"
             log_init(f"Using local cached news: {local_url}")
-            return local_url
-        return remote_url
+            return "news.html"
+        return "news.html"
 
     def get_players_online(self, *args, **kwargs):
         pack = get_pack_name()
@@ -407,7 +407,7 @@ class Api:
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=4, context=ctx) as response:
+            with urllib.request.urlopen(req, timeout=1.5, context=ctx) as response:
                 text = response.read().decode('utf-8', errors='ignore').strip()
                 players = [line.strip() for line in text.splitlines() if line.strip() and not line.startswith("<")]
                 if players:
@@ -449,7 +449,7 @@ class Api:
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:
+            with urllib.request.urlopen(req, timeout=2.0, context=ctx) as resp:
                 body = resp.read().decode('utf-8', errors='ignore').strip()
                 log_init(f"Auth response: {body}")
                 if "Login Successful" in body or "400.auth" in body or "200" in body or body == "1":
@@ -551,7 +551,7 @@ class Api:
                         ftp_str = rot13_5("cg32.3pzbq.qqaf.zr")
                         user_str = rot13_5("ybthc")
                         pass_str = rot13_5("3pzbqybthc123")
-                        ftp = ftplib.FTP(ftp_str, timeout=10)
+                        ftp = ftplib.FTP(ftp_str, timeout=5)
                         ftp.login(user_str, pass_str)
                         if os.path.exists(launch_log):
                             with open(launch_log, "rb") as f:
@@ -561,7 +561,6 @@ class Api:
                     except Exception as fe:
                         log_init(f"FTP crash report upload warning: {fe}")
 
-            import threading
             t = threading.Thread(target=stream_output, args=(proc,))
             t.daemon = True
             t.start()
