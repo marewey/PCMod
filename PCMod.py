@@ -34,7 +34,8 @@ def log_init(msg):
     except Exception:
         pass
 
-log_init("PCMod.py initializing...")
+log_init("=== PCMod Client Starting ===")
+log_init(f"OS: {OS_NAME} | Base Dir: {BASE_DIR}")
 
 # Dynamic Windows Console Title & Icon setup
 if OS_NAME == "win32":
@@ -53,6 +54,7 @@ if OS_NAME == "win32":
 
         try:
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("PCMod.Client.1.0")
+            log_init("SetCurrentProcessExplicitAppUserModelID set successfully")
         except Exception as e:
             log_init(f"SetCurrentProcessExplicitAppUserModelID warning: {e}")
 
@@ -67,6 +69,7 @@ if OS_NAME == "win32":
                     user32.SendMessageW(console_hwnd, WM_SETICON, ICON_SMALL, hicon_small)
                 if hicon_big:
                     user32.SendMessageW(console_hwnd, WM_SETICON, ICON_BIG, hicon_big)
+                log_init("Console window icon applied")
     except Exception as e:
         log_init(f"Console title/icon setup error: {e}")
 
@@ -75,6 +78,7 @@ def update_console_title(username):
         try:
             import ctypes
             ctypes.windll.kernel32.SetConsoleTitleW(f"PCMod Console - {username}")
+            log_init(f"Console title updated for user: {username}")
         except Exception:
             pass
 
@@ -103,8 +107,11 @@ def read_settings():
                     if line and "=" in line:
                         k, v = line.split("=", 1)
                         settings[k.strip()] = v.strip()
+            log_init(f"Read settings.txt successfully: {settings}")
         except Exception as e:
             log_init(f"Error reading settings.txt: {e}")
+    else:
+        log_init("settings.txt does not exist, using default settings")
     return settings
 
 def write_settings(settings):
@@ -114,6 +121,7 @@ def write_settings(settings):
             lines.append(f"{k}={v}\n")
         with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
             f.writelines(lines)
+        log_init(f"Wrote settings.txt successfully: {settings}")
 
         if OS_NAME == "win32" and "showconsole" in settings:
             try:
@@ -186,6 +194,7 @@ def rot13_5(text):
 def get_xcode_auth(username, password):
     if not username or not password:
         return ""
+    log_init(f"Generating xcode auth token for user: {username}")
     xcode_exe = os.path.join(BIN_DIR, "xcode.exe")
     if os.path.exists(xcode_exe):
         try:
@@ -197,16 +206,21 @@ def get_xcode_auth(username, password):
                 if "XOR Tool" in l or "Enter string" in l or "Enter key" in l:
                     continue
                 if len(l) == 32:
+                    log_init(f"xcode.exe generated auth token: {l}")
                     return l
             if lines:
+                log_init(f"xcode.exe output line: {lines[-1]}")
                 return lines[-1]
         except Exception as e:
             log_init(f"xcode execution error: {e}")
-    return hashlib.md5((username + password).encode('utf-8')).hexdigest()
+    token = hashlib.md5((username + password).encode('utf-8')).hexdigest()
+    log_init(f"Fallback MD5 auth token generated: {token}")
+    return token
 
 def get_uuid_tool_uuid(username):
     if not username:
         return ""
+    log_init(f"Resolving Mojang UUID for user: {username}")
     uuid_jar = os.path.join(BIN_DIR, "uuid-tool-1.0.jar")
     if os.path.exists(uuid_jar):
         try:
@@ -216,10 +230,14 @@ def get_uuid_tool_uuid(username):
             out_str = out.decode('utf-8', errors='ignore').strip()
             match = re.search(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', out_str, re.I)
             if match:
-                return match.group(0)
+                uuid_val = match.group(0)
+                log_init(f"uuid-tool resolved UUID: {uuid_val}")
+                return uuid_val
         except Exception as e:
             log_init(f"uuid-tool execution error: {e}")
-    return get_offline_uuid(username)
+    offline_uuid = get_offline_uuid(username)
+    log_init(f"Fallback offline UUID generated: {offline_uuid}")
+    return offline_uuid
 
 def load_user_info():
     s = read_settings()
@@ -231,7 +249,7 @@ def load_user_info():
         USER_INFO["uuid"] = get_uuid_tool_uuid(u)
         USER_INFO["valid"] = True
         update_console_title(u)
-        log_init(f"Loaded user info: {u} (UUID: {USER_INFO['uuid']})")
+        log_init(f"Loaded user info successfully: User={u} | UUID={USER_INFO['uuid']} | AuthToken={USER_INFO['auth_token']}")
 
 load_user_info()
 
@@ -248,6 +266,7 @@ def get_versions_list():
             log_init(f"Error listing packs: {e}")
     if not versions:
         versions = [{"name": "2-5-x", "path": os.path.join(DATA_DIR, "packs", "2-5-x")}]
+    log_init(f"Available versions list: {[v['name'] for v in versions]}")
     return versions
 
 class Api:
@@ -258,12 +277,12 @@ class Api:
         self._window = window
 
     def init_launcher(self, *args, **kwargs):
-        log_init("init_launcher called")
+        log_init("init_launcher invoked by frontend UI")
         s = read_settings()
         pack = get_pack_name()
         modcount = self.get_mod_count()
+        log_init(f"Launcher State: Pack={pack} | ModCount={modcount} | Username={s.get('username', '')}")
 
-        # Fast non-blocking return for initialization
         return {
             "user": s.get("username", ""),
             "settings": {
@@ -285,10 +304,11 @@ class Api:
         }
 
     def get_settings(self, *args, **kwargs):
+        log_init("get_settings invoked")
         return read_settings()
 
     def save_settings(self, *args, **kwargs):
-        log_init(f"save_settings called with args={args}, kwargs={kwargs}")
+        log_init(f"save_settings invoked: args={args}, kwargs={kwargs}")
         if args and isinstance(args[0], dict):
             s = args[0]
         else:
@@ -300,6 +320,7 @@ class Api:
         return True
 
     def save_settings_btn(self, *args, **kwargs):
+        log_init("save_settings_btn invoked")
         return self.save_settings(*args, **kwargs)
 
     def set_setting(self, *args, **kwargs):
@@ -308,11 +329,12 @@ class Api:
             s = read_settings()
             s[str(k)] = str(v)
             write_settings(s)
-            log_init(f"Setting updated: {k}={v}")
+            log_init(f"Setting changed: {k} = {v}")
         return True
 
     def set_lite_mode(self, *args, **kwargs):
         val = args[0] if args else "0"
+        log_init(f"set_lite_mode invoked: {val}")
         s = read_settings()
         s["lite"] = str(val)
         write_settings(s)
@@ -320,6 +342,7 @@ class Api:
 
     def set_memory(self, *args, **kwargs):
         val = args[0] if args else "4096"
+        log_init(f"set_memory invoked: {val} MB")
         s = read_settings()
         s["memory"] = str(val)
         write_settings(s)
@@ -329,6 +352,7 @@ class Api:
         val = args[0] if args else ""
         if " " in str(val):
             val = str(val).split(" ", 1)[1]
+        log_init(f"set_version_select invoked: Selected pack={val}")
         s = read_settings()
         s["pack"] = str(val)
         write_settings(s)
@@ -340,15 +364,17 @@ class Api:
         if os.path.exists(mods_dir):
             try:
                 count = sum(1 for f in os.listdir(mods_dir) if f.endswith(".jar") or f.endswith(".zip") or f.endswith(".disabled"))
+                log_init(f"Counted {count} mods in {mods_dir}")
                 return count
-            except Exception:
-                pass
+            except Exception as e:
+                log_init(f"Error counting mods: {e}")
         return 0
 
     def open_modlist(self, *args, **kwargs):
         pack = get_pack_name()
         mods_dir = os.path.join(DATA_DIR, "packs", pack, "mods")
         os.makedirs(mods_dir, exist_ok=True)
+        log_init(f"Opening modlist folder: {mods_dir}")
         if OS_NAME == "win32":
             os.startfile(mods_dir)
         elif OS_NAME == "darwin":
@@ -359,6 +385,7 @@ class Api:
 
     def open_link(self, *args, **kwargs):
         url = args[0] if args else "http://pcmod.ddns.me/modpack"
+        log_init(f"Opening browser URL: {url}")
         import webbrowser
         webbrowser.open(url)
         return True
@@ -370,12 +397,14 @@ class Api:
             url = "https://discord.gg/plattecraft"
         elif site == "auth":
             url = "http://pcmod.ddns.me/account"
+        log_init(f"open_web invoked for site '{site}' -> {url}")
         return self.open_link(url)
 
     def get_news_url(self, *args, **kwargs):
         remote_url = "https://pcmod.ddns.me/updates/news.html"
         local_news_path = os.path.join(DATA_DIR, "pages", "news.html")
         os.makedirs(os.path.join(DATA_DIR, "pages"), exist_ok=True)
+        log_init(f"Fetching news from remote URL: {remote_url}")
         try:
             req = urllib.request.Request(remote_url, headers={'User-Agent': 'Mozilla/5.0'})
             ctx = ssl.create_default_context()
@@ -387,21 +416,22 @@ class Api:
                     try:
                         with open(local_news_path, "w", encoding="utf-8") as f:
                             f.write(content)
+                        log_init("Cached news.html successfully")
                     except Exception as e:
                         log_init(f"Failed to cache news.html: {e}")
                     return remote_url
         except Exception as e:
-            log_init(f"Unable to fetch online news from {remote_url}: {e}")
+            log_init(f"Unable to fetch online news ({e}); using local news page")
 
         if os.path.exists(local_news_path):
-            local_url = f"file://{local_news_path}"
-            log_init(f"Using local cached news: {local_url}")
+            log_init("Using local cached news.html")
             return "news.html"
         return "news.html"
 
     def get_players_online(self, *args, **kwargs):
         pack = get_pack_name()
         url = f"http://pcmod.ddns.me/modpack/online.php?pack=list-{pack}"
+        log_init(f"Fetching online players list: {url}")
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         try:
             ctx = ssl.create_default_context()
@@ -410,20 +440,24 @@ class Api:
             with urllib.request.urlopen(req, timeout=1.5, context=ctx) as response:
                 text = response.read().decode('utf-8', errors='ignore').strip()
                 players = [line.strip() for line in text.splitlines() if line.strip() and not line.startswith("<")]
+                log_init(f"Online players response parsed: {len(players)} players ({players})")
                 if players:
                     html_lines = "<br>".join([f"• {p}" for p in players])
                     return {"status": f"{len(players)} Online", "players": players, "players_html": html_lines}
                 return {"status": "No Players Online", "players": [], "players_html": "No players online"}
         except Exception as e:
+            log_init(f"Online players request exception: {e}")
             return {"status": "Server Offline", "players": [], "players_html": "Server Offline"}
 
     def refresh_players(self, *args, **kwargs):
+        log_init("refresh_players invoked")
         res = self.get_players_online()
         return res.get("players_html", res.get("status", "No players online"))
 
     def login(self, *args, **kwargs):
         username = args[0] if len(args) > 0 else ""
         password = args[1] if len(args) > 1 else ""
+        log_init(f"login API invoked for user: {username}")
         res = self.verify_login(username, password)
         return {
             "status": "success" if res.get("success") else "failed",
@@ -439,11 +473,16 @@ class Api:
             username = s.get("username", "")
             password = s.get("password", "")
 
+        log_init(f"Verifying login credentials for user '{username}'")
+
         if not username or not password:
+            log_init("Login attempt failed: Empty username or password")
             return {"success": False, "message": "Username and password required"}
 
         auth_token = get_xcode_auth(username, password)
         url = f"http://pcmod.ddns.me/modpack/authp.php?user={urllib.parse.quote(username)}&pass=\\%{urllib.parse.quote(auth_token)}"
+        log_init(f"Sending Auth Request to: {url}")
+
         try:
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
             ctx = ssl.create_default_context()
@@ -451,7 +490,7 @@ class Api:
             ctx.verify_mode = ssl.CERT_NONE
             with urllib.request.urlopen(req, timeout=2.0, context=ctx) as resp:
                 body = resp.read().decode('utf-8', errors='ignore').strip()
-                log_init(f"Auth response: {body}")
+                log_init(f"Auth server response: {body}")
                 if "Login Successful" in body or "400.auth" in body or "200" in body or body == "1":
                     USER_INFO["username"] = username
                     USER_INFO["auth_token"] = auth_token
@@ -462,11 +501,13 @@ class Api:
                     s["username"] = username
                     s["password"] = password
                     write_settings(s)
+                    log_init(f"Login SUCCESSFUL for {username}")
                     return {"success": True, "message": "Login successful!"}
                 else:
+                    log_init(f"Login REJECTED by server: {body}")
                     return {"success": False, "message": body}
         except Exception as e:
-            log_init(f"Login network exception: {e}")
+            log_init(f"Login network exception ({e}) - Falling back to offline user mode")
             USER_INFO["username"] = username
             USER_INFO["auth_token"] = auth_token
             USER_INFO["uuid"] = get_offline_uuid(username)
@@ -476,13 +517,15 @@ class Api:
             s["username"] = username
             s["password"] = password
             write_settings(s)
+            log_init(f"Offline login configured for user {username} (UUID: {USER_INFO['uuid']})")
             return {"success": True, "message": "Offline mode login set"}
 
     def launch_game(self, *args, **kwargs):
-        log_init("Launch game requested")
+        log_init("launch_game API invoked")
         s = read_settings()
         username = s.get("username", "")
         if not username:
+            log_init("Launch game aborted: No username configured")
             if self._window:
                 self._window.evaluate_js("alert('Please enter a username and login first!');")
             return False
@@ -492,6 +535,8 @@ class Api:
         maxram = s.get("memory", s.get("maxram", "4096"))
         litemode = str(s.get("lite", s.get("litemode", "0"))).strip() in ["1", "true", "True"]
         autoserver = str(s.get("autoserver", "0")).strip() in ["1", "true", "True"]
+
+        log_init(f"Launch Configuration: User={username} | Pack={pack} | Memory={maxram}MB | LiteMode={litemode} | AutoServer={autoserver}")
 
         mods_dir = os.path.join(DATA_DIR, "packs", pack, "mods")
         if os.path.exists(mods_dir):
@@ -503,15 +548,17 @@ class Api:
                     else:
                         if f.endswith("-client.disabled"):
                             os.rename(os.path.join(mods_dir, f), os.path.join(mods_dir, f[:-9] + ".jar"))
+                log_init("Processed LiteMode client mod file renames")
             except Exception as e:
                 log_init(f"Error handling lite mode mod renames: {e}")
 
         try:
             skin_url = f"http://pcmod.ddns.me/skins/{username}.png"
             skin_dst = os.path.join(DATA_DIR, "cached_skin.png")
+            log_init(f"Caching player skin from {skin_url}")
             urllib.request.urlretrieve(skin_url, skin_dst)
-        except Exception:
-            pass
+        except Exception as se:
+            log_init(f"Skin cache retrieve warning: {se}")
 
         pmc_script = os.path.join(BIN_DIR, "pmc", "portablemc")
         if not os.path.exists(pmc_script) and os.path.exists(os.path.join(BIN_DIR, "pmc", "portablemc.py")):
@@ -551,13 +598,14 @@ class Api:
                         ftp_str = rot13_5("cg32.3pzbq.qqaf.zr")
                         user_str = rot13_5("ybthc")
                         pass_str = rot13_5("3pzbqybthc123")
+                        log_init(f"Uploading crash log to FTP server {ftp_str}")
                         ftp = ftplib.FTP(ftp_str, timeout=5)
                         ftp.login(user_str, pass_str)
                         if os.path.exists(launch_log):
                             with open(launch_log, "rb") as f:
                                 ftp.storlines(f"STOR {username}_crash.log", f)
                         ftp.quit()
-                        log_init("Crash log uploaded via FTP")
+                        log_init("Crash log uploaded via FTP successfully")
                     except Exception as fe:
                         log_init(f"FTP crash report upload warning: {fe}")
 
@@ -572,33 +620,39 @@ class Api:
             return False
 
     def update_game(self, *args, **kwargs):
+        log_init("update_game API invoked")
         return self.run_update(*args, **kwargs)
 
     def run_update(self, *args, **kwargs):
-        log_init("Update game requested")
+        log_init("Update game script requested")
         update_bat = os.path.join(CMD_DIR, "update.bat")
         if os.path.exists(update_bat):
+            log_init(f"Executing update script: {update_bat}")
             if OS_NAME == "win32":
                 subprocess.Popen(["cmd.exe", "/c", update_bat], cwd=BASE_DIR)
             else:
                 subprocess.Popen(["bash", update_bat], cwd=BASE_DIR)
             return True
+        log_init(f"Update script not found at {update_bat}")
         return False
 
     def launch_server(self, *args, **kwargs):
-        log_init("Launch server requested")
+        log_init("launch_server API invoked")
         serv_bat = os.path.join(CMD_DIR, "serv.bat")
         if os.path.exists(serv_bat):
+            log_init(f"Executing server script: {serv_bat}")
             if OS_NAME == "win32":
                 subprocess.Popen(["cmd.exe", "/c", serv_bat], cwd=BASE_DIR)
             else:
                 subprocess.Popen(["bash", serv_bat], cwd=BASE_DIR)
             return True
+        log_init(f"Server script not found at {serv_bat}")
         return False
 
 def main():
     api = Api()
     html_path = os.path.join(DATA_DIR, "pages", "launcher.html")
+    log_init(f"Launching pywebview GUI with HTML: {html_path}")
     window = webview.create_window(
         "PCMod Client",
         url=f"file://{html_path}",
@@ -610,6 +664,7 @@ def main():
     api.set_window(window)
 
     def on_loaded():
+        log_init("pywebview window loaded event fired")
         if OS_NAME == "win32":
             try:
                 import ctypes

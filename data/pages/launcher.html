@@ -350,7 +350,7 @@
     <div class="main-content" style="grid-column: 1;">
       <div class="panel left-sidebar" style="width: 100%; height: 100%;">
         <div class="panel-title">Tasks / Links</div>
-        <button class="nav-btn" onclick="openModlist()" id="modlistBtn">Modlist<br>(<span id="modcount">--</span> mods)</button>
+        <button class="nav-btn" onclick="openModlist()" id="modlistBtn">Modlist (<span id="modcount">--</span> mods)</button>
         <button class="nav-btn" onclick="openWeb('pcmod')">PCMod Website</button>
         <button class="nav-btn" onclick="openWeb('discord')">Join Discord</button>
         <button class="nav-btn" onclick="openWeb('auth')">My Account</button>
@@ -419,7 +419,7 @@
           <input type="number" id="maxram" value="4096" step="512" min="1024" onchange="changeMemory()">
         </div>
 
-        <div style="display: flex; gap: 8px; margin-top: 6px;">
+        <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
           <button class="btn-secondary" onclick="saveSettingsButton()">Save</button>
           <button class="btn-secondary" onclick="launchServer()">Launch Server</button>
         </div>
