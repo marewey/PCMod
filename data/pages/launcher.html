@@ -1,548 +1,516 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" href="../icons/icon.ico" type="image/x-icon">
-<link rel="shortcut icon" href="../icons/icon.ico" type="image/x-icon">
-<title>PCMod Launcher</title>
-<style>
-/* Modern Card-Style Responsive Design */
-* {
-  box-sizing: border-box;
-}
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PCMod Client</title>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --card-bg: rgba(15, 23, 42, 0.88);
+      --card-border: rgba(255, 255, 255, 0.12);
+      --card-hover-border: rgba(59, 130, 246, 0.4);
+      --accent-blue: #3b82f6;
+      --accent-blue-hover: #2563eb;
+      --accent-green: #10b981;
+      --accent-green-hover: #059669;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --input-bg: rgba(30, 41, 59, 0.7);
+      --input-border: rgba(255, 255, 255, 0.15);
+    }
 
-body {
-  background: url(../icons/dirt.png) repeat 0 0;
-  background-color: #121926;
-  color: #e2e8f0;
-  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
-  margin: 0;
-  padding: 12px;
-  overflow: hidden;
-  height: 100vh;
-  user-select: none;
-}
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
 
-/* Base Card Styling */
-.card {
-  background: rgba(24, 35, 54, 0.88);
-  backdrop-filter: blur(8px);
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  padding: 10px 12px;
-  margin-bottom: 10px;
-}
+    body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 30%, #1e293b 0%, #0f172a 60%, #090d16 100%);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
 
-.card-title {
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #94a3b8;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: 6px;
-  margin-bottom: 8px;
-  text-align: center;
-}
+    /* Ambient background glow elements */
+    body::before {
+      content: '';
+      position: absolute;
+      top: -10%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 300px;
+      background: radial-gradient(ellipse at center, rgba(59, 130, 246, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
 
-/* Layout Grid */
-.container {
-  display: grid;
-  grid-template-columns: 210px 1fr 220px;
-  gap: 12px;
-  height: calc(100vh - 28px);
-}
+    .app-container {
+      width: 960px;
+      height: 650px;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: 220px 1fr 220px;
+      gap: 16px;
+      position: relative;
+      z-index: 1;
+    }
 
-.column-left, .column-right {
-  display: flex;
-  flex-direction: column;
-}
+    .panel {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      transition: border-color 0.3s;
+    }
 
-.column-center {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
+    .panel:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+    }
 
-/* Left Column Styling */
-.tasks-card {
-  flex: 0 0 auto;
-}
+    .panel-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      color: #38bdf8;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      text-align: center;
+      text-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+    }
 
-.players-card {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-}
+    /* Left Sidebar */
+    .left-sidebar {
+      gap: 12px;
+    }
 
-.btn-card {
-  width: 100%;
-  background: #2a3d58;
-  color: #f1f5f9;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
-  padding: 8px;
-  margin-bottom: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-align: center;
-}
+    .nav-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
 
-.btn-card:hover {
-  background: #3b5278;
-  border-color: #60a5fa;
-  transform: translateY(-1px);
-}
+    .nav-btn:hover {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: rgba(59, 130, 246, 0.4);
+      color: #ffffff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
 
-.btn-card:active {
-  transform: translateY(0);
-}
+    .player-list {
+      flex: 1;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+      overflow-y: auto;
+      margin-top: 8px;
+    }
 
-#online {
-  flex: 1;
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 8px;
-  font-size: 13px;
-  overflow-y: auto;
-  margin: 0;
-  color: #cbd5e1;
-}
+    /* Main Center Content */
+    .main-content {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: center;
+    }
 
-/* Right Column Styling */
-.settings-card {
-  flex: 1 1 auto;
-  font-size: 12px;
-}
+    .logo-header {
+      text-align: center;
+      margin-bottom: 2px;
+    }
 
-.settings-table {
-  width: 100%;
-  border-collapse: collapse;
-}
+    .logo-header img {
+      max-height: 58px;
+      filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.6));
+    }
 
-.settings-table td {
-  padding: 4px 0;
-}
+    .news-card {
+      flex: 1;
+      width: 100%;
+      overflow: hidden;
+      padding: 0;
+    }
 
-.settings-label {
-  color: #cbd5e1;
-  font-size: 12px;
-}
+    .news-iframe {
+      width: 100%;
+      height: 315px;
+      border: none;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.4);
+    }
 
-input.largerCheckbox {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  accent-color: #3b82f6;
-}
+    .action-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      width: 100%;
+    }
 
-select, input[type="text"], input[type="password"], input[type="number"] {
-  background: rgba(15, 23, 42, 0.8);
-  color: #f8fafc;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 4px 6px;
-  outline: none;
-  font-size: 12px;
-  width: 100%;
-}
+    .btn-launch {
+      background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    }
 
-select:focus, input:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-}
+    .btn-launch:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5);
+      background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+    }
 
-.login-card {
-  flex: 0 0 auto;
-}
+    .btn-update {
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.35);
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    }
 
-/* Center Column Styling */
-.logo-container {
-  text-align: center;
-  margin-bottom: 8px;
-}
+    .btn-update:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(59, 130, 246, 0.5);
+      background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+    }
 
-.logo-img {
-  height: 80px;
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
-}
+    /* Right Sidebar (Settings & Login) */
+    .right-sidebar {
+      gap: 10px;
+    }
 
-.main-card {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 12px;
-}
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: var(--text-main);
+    }
 
-.news-frame {
-  flex: 1;
-  width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  background: #0f172a;
-  margin-bottom: 12px;
-}
+    .setting-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent-blue);
+      cursor: pointer;
+    }
 
-.action-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
+    .setting-row input[type="number"],
+    .setting-row select {
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text-main);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 12px;
+      width: 90px;
+      outline: none;
+    }
 
-.btn-launch {
-  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-  color: #ffffff;
-  border: 1px solid #22c55e;
-  border-radius: 8px;
-  height: 65px;
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.4);
-  transition: all 0.2s ease;
-}
+    .login-section {
+      margin-top: auto;
+      border-top: 1px solid var(--card-border);
+      padding-top: 12px;
+    }
 
-.btn-launch:hover {
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.5);
-}
+    .input-field {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text-main);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 13px;
+      margin-bottom: 8px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
 
-.btn-update {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  color: #ffffff;
-  border: 1px solid #3b82f6;
-  border-radius: 8px;
-  height: 65px;
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
-  transition: all 0.2s ease;
-}
+    .input-field:focus {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+    }
 
-.btn-update:hover {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
-}
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+    }
 
-.version-bar {
-  text-align: right;
-  font-size: 12px;
-  color: #94a3b8;
-  padding-top: 4px;
-}
-</style>
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .btn-login {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+      margin-top: 4px;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-login:hover {
+      background: linear-gradient(135deg, #60a5fa 0%, #1d4ed8 100%);
+    }
+
+    .login-msg {
+      font-size: 11px;
+      margin-top: 6px;
+      text-align: center;
+      display: none;
+    }
+  </style>
 </head>
 <body>
+  <div class="app-container">
+    <!-- Left Column: Navigation & Server Info -->
+    <div class="main-content" style="grid-column: 1;">
+      <div class="panel left-sidebar" style="width: 100%; height: 100%;">
+        <div class="panel-title">Tasks / Links</div>
+        <button class="nav-btn" onclick="openModlist()" id="modlistBtn">Modlist<br>(-- mods)</button>
+        <button class="nav-btn" onclick="pywebview.api.open_link('http://plattecraft.com/modpack')">PCMod Website</button>
+        <button class="nav-btn" onclick="pywebview.api.open_link('https://discord.gg/plattecraft')">Join Discord</button>
+        <button class="nav-btn" onclick="pywebview.api.open_link('http://plattecraft.com/account')">My Account</button>
 
-<div class="container">
-  <!-- LEFT COLUMN -->
-  <div class="column-left">
-    <!-- Tasks/Links Card -->
-    <div class="card tasks-card">
-      <div class="card-title">Tasks / Links</div>
-      <button class="btn-card" id="ML" onclick="openModlist()">Modlist<br><span style="font-size:11px; font-weight:normal;">(<span id="modcount">--</span> mods)</span></button>
-      <button class="btn-card" onclick="openWeb('pcmod')">PCMod Website</button>
-      <button class="btn-card" onclick="openWeb('discord')">Join Discord</button>
-      <button class="btn-card" onclick="openWeb('auth')">My Account</button>
+        <div style="margin-top: 12px; border-top: 1px solid var(--card-border); padding-top: 12px; flex: 1; display: flex; flex-direction: column;">
+          <div class="panel-title" style="margin-bottom: 8px;">Players Online</div>
+          <button class="nav-btn" style="padding: 6px; font-size: 12px;" onclick="refreshPlayers()">Refresh</button>
+          <div class="player-list" id="playerList">
+            Loading...
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Players Online Card -->
-    <div class="card players-card">
-      <div class="card-title">Players Online</div>
-      <button class="btn-card" style="padding: 4px; font-size: 11px; margin-bottom: 8px;" onclick="refreshPlayers()">Refresh</button>
-      <div id="online">Loading...</div>
-    </div>
-  </div>
+    <!-- Middle Column: Logo, News & Main Actions -->
+    <div class="main-content" style="grid-column: 2;">
+      <div class="logo-header">
+        <img src="../head.png" alt="PlatteCraft Client">
+      </div>
 
-  <!-- CENTER COLUMN -->
-  <div class="column-center">
-    <div class="logo-container">
-      <img class="logo-img" src="../icons/pcmod.png" alt="PCMod Logo">
-    </div>
+      <div class="panel news-card">
+        <iframe src="http://plattecraft.com/modpack/update_old.php" class="news-iframe" id="newsIframe"></iframe>
+      </div>
 
-    <div class="card main-card">
-      <iframe id="news" class="news-frame" title="PCMod News" name="PCMod News" src="news.html"></iframe>
-
-      <div class="action-buttons">
+      <div class="action-bar">
         <button class="btn-launch" onclick="launchGame()">LAUNCH</button>
-        <button class="btn-update" onclick="runUpdate()">UPDATE</button>
+        <button class="btn-update" onclick="updateGame()">UPDATE</button>
       </div>
     </div>
 
-    <div class="version-bar" id="version">-.-.-</div>
+    <!-- Right Column: Settings & Account Login -->
+    <div class="main-content" style="grid-column: 3;">
+      <div class="panel right-sidebar" style="width: 100%; height: 100%;">
+        <div class="panel-title">Settings</div>
+
+        <div class="setting-row">
+          <label for="shortcut">Shortcut</label>
+          <input type="checkbox" id="shortcut" onchange="saveSettings()">
+        </div>
+        <div class="setting-row">
+          <label for="autoserver">Auto Server</label>
+          <input type="checkbox" id="autoserver" onchange="saveSettings()">
+        </div>
+        <div class="setting-row">
+          <label for="loglogins">Log Logins</label>
+          <input type="checkbox" id="loglogins" onchange="saveSettings()">
+        </div>
+        <div class="setting-row">
+          <label for="litemode">Lite Mode</label>
+          <input type="checkbox" id="litemode" onchange="saveSettings()">
+        </div>
+        <div class="setting-row">
+          <label for="showconsole">Console</label>
+          <input type="checkbox" id="showconsole" onchange="saveSettings()">
+        </div>
+        <div class="setting-row" style="margin-top: 4px;">
+          <label for="selver">Version</label>
+          <select id="selver" onchange="saveSettings()">
+            <option value="">Default</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <label for="maxram">Memory</label>
+          <input type="number" id="maxram" value="4096" step="512" min="1024" onchange="saveSettings()">
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-top: 8px;">
+          <button class="btn-secondary" onclick="saveSettings()">Save</button>
+          <button class="btn-secondary" onclick="pywebview.api.launch_server()">Launch Server</button>
+        </div>
+
+        <div class="login-section">
+          <div class="panel-title" style="margin-bottom: 8px;">Login</div>
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+            <span style="font-size: 12px; color: var(--text-muted); width: 35px;">User</span>
+            <input type="text" class="input-field" id="username" placeholder="Username" style="margin-bottom: 0;">
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+            <span style="font-size: 12px; color: var(--text-muted); width: 35px;">Pass</span>
+            <input type="password" class="input-field" id="password" placeholder="Password" style="margin-bottom: 0;">
+          </div>
+          <button class="btn-login" onclick="performLogin()">Login</button>
+          <div class="login-msg" id="loginMsg"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- RIGHT COLUMN -->
-  <div class="column-right">
-    <!-- Settings Card -->
-    <div class="card settings-card">
-      <div class="card-title">Settings</div>
-      <table class="settings-table">
-        <tr>
-          <td class="settings-label"><label for="Shortcut">Shortcut</label></td>
-          <td align="right"><input class="largerCheckbox" title="Creates a shortcut on your desktop." type="checkbox" id="Shortcut" onclick="toggleShortcut()"></td>
-        </tr>
-        <tr>
-          <td class="settings-label"><label for="AutoServer">Auto Server</label></td>
-          <td align="right"><input class="largerCheckbox" title="Launch into the server." type="checkbox" id="AutoServer" onclick="toggleAutoServer()"></td>
-        </tr>
-        <tr>
-          <td class="settings-label"><label for="LL">Log Logins</label></td>
-          <td align="right"><input class="largerCheckbox" title="Keeps track of how often you play." type="checkbox" id="LL" onclick="toggleLogLogins()"></td>
-        </tr>
-        <tr>
-          <td class="settings-label"><label for="LT">Lite Mode</label></td>
-          <td align="right"><input class="largerCheckbox" title="Removes client side mods." type="checkbox" id="LT" onclick="toggleLiteMode()"></td>
-        </tr>
-        <tr>
-          <td class="settings-label"><label for="ShowConsole">Console</label></td>
-          <td align="right"><input class="largerCheckbox" title="Show/Hide the python console window." type="checkbox" id="ShowConsole" onclick="toggleShowConsole()"></td>
-        </tr>
-        <tr>
-          <td class="settings-label"><label for="VERSION-select">Version</label></td>
-          <td align="right">
-            <select title="Select Previous versions of the game." name="version-select" id="VERSION-select" style="width: 100px;" onchange="changeVersion()"></select>
-          </td>
-        </tr>
-        <tr>
-          <td class="settings-label"><label for="MEM">Memory</label></td>
-          <td align="right">
-            <input title="Sets Memory Allocated to game in MB." value="4096" type="number" style="width: 70px;" id="MEM" onchange="changeMemory()">
-          </td>
-        </tr>
-      </table>
-
-      <div style="margin-top: 10px; display: flex; gap: 6px;">
-        <button class="btn-card" style="font-size: 11px; padding: 6px;" onclick="saveSettingsButton()">Save</button>
-        <button class="btn-card" style="font-size: 11px; padding: 6px;" onclick="launchServer()">Launch Server</button>
-      </div>
-    </div>
-
-    <!-- Login Card -->
-    <div class="card login-card">
-      <div class="card-title">Login</div>
-      <table class="settings-table">
-        <tr>
-          <td style="width: 40px; color: #cbd5e1;">User</td>
-          <td><input type="text" id="user" placeholder="Username" value="Loading..."></td>
-        </tr>
-        <tr>
-          <td style="color: #cbd5e1;">Pass</td>
-          <td><input type="password" id="pass" placeholder="Password"></td>
-        </tr>
-      </table>
-
-      <div style="margin-top: 8px;">
-        <button class="btn-card" style="background: #3b82f6; font-size: 12px; padding: 6px;" onclick="login()">Login</button>
-      </div>
-      <div id="login-status" style="font-size: 11px; text-align: center; margin-top: 4px; color: #94a3b8;"></div>
-    </div>
-  </div>
-</div>
-
-<script>
-// Pure ES5/IE11 Compatible JavaScript Bridge for WebViews
-var isInitialized = false;
-
-function initLauncher() {
-    if (!window.pywebview || !window.pywebview.api) return;
-    window.pywebview.api.init_launcher().then(function(data) {
-        if (!data) return;
-
-        // 1. Set username
-        document.getElementById('user').value = data.user || "";
-
-        // 2. Load Settings checkboxes & inputs
-        document.getElementById('Shortcut').checked = (data.settings.shortcut === "1");
-        document.getElementById('AutoServer').checked = (data.settings.autoserver === "1");
-        document.getElementById('LL').checked = (data.settings['log-logins'] === "1" || data.settings.log_logins === "1");
-        document.getElementById('LT').checked = (data.settings.lite === "1");
-        document.getElementById('ShowConsole').checked = (data.settings.showconsole === "1");
-        document.getElementById('MEM').value = data.settings.memory || "4096";
-
-        // 3. Set Mod Count
-        document.getElementById('modcount').innerHTML = data.modcount || "--";
-
-        // 4. Set Version Text
-        document.getElementById('version').innerHTML = "Launcher: " + data.launcher_version + " / Pack: " + data.pack_version;
-
-        // 5. Populate Versions Select dropdown
-        var select = document.getElementById('VERSION-select');
-        select.innerHTML = "";
-        for (var i = 0; i < data.versions_list.length; i++) {
-            var v = data.versions_list[i];
-            var opt = document.createElement('option');
-            opt.value = i + " " + v.name;
-            opt.text = v.name;
-            if (v.name === data.settings.pack) {
-                opt.selected = true;
-            }
-            select.add(opt);
-        }
-
-        // 6. Set Online Players
-        document.getElementById('online').innerHTML = data.online_players || "No players online";
+  <script>
+    window.addEventListener('pywebviewready', function() {
+      loadSettings();
+      refreshPlayers();
+      updateModlistCount();
     });
-}
 
-// Robust Polling for pywebview API to ensure it initializes safely on all WebView engines
-var initInterval = setInterval(function() {
-    if (window.pywebview && window.pywebview.api && !isInitialized) {
-        clearInterval(initInterval);
-        isInitialized = true;
-        initLauncher();
+    async function loadSettings() {
+      const s = await pywebview.api.get_settings();
+      if (s) {
+        document.getElementById('shortcut').checked = (s.shortcut === 'true');
+        document.getElementById('autoserver').checked = (s.autoserver === 'true');
+        document.getElementById('loglogins').checked = (s.loglogins === 'true');
+        document.getElementById('litemode').checked = (s.litemode === 'true');
+        document.getElementById('showconsole').checked = (s.showconsole === 'true');
+        if (s.maxram) document.getElementById('maxram').value = s.maxram;
+        if (s.username) document.getElementById('username').value = s.username;
+        if (s.password) document.getElementById('password').value = s.password;
+      }
     }
-}, 100);
 
-window.addEventListener('pywebviewready', function() {
-    clearInterval(initInterval);
-    if (!isInitialized) {
-        isInitialized = true;
-        initLauncher();
+    async function saveSettings() {
+      const s = {
+        shortcut: document.getElementById('shortcut').checked ? 'true' : 'false',
+        autoserver: document.getElementById('autoserver').checked ? 'true' : 'false',
+        loglogins: document.getElementById('loglogins').checked ? 'true' : 'false',
+        litemode: document.getElementById('litemode').checked ? 'true' : 'false',
+        showconsole: document.getElementById('showconsole').checked ? 'true' : 'false',
+        maxram: document.getElementById('maxram').value,
+        selver: document.getElementById('selver').value,
+        username: document.getElementById('username').value,
+        password: document.getElementById('password').value
+      };
+      await pywebview.api.save_settings(s);
     }
-});
 
-function openModlist() {
-    if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.open_modlist();
+    async function updateModlistCount() {
+      const count = await pywebview.api.get_mod_count();
+      const btn = document.getElementById('modlistBtn');
+      if (btn) {
+        btn.innerHTML = `Modlist<br>(${count} mods)`;
+      }
     }
-}
 
-function openWeb(site) {
-    if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.open_web(site);
+    async function openModlist() {
+      await pywebview.api.open_modlist();
     }
-}
 
-function refreshPlayers() {
-    document.getElementById('online').innerHTML = "Refreshing...";
-    if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.refresh_players().then(function(html) {
-            document.getElementById('online').innerHTML = (html && html.trim() !== "") ? html : "No Players Online";
-        });
+    async function refreshPlayers() {
+      const listDiv = document.getElementById('playerList');
+      listDiv.innerText = 'Refreshing...';
+      const res = await pywebview.api.get_players_online();
+      if (res && res.players && res.players.length > 0) {
+        listDiv.innerHTML = res.players.map(p => `<div>• ${p}</div>`).join('');
+      } else if (res && res.status) {
+        listDiv.innerText = res.status;
+      } else {
+        listDiv.innerText = 'No players online';
+      }
     }
-}
 
-function toggleShowConsole() {
-    var val = document.getElementById('ShowConsole').checked ? "1" : "0";
-    if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.set_setting('showconsole', val);
+    async function performLogin() {
+      const u = document.getElementById('username').value;
+      const p = document.getElementById('password').value;
+      const msgDiv = document.getElementById('loginMsg');
+      msgDiv.style.display = 'block';
+      msgDiv.style.color = '#eab308';
+      msgDiv.innerText = 'Logging in...';
+      await saveSettings();
+      const res = await pywebview.api.verify_login(u, p);
+      if (res.success) {
+        msgDiv.style.color = '#10b981';
+        msgDiv.innerText = 'Login successful!';
+      } else {
+        msgDiv.style.color = '#ef4444';
+        msgDiv.innerText = res.message || 'Login failed';
+      }
     }
-}
 
-function login() {
-    var u = document.getElementById('user').value;
-    var p = document.getElementById('pass').value;
-    var statusElem = document.getElementById('login-status');
-    if (statusElem) {
-        statusElem.style.color = "#94a3b8";
-        statusElem.innerHTML = "Logging in...";
+    async function launchGame() {
+      await saveSettings();
+      await pywebview.api.launch_game();
     }
-    if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.login(u, p).then(function(res) {
-            if (res) {
-                if (statusElem) {
-                    if (res.status === "success") {
-                        statusElem.style.color = "#4ade80";
-                        statusElem.innerHTML = "Logged In Successfully.";
-                    } else if (res.auth === "401.auth") {
-                        statusElem.style.color = "#f87171";
-                        statusElem.innerHTML = "Password incorrect. Try again.";
-                    } else {
-                        statusElem.style.color = "#f87171";
-                        statusElem.innerHTML = "Login failed: " + res.auth;
-                    }
-                }
-                if (res.status === "success") {
-                    initLauncher();
-                }
-            }
-        });
-    }
-}
 
-function toggleShortcut() {
-    var val = document.getElementById('Shortcut').checked ? "1" : "0";
-    if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.set_setting('shortcut', val);
+    async function updateGame() {
+      await pywebview.api.update_game();
     }
-}
-
-function toggleAutoServer() {
-    var val = document.getElementById('AutoServer').checked ? "1" : "0";
-    if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.set_setting('autoserver', val);
-    }
-}
-
-function toggleLogLogins() {
-    var val = document.getElementById('LL').checked ? "1" : "0";
-    if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.set_setting('log-logins', val);
-    }
-}
-
-function toggleLiteMode() {
-    var val = document.getElementById('LT').checked ? "1" : "0";
-    if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.set_lite_mode(val).then(function() {
-            initLauncher();
-        });
-    }
-}
-
-function changeMemory() {
-    var val = document.getElementById('MEM').value;
-    if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.set_memory(val).then(function() {
-            initLauncher();
-        });
-    }
-}
-
-function changeVersion() {
-    var select = document.getElementById('VERSION-select');
-    var val = select.value;
-    if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.set_version_select(val).then(function() {
-            initLauncher();
-        });
-    }
-}
-
-function saveSettingsButton() {
-    if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.save_settings_btn();
-    }
-}
-
-function launchServer() {
-    if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.launch_server();
-    }
-}
-
-function launchGame() {
-    if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.launch_game();
-    }
-}
-
-function runUpdate() {
-    if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.run_update();
-    }
-}
-</script>
+  </script>
 </body>
 </html>
