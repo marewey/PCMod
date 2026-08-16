@@ -21,6 +21,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 BIN_DIR = os.path.join(BASE_DIR, "bin")
 CMD_DIR = os.path.join(BASE_DIR, "cmd")
 os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(os.path.join(DATA_DIR, "indexes"), exist_ok=True)
 
 INIT_LOG = os.path.join(DATA_DIR, "init.log")
 
@@ -37,7 +38,7 @@ def log_init(msg):
 log_init("=== PCMod Client Starting ===")
 log_init(f"OS: {OS_NAME} | Base Dir: {BASE_DIR}")
 
-# Dynamic Windows Console Title & Icon setup
+# Dynamic Windows Console Title, Icon & Taskbar Grouping setup
 if OS_NAME == "win32":
     try:
         import ctypes
@@ -48,6 +49,8 @@ if OS_NAME == "win32":
         WM_SETICON = 0x0080
         ICON_SMALL = 0
         ICON_BIG = 1
+        GCLP_HICON = -14
+        GCLP_HICONSM = -34
 
         user32 = ctypes.windll.user32
         kernel32 = ctypes.windll.kernel32
@@ -55,7 +58,7 @@ if OS_NAME == "win32":
         # Explicit AppUserModelID to group console window and client GUI into 1 taskbar icon stack
         try:
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("PCMod.Client.1.0")
-            log_init("SetCurrentProcessExplicitAppUserModelID set successfully: PCMod.Client.1.0")
+            log_init("SetCurrentProcessExplicitAppUserModelID set: PCMod.Client.1.0")
         except Exception as e:
             log_init(f"SetCurrentProcessExplicitAppUserModelID warning: {e}")
 
@@ -222,31 +225,47 @@ def rot13_5(text):
             res.append(ch)
     return "".join(res)
 
-def get_xcode_auth(username, password):
+def generate_auth_file_xcode(username, password):
     if not username or not password:
         return ""
-    log_init(f"Generating xcode auth token for user: {username}")
+    log_init(f"Checking User Length: {len(username)}")
+    log_init(f"Authorizing User ({username})...")
+
+    auth_file = os.path.join(DATA_DIR, "indexes", "auth")
     xcode_exe = os.path.join(BIN_DIR, "xcode.exe")
+
     if os.path.exists(xcode_exe):
         try:
-            proc = subprocess.Popen([xcode_exe], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
+            # Matching settings.bat: echo.%user%|bin\xcode.exe data\indexes\auth >nul
+            proc = subprocess.Popen([xcode_exe, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
             input_data = f"{username}\r\n{password}\r\n".encode('utf-8')
-            out, err = proc.communicate(input=input_data, timeout=2)
-            lines = [l.strip() for l in out.decode('utf-8', errors='ignore').splitlines() if l.strip()]
-            for l in lines:
-                if "XOR Tool" in l or "Enter string" in l or "Enter key" in l:
-                    continue
-                if len(l) == 32:
-                    log_init(f"xcode.exe generated auth token: {l}")
-                    return l
-            if lines:
-                log_init(f"xcode.exe output line: {lines[-1]}")
-                return lines[-1]
+            proc.communicate(input=input_data, timeout=2)
+            log_init(f"Wrote xcode auth file to {auth_file}")
         except Exception as e:
             log_init(f"xcode execution error: {e}")
+
+    # Read token from data/indexes/auth
+    if os.path.exists(auth_file):
+        try:
+            with open(auth_file, "r", encoding="utf-8", errors="ignore") as f:
+                token = f.read().strip()
+                if token:
+                    log_init(f"Token read from data/indexes/auth: {token}")
+                    return token
+        except Exception as e:
+            log_init(f"Error reading auth file: {e}")
+
     token = hashlib.md5((username + password).encode('utf-8')).hexdigest()
+    try:
+        with open(auth_file, "w", encoding="utf-8") as f:
+            f.write(token)
+    except Exception:
+        pass
     log_init(f"Fallback MD5 auth token generated: {token}")
     return token
+
+def get_xcode_auth(username, password):
+    return generate_auth_file_xcode(username, password)
 
 def get_uuid_tool_uuid(username):
     if not username:
@@ -531,19 +550,33 @@ class Api:
             log_init("Login attempt failed: Empty username or password")
             return {"success": False, "message": "Username and password required"}
 
-        auth_token = get_xcode_auth(username, password)
-        url = f"http://pcmod.ddns.me/modpack/authp.php?user={urllib.parse.quote(username)}&pass=\\%{urllib.parse.quote(auth_token)}"
-        log_init(f"Sending Auth Request to: {url}")
+        # Batch Auth Routine from settings.bat:
+        auth_token = generate_auth_file_xcode(username, password)
+
+        # POST "x=%token%&u=%user%&z=auth" to authp.php
+        auth_url = "http://pcmod.ddns.me/commands/authp.php"
+        post_data = urllib.parse.urlencode({
+            'x': auth_token,
+            'u': username,
+            'z': 'auth'
+        }).encode('utf-8')
+
+        log_init(f"Sending Auth POST Request to {auth_url}: u={username}")
 
         try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            req = urllib.request.Request(auth_url, data=post_data, headers={'User-Agent': 'Mozilla/5.0'})
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=2.0, context=ctx) as resp:
+            with urllib.request.urlopen(req, timeout=2.5, context=ctx) as resp:
                 body = resp.read().decode('utf-8', errors='ignore').strip()
                 log_init(f"Auth server response: {body}")
-                if "Login Successful" in body or "400.auth" in body or "200" in body or body == "1":
+
+                # Check for strict 401.auth password failure
+                if "401.auth" in body or "incorrect" in body.lower():
+                    log_init(f"Login REJECTED: Password incorrect for {username} ({body})")
+                    return {"success": False, "message": "Password was incorrect. Try again."}
+                elif "200.auth" in body or "200" in body or "Login Successful" in body or body == "1":
                     USER_INFO["username"] = username
                     USER_INFO["auth_token"] = auth_token
                     USER_INFO["uuid"] = get_uuid_tool_uuid(username)
@@ -555,8 +588,16 @@ class Api:
                     log_init(f"Login SUCCESSFUL for {username}")
                     return {"success": True, "message": "Login successful!"}
                 else:
-                    log_init(f"Login REJECTED by server: {body}")
-                    return {"success": False, "message": body}
+                    log_init(f"Auth response string: {body}")
+                    USER_INFO["username"] = username
+                    USER_INFO["auth_token"] = auth_token
+                    USER_INFO["uuid"] = get_uuid_tool_uuid(username)
+                    USER_INFO["valid"] = True
+                    update_console_title(username)
+                    s = read_settings()
+                    s["username"] = username
+                    write_settings(s)
+                    return {"success": True, "message": "Logged In"}
         except Exception as e:
             log_init(f"Login network exception ({e}) - Falling back to offline user mode")
             USER_INFO["username"] = username
@@ -699,6 +740,54 @@ class Api:
         log_init(f"Server script not found at {serv_bat}")
         return False
 
+def apply_win32_window_icons():
+    if OS_NAME == "win32":
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+            kernel32 = ctypes.windll.kernel32
+            current_pid = kernel32.GetCurrentProcessId()
+
+            IMAGE_ICON = 1
+            LR_LOADFROMFILE = 0x00000010
+            WM_SETICON = 0x0080
+            ICON_SMALL = 0
+            ICON_BIG = 1
+            GCLP_HICON = -14
+            GCLP_HICONSM = -34
+
+            icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
+            if os.path.exists(icon_path):
+                hicon_small = user32.LoadImageW(None, icon_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
+                hicon_big = user32.LoadImageW(None, icon_path, IMAGE_ICON, 32, 32, LR_LOADFROMFILE)
+
+                # Callback to apply icon to all windows created by current process
+                WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+
+                def enum_windows_callback(hwnd, lparam):
+                    pid = ctypes.c_ulong()
+                    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                    if pid.value == current_pid:
+                        if hicon_small:
+                            user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, hicon_small)
+                        if hicon_big:
+                            user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, hicon_big)
+                        try:
+                            if hasattr(user32, 'SetClassLongPtrW'):
+                                user32.SetClassLongPtrW(hwnd, GCLP_HICON, hicon_big)
+                                user32.SetClassLongPtrW(hwnd, GCLP_HICONSM, hicon_small)
+                            else:
+                                user32.SetClassLongW(hwnd, GCLP_HICON, hicon_big)
+                                user32.SetClassLongW(hwnd, GCLP_HICONSM, hicon_small)
+                        except Exception:
+                            pass
+                    return True
+
+                user32.EnumWindows(WNDENUMPROC(enum_windows_callback), 0)
+                log_init("Enumerate process windows applied icon.ico to all pywebview window handles")
+        except Exception as e:
+            log_init(f"apply_win32_window_icons error: {e}")
+
 def main():
     api = Api()
     html_path = os.path.join(DATA_DIR, "pages", "launcher.html")
@@ -715,60 +804,28 @@ def main():
 
     def on_loaded():
         log_init("pywebview window loaded event fired")
+        apply_win32_window_icons()
         if OS_NAME == "win32":
             try:
-                import ctypes
-                user32 = ctypes.windll.user32
-                hwnd = user32.FindWindowW(None, "PCMod Client")
-                if hwnd:
+                import System
+                import System.Drawing
+                import System.Windows.Forms
+
+                forms = System.Windows.Forms.Application.OpenForms
+                for f in forms:
                     icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
                     if os.path.exists(icon_path):
-                        IMAGE_ICON = 1
-                        LR_LOADFROMFILE = 0x00000010
-                        WM_SETICON = 0x0080
-                        ICON_SMALL = 0
-                        ICON_BIG = 1
+                        def set_form_icon():
+                            try:
+                                f.Icon = System.Drawing.Icon(icon_path)
+                                f.ShowIcon = True
+                                log_init("WinForms form.Icon and ShowIcon set")
+                            except Exception as e:
+                                log_init(f"WinForms form.Icon error: {e}")
 
-                        hicon_small = user32.LoadImageW(None, icon_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
-                        hicon_big = user32.LoadImageW(None, icon_path, IMAGE_ICON, 32, 32, LR_LOADFROMFILE)
-                        if hicon_small:
-                            user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, hicon_small)
-                        if hicon_big:
-                            user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, hicon_big)
-
-                        try:
-                            GCLP_HICON = -14
-                            GCLP_HICONSM = -34
-                            if hasattr(user32, 'SetClassLongPtrW'):
-                                user32.SetClassLongPtrW(hwnd, GCLP_HICON, hicon_big)
-                                user32.SetClassLongPtrW(hwnd, GCLP_HICONSM, hicon_small)
-                            else:
-                                user32.SetClassLongW(hwnd, GCLP_HICON, hicon_big)
-                                user32.SetClassLongW(hwnd, GCLP_HICONSM, hicon_small)
-                        except Exception as ex:
-                            log_init(f"SetClassLong error: {ex}")
-
-                try:
-                    import System
-                    import System.Drawing
-                    import System.Windows.Forms
-
-                    forms = System.Windows.Forms.Application.OpenForms
-                    for f in forms:
-                        if "PCMod Client" in f.Text or f.Text == "PCMod Client":
-                            icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
-                            if os.path.exists(icon_path):
-                                def set_form_icon():
-                                    try:
-                                        f.Icon = System.Drawing.Icon(icon_path)
-                                    except Exception as e:
-                                        log_init(f"WinForms form.Icon error: {e}")
-
-                                f.BeginInvoke(System.Action(set_form_icon))
-                except Exception as e:
-                    log_init(f"WinForms icon set error: {e}")
+                        f.BeginInvoke(System.Action(set_form_icon))
             except Exception as e:
-                log_init(f"on_loaded window icon setup error: {e}")
+                log_init(f"WinForms icon setup warning: {e}")
 
     webview.start(on_loaded, debug=False)
 
