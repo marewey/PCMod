@@ -7,253 +7,347 @@
 <link rel="shortcut icon" href="../icons/icon.ico" type="image/x-icon">
 <title>PCMod Launcher</title>
 <style>
- /* The sidebar menu */
-.sidenav {
-  height: 98%; /* Full-height: remove this if you want "auto" height */
-  width: 200px; /* Set the width of the sidebar */
-  position: absolute;
-  z-index: 1; /* Stay on top */
-  top: 5px; /* Stay at the top */
-  left: 5px;
-  background-color: #2c4569; /* Color */
-  color: #afc9f0; /* Color */
-  overflow-x: hidden; /* Disable horizontal scroll */
-  padding-top: 2px;
-  padding-bottom: 10px;
-}
-.settingnav {
-  height: 98%; /* Full-height: remove this if you want "auto" height */
-  width: 200px; /* Set the width of the sidebar */
-  position: absolute;
-  z-index: 1; /* Stay on top */
-  top: 5px; /* Stay at the top */
-  right: 5px;
-  background-color: #2c4569; /* Black */
-  overflow-x: hidden; /* Disable horizontal scroll */
-  padding-top: 2px;
-  padding-bottom: 10px;
-}
-.loginnav {
-  width: 200px; /* Set the width of the sidebar */
-  position: absolute;
-  z-index: 1; /* Stay on top */
-  bottom: 5px; /* Stay at the top */
-  right: 5px;
-  background-color: #2c4569; /* Black */
-  overflow-x: hidden; /* Disable horizontal scroll */
-  padding-top: 2px;
-  padding-bottom: 5px;
-}
-.playernav {
-  width: 200px; /* Set the width of the sidebar */
-  position: absolute;
-  z-index: 1; /* Stay on top */
-  bottom: 5px; /* Stay at the top */
-  left: 5px;
-  background-color: #2c4569; /* Black */
-  overflow-x: hidden; /* Disable horizontal scroll */
-  padding-top: 2px;
-  padding-bottom: 5px;
-}
-/* The navigation menu links */
-.sidenav button {
-  padding: 6px 16px 6px 16px;
-  text-decoration: none;
-  font-size: 15px;
-  display: block;
-  font: 17px;
-  font-family: 'Nobile', Helvetica, Arial, sans-serif;
+/* Modern Card-Style Responsive Design */
+* {
+  box-sizing: border-box;
 }
 
-/* Style page content */
-.main {
-  margin-top: 20px;
-  margin-left: 200px; /* Same as the width of the sidebar */
-  margin-right: 200px; /* Same as the width of the sidebar */
-  padding: 0px 10px;
-}
-
-/* On smaller screens, where height is less than 450px, change the style of the sidebar (less padding and a smaller font size) */
-@media screen and (max-height: 450px) {
-  .sidenav {padding-top: 15px;}
-  .sidenav a {font-size: 18px;}
-  .playernav {padding-top: 15px;}
-  .playernav a {font-size: 18px;}
-}
-
-/* ======= ORIGINAL ======== */
 body {
-    background: url(../icons/dirt.png) repeat 0 0;
-	background-color:#243855;
-	color:#000000;
-	border-color:#707b7c;
-    overflow: hidden;
+  background: url(../icons/dirt.png) repeat 0 0;
+  background-color: #121926;
+  color: #e2e8f0;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  margin: 0;
+  padding: 12px;
+  overflow: hidden;
+  height: 100vh;
+  user-select: none;
 }
-h1, h2, h3, h4, h5, h6 {
-    font-family: 'Corben', Georgia, Times, serif;
+
+/* Base Card Styling */
+.card {
+  background: rgba(24, 35, 54, 0.88);
+  backdrop-filter: blur(8px);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 10px 12px;
+  margin-bottom: 10px;
 }
-p, div {
-    font-family: 'Nobile', Helvetica, Arial, sans-serif;
+
+.card-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #94a3b8;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  text-align: center;
 }
-button {
-	background-color:#ccd1d1;
-	color:#111112;
-	font: 22px;
-    cursor: pointer;
+
+/* Layout Grid */
+.container {
+  display: grid;
+  grid-template-columns: 210px 1fr 220px;
+  gap: 12px;
+  height: calc(100vh - 28px);
 }
-input {
-	background-color:#ccd1d1;
-	color:#111112;
-	align: right;
+
+.column-left, .column-right {
+  display: flex;
+  flex-direction: column;
 }
-#title {
-    text-align:center;
-    padding:2px;
-    font-size:15px;
+
+.column-center {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
-#content {
-    background-color:#2c4569;
-    color:#afc9f0;
-    text-align:left;
-    padding:10px;
+
+/* Left Column Styling */
+.tasks-card {
+  flex: 0 0 auto;
 }
-#menu {
-    background-color:#243855;
-    color:#afc9f0;
-    text-align:left;
-    padding:10px;
-	font: 22px;
+
+.players-card {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
 }
-#menu2 {
-    background-color:#243855;
-    color:#afc9f0;
-    text-align:left;
-    padding:10px;
-	font: 22px;
+
+.btn-card {
+  width: 100%;
+  background: #2a3d58;
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
 }
-#menu3 {
-    background-color:#243855;
-    color:#afc9f0;
-    text-align:left;
-    padding:1px;
-	font: 22px;
+
+.btn-card:hover {
+  background: #3b5278;
+  border-color: #60a5fa;
+  transform: translateY(-1px);
 }
-#version {
-    text-align:right;
-    padding:1px;
-	font-weight: 600;
+
+.btn-card:active {
+  transform: translateY(0);
+}
+
+#online {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 8px;
+  font-size: 13px;
+  overflow-y: auto;
+  margin: 0;
+  color: #cbd5e1;
+}
+
+/* Right Column Styling */
+.settings-card {
+  flex: 1 1 auto;
+  font-size: 12px;
+}
+
+.settings-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.settings-table td {
+  padding: 4px 0;
+}
+
+.settings-label {
+  color: #cbd5e1;
+  font-size: 12px;
 }
 
 input.largerCheckbox {
-    width: 30px;
-    height: 30px;
-    cursor: pointer;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #3b82f6;
+}
+
+select, input[type="text"], input[type="password"], input[type="number"] {
+  background: rgba(15, 23, 42, 0.8);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 4px 6px;
+  outline: none;
+  font-size: 12px;
+  width: 100%;
+}
+
+select:focus, input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.login-card {
+  flex: 0 0 auto;
+}
+
+/* Center Column Styling */
+.logo-container {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.logo-img {
+  height: 80px;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+}
+
+.main-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+}
+
+.news-frame {
+  flex: 1;
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: #0f172a;
+  margin-bottom: 12px;
+}
+
+.action-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.btn-launch {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  color: #ffffff;
+  border: 1px solid #22c55e;
+  border-radius: 8px;
+  height: 65px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.4);
+  transition: all 0.2s ease;
+}
+
+.btn-launch:hover {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.5);
+}
+
+.btn-update {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  border: 1px solid #3b82f6;
+  border-radius: 8px;
+  height: 65px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+  transition: all 0.2s ease;
+}
+
+.btn-update:hover {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+}
+
+.version-bar {
+  text-align: right;
+  font-size: 12px;
+  color: #94a3b8;
+  padding-top: 4px;
 }
 </style>
 </head>
 <body>
-<!-- Side Bar -->
-<div class="sidenav" style="height: 62%;">
-	<table border="0" cellpadding="1px" id="menu" width="100%">
-		<th align="center"><hr>Tasks/Links<hr></th>
-		<tr><td align="center" width="auto">
-		<button style="width: 92%; font-size: 14px; line-height: 1.2;" id="ML" onclick="openModlist()">Modlist<br>(<span id="modcount">--</span> mods)</button>
-		</td></tr><tr><td align="center" width="auto">
-		<button style="width: 92%;" onclick="openWeb('pcmod')">PCMod website</button>
-		</td></tr><tr><td align="center" width="auto">
-		<button style="width: 92%;" onclick="openWeb('discord')">Join Discord</button>
-		</td></tr><tr><td align="center" width="auto">
-		<button style="width: 92%;" onclick="openWeb('auth')">My Account</button>
-		</td></tr>
-	</table>
-</div>
 
-<div class="playernav" style="height: 35%; top: 63%;">
-	<table width="100%" id="menu3">
-		<th align="center"><hr>Players Online<hr></th>
-		<tr><td>
-		<button style="height:25px;width:100%;font-size:10px" onclick="refreshPlayers()">Refresh</button><hr>
-		</td></tr>
-		<tr><td align="left" style="padding-left:10px;">
-		<p style="width: 100%; height: 110px; font: 14px; font-weight: bolder; margin: 0; overflow-y: auto;" id="online"></p>
-		</td></tr>
-	</table>
-</div>
+<div class="container">
+  <!-- LEFT COLUMN -->
+  <div class="column-left">
+    <!-- Tasks/Links Card -->
+    <div class="card tasks-card">
+      <div class="card-title">Tasks / Links</div>
+      <button class="btn-card" id="ML" onclick="openModlist()">Modlist<br><span style="font-size:11px; font-weight:normal;">(<span id="modcount">--</span> mods)</span></button>
+      <button class="btn-card" onclick="openWeb('pcmod')">PCMod Website</button>
+      <button class="btn-card" onclick="openWeb('discord')">Join Discord</button>
+      <button class="btn-card" onclick="openWeb('auth')">My Account</button>
+    </div>
 
-<div class="settingnav" style="height: 69%;">
-	<table border="0" cellpadding="2px" id="menu2" width="100%">
-		<th align="center" colspan="2"><hr>Settings<hr></th>
-		<tr><td align="left" width="auto">
-		<label for="Shortcut">Shortcut </label>
-		</td><td align="right">
-		<input class="largerCheckbox" title="Creates a shortcut on your desktop." type="checkbox" id="Shortcut" onclick="toggleShortcut()"></span><br>
-		</td></tr><tr><td align="left" width="auto">
-		<label for="AutoServer">Auto Server </label>
-		</td><td align="right">
-		<input class="largerCheckbox" title="Launch into the server." type="checkbox" id="AutoServer" onclick="toggleAutoServer()"><br>
-		</td></tr><tr><td align="left" width="auto">
-		<label for="LL">Log Logins </label>
-		</td><td align="right">
-		<input class="largerCheckbox" title="Keeps track of how often you play." type="checkbox" id="LL" onclick="toggleLogLogins()"><br>
-		</td></tr><tr><td align="left" width="auto">
-		<label for="LT">Lite Mode </label>
-		</td><td align="right">
-		<input class="largerCheckbox" title="Removes client side mods. (for slower computers)." type="checkbox" id="LT" onclick="toggleLiteMode()"><br>
-		</td></tr><tr><td align="left" width="auto">
-		<label for="ShowConsole">Console </label>
-		</td><td align="right">
-		<input class="largerCheckbox" title="Show/Hide the python console window." type="checkbox" id="ShowConsole" onclick="toggleShowConsole()"><br>
-		</td></tr><tr><td align="left" width="auto">
-		<label for="VERSION-select">Version</label>
-		</td><td align="right">
-		<select title="Select Previous versions of the game." size="1" name="version-select" id="VERSION-select" style="font-size:10px; width:100px;" onchange="changeVersion()">
-		</select><br>
-		</td></tr><tr><td align="left" width="auto">
-		<label for="MEM">Memory</label>
-		</td><td align="right">
-		<input title="Sets Memory Allocated to game, in megabytes." value="4096" type="number" style="font-size:10px; width:70px;" maxlength="5" size="4" id="MEM" onchange="changeMemory()"><br>
-		</td></tr><tr><td colspan="2" align="center" width="auto">
-		<hr><button style="width: 100px; font-size: 11px;" onclick="saveSettingsButton()">Save</button><hr>
-		</td></tr><tr><td colspan="2" align="center" width="auto">
-		<button style="width: 100px; font-size: 11px;" onclick="launchServer()">Launch Server</button><br>
-		</td>
-		</tr>
-	</table>
-</div>
+    <!-- Players Online Card -->
+    <div class="card players-card">
+      <div class="card-title">Players Online</div>
+      <button class="btn-card" style="padding: 4px; font-size: 11px; margin-bottom: 8px;" onclick="refreshPlayers()">Refresh</button>
+      <div id="online">Loading...</div>
+    </div>
+  </div>
 
-<div class="loginnav" style="height: 29%; top: 70%;">
-	<table border=0 cellpadding="1px" id="menu2" width="100%">
-		<th colspan="2" align="center"><hr>Login<hr></th>
-		<tr><td align="left" style="font-size: 13px;">User</td><td align="left">
-		<input type="text" size="14" id="user" placeholder="Username" value="Loading..." style="font-size:12px;"></td>
-		</tr><tr><td align="left" style="font-size: 13px;">Pass</td><td align="left">
-		<input type="password" size="14" id="pass" placeholder="Password" style="font-size:12px;"></td>
-		</tr><tr><td></td><td colspan="1" align="left">
-		<input type="button" style="width: 110px; font-size: 13px; cursor: pointer;" value="Login" onclick="login()">
-		</td>
-		</tr>
-		<tr><td colspan="2" style="padding-top:2px;"><hr><div id="login-status" style="font-size: 11px; text-align: center; color: #afc9f0;"></div></td></tr>
-	</table>
-</div>
+  <!-- CENTER COLUMN -->
+  <div class="column-center">
+    <div class="logo-container">
+      <img class="logo-img" src="../icons/pcmod.png" alt="PCMod Logo">
+    </div>
 
-<!-- MAIN PAGE -->
-<div class="main">
-<div id="title">
-<img height="85px" src="../icons/pcmod.png"><br>
-</div>
-<br>
-<div id="content" style="height: 420px;">
-<center>
-<table width="100%" height="100%" border=0><tr>
-<td colspan=2 height="315px">
-<iframe id="news" width="100%" height="100%" title="PCMod News" name="PCMod News" src="news.html"></iframe><br>
-</td></tr><tr>
-<td align="center"><button style="width: 100%; height: 75px; font-size: 24px; font-weight: bold;" onclick="launchGame()">LAUNCH</button></td>
-<td align="center" width="50%"><button style="width: 100%; height: 75px; font-size: 24px; font-weight: bold;" onclick="runUpdate()">UPDATE</button></td>
-</tr></table>
-</center>
-</div>
-<div style="font-size:14px; text-align:right; width:100%; padding:3px; color:#ccd1d1;" id="version">-.-.-</div>
+    <div class="card main-card">
+      <iframe id="news" class="news-frame" title="PCMod News" name="PCMod News" src="news.html"></iframe>
+
+      <div class="action-buttons">
+        <button class="btn-launch" onclick="launchGame()">LAUNCH</button>
+        <button class="btn-update" onclick="runUpdate()">UPDATE</button>
+      </div>
+    </div>
+
+    <div class="version-bar" id="version">-.-.-</div>
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div class="column-right">
+    <!-- Settings Card -->
+    <div class="card settings-card">
+      <div class="card-title">Settings</div>
+      <table class="settings-table">
+        <tr>
+          <td class="settings-label"><label for="Shortcut">Shortcut</label></td>
+          <td align="right"><input class="largerCheckbox" title="Creates a shortcut on your desktop." type="checkbox" id="Shortcut" onclick="toggleShortcut()"></td>
+        </tr>
+        <tr>
+          <td class="settings-label"><label for="AutoServer">Auto Server</label></td>
+          <td align="right"><input class="largerCheckbox" title="Launch into the server." type="checkbox" id="AutoServer" onclick="toggleAutoServer()"></td>
+        </tr>
+        <tr>
+          <td class="settings-label"><label for="LL">Log Logins</label></td>
+          <td align="right"><input class="largerCheckbox" title="Keeps track of how often you play." type="checkbox" id="LL" onclick="toggleLogLogins()"></td>
+        </tr>
+        <tr>
+          <td class="settings-label"><label for="LT">Lite Mode</label></td>
+          <td align="right"><input class="largerCheckbox" title="Removes client side mods." type="checkbox" id="LT" onclick="toggleLiteMode()"></td>
+        </tr>
+        <tr>
+          <td class="settings-label"><label for="ShowConsole">Console</label></td>
+          <td align="right"><input class="largerCheckbox" title="Show/Hide the python console window." type="checkbox" id="ShowConsole" onclick="toggleShowConsole()"></td>
+        </tr>
+        <tr>
+          <td class="settings-label"><label for="VERSION-select">Version</label></td>
+          <td align="right">
+            <select title="Select Previous versions of the game." name="version-select" id="VERSION-select" style="width: 100px;" onchange="changeVersion()"></select>
+          </td>
+        </tr>
+        <tr>
+          <td class="settings-label"><label for="MEM">Memory</label></td>
+          <td align="right">
+            <input title="Sets Memory Allocated to game in MB." value="4096" type="number" style="width: 70px;" id="MEM" onchange="changeMemory()">
+          </td>
+        </tr>
+      </table>
+
+      <div style="margin-top: 10px; display: flex; gap: 6px;">
+        <button class="btn-card" style="font-size: 11px; padding: 6px;" onclick="saveSettingsButton()">Save</button>
+        <button class="btn-card" style="font-size: 11px; padding: 6px;" onclick="launchServer()">Launch Server</button>
+      </div>
+    </div>
+
+    <!-- Login Card -->
+    <div class="card login-card">
+      <div class="card-title">Login</div>
+      <table class="settings-table">
+        <tr>
+          <td style="width: 40px; color: #cbd5e1;">User</td>
+          <td><input type="text" id="user" placeholder="Username" value="Loading..."></td>
+        </tr>
+        <tr>
+          <td style="color: #cbd5e1;">Pass</td>
+          <td><input type="password" id="pass" placeholder="Password"></td>
+        </tr>
+      </table>
+
+      <div style="margin-top: 8px;">
+        <button class="btn-card" style="background: #3b82f6; font-size: 12px; padding: 6px;" onclick="login()">Login</button>
+      </div>
+      <div id="login-status" style="font-size: 11px; text-align: center; margin-top: 4px; color: #94a3b8;"></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -351,7 +445,7 @@ function login() {
     var p = document.getElementById('pass').value;
     var statusElem = document.getElementById('login-status');
     if (statusElem) {
-        statusElem.style.color = "#afc9f0";
+        statusElem.style.color = "#94a3b8";
         statusElem.innerHTML = "Logging in...";
     }
     if (window.pywebview && window.pywebview.api) {
@@ -359,13 +453,13 @@ function login() {
             if (res) {
                 if (statusElem) {
                     if (res.status === "success") {
-                        statusElem.style.color = "#a3e4d7";
+                        statusElem.style.color = "#4ade80";
                         statusElem.innerHTML = "Logged In Successfully.";
                     } else if (res.auth === "401.auth") {
-                        statusElem.style.color = "#f5b7b1";
+                        statusElem.style.color = "#f87171";
                         statusElem.innerHTML = "Password incorrect. Try again.";
                     } else {
-                        statusElem.style.color = "#f5b7b1";
+                        statusElem.style.color = "#f87171";
                         statusElem.innerHTML = "Login failed: " + res.auth;
                     }
                 }
