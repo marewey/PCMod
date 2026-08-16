@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="../icons/icon.ico" type="image/x-icon">
+  <title>PCMod Client</title>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --card-bg: rgba(15, 23, 42, 0.88);
+      --card-border: rgba(255, 255, 255, 0.12);
+      --card-hover-border: rgba(59, 130, 246, 0.4);
+      --accent-blue: #3b82f6;
+      --accent-blue-hover: #2563eb;
+      --accent-green: #10b981;
+      --accent-green-hover: #059669;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --input-bg: rgba(30, 41, 59, 0.7);
+      --input-border: rgba(255, 255, 255, 0.15);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 30%, #1e293b 0%, #0f172a 60%, #090d16 100%);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* Ambient background glow elements */
+    body::before {
+      content: '';
+      position: absolute;
+      top: -10%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 300px;
+      background: radial-gradient(ellipse at center, rgba(59, 130, 246, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .app-container {
+      width: 1140px;
+      height: 650px;
+      padding: 14px;
+      display: grid;
+      grid-template-columns: 210px 1fr 210px;
+      gap: 14px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .panel {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      transition: border-color 0.3s;
+    }
+
+    .panel:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .panel-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      color: #38bdf8;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      text-align: center;
+      text-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+    }
+
+    /* Left Sidebar */
+    .left-sidebar {
+      gap: 10px;
+    }
+
+    .nav-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .nav-btn:hover {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: rgba(59, 130, 246, 0.4);
+      color: #ffffff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .player-list {
+      flex: 1;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+      overflow-y: auto;
+      margin-top: 8px;
+    }
+
+    /* Main Center Content */
+    .main-content {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: center;
+      height: 100%;
+    }
+
+    .logo-header {
+      text-align: center;
+      margin-bottom: 0px;
+      flex-shrink: 0;
+      width: 100%;
+    }
+
+    .logo-header img {
+      max-height: 95px;
+      max-width: 100%;
+      object-fit: contain;
+      filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.6));
+    }
+
+    .news-card {
+      flex: 1;
+      width: 100%;
+      overflow: hidden;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .news-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.4);
+      flex: 1;
+    }
+
+    .action-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      width: 100%;
+      flex-shrink: 0;
+    }
+
+    .btn-launch {
+      background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    }
+
+    .btn-launch:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5);
+      background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+    }
+
+    .btn-update {
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.35);
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    }
+
+    .btn-update:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(59, 130, 246, 0.5);
+      background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+    }
+
+    .version-footer {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: right;
+      width: 100%;
+      padding-top: 2px;
+    }
+
+    /* Right Sidebar (Settings & Login) */
+    .right-sidebar {
+      gap: 8px;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: var(--text-main);
+    }
+
+    .setting-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent-blue);
+      cursor: pointer;
+    }
+
+    .setting-row input[type="number"],
+    .setting-row select {
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text-main);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 12px;
+      width: 90px;
+      outline: none;
+    }
+
+    .login-section {
+      margin-top: auto;
+      padding-top: 8px;
+    }
+
+    .input-field {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text-main);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 13px;
+      margin-bottom: 8px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-field:focus {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .btn-login {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+      margin-top: 4px;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-login:hover {
+      background: linear-gradient(135deg, #60a5fa 0%, #1d4ed8 100%);
+    }
+
+    .login-msg {
+      font-size: 11px;
+      margin-bottom: 8px;
+      text-align: center;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Left Column: Navigation & Server Info -->
+    <div class="main-content" style="grid-column: 1;">
+      <div class="panel left-sidebar" style="width: 100%; height: 100%;">
+        <div class="panel-title">Tasks / Links</div>
+        <button class="nav-btn" onclick="openModlist()" id="modlistBtn">Modlist (<span id="modcount">--</span> mods)</button>
+        <button class="nav-btn" onclick="openWeb('pcmod')">PCMod Website</button>
+        <button class="nav-btn" onclick="openWeb('discord')">Join Discord</button>
+        <button class="nav-btn" onclick="openWeb('auth')">My Account</button>
+
+        <div style="margin-top: 10px; border-top: 1px solid var(--card-border); padding-top: 10px; flex: 1; display: flex; flex-direction: column;">
+          <div class="panel-title" style="margin-bottom: 8px;">Players Online</div>
+          <button class="nav-btn" style="padding: 6px; font-size: 12px;" onclick="refreshPlayers()">Refresh</button>
+          <div class="player-list" id="playerList">
+            Loading...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Middle Column: Logo, News & Main Actions -->
+    <div class="main-content" style="grid-column: 2;">
+      <div class="logo-header">
+        <img src="../icons/pcmod.png" alt="PCMod Client" id="logoImg">
+      </div>
+
+      <div class="panel news-card">
+        <iframe src="news.html" class="news-iframe" id="newsIframe"></iframe>
+      </div>
+
+      <div class="action-bar">
+        <button class="btn-launch" onclick="launchGame()">LAUNCH</button>
+        <button class="btn-update" onclick="updateGame()">UPDATE</button>
+      </div>
+
+      <div class="version-footer" id="versionFooter">Launcher: 1.2a / Pack: 2.5.3a</div>
+    </div>
+
+    <!-- Right Column: Settings & Account Login -->
+    <div class="main-content" style="grid-column: 3;">
+      <div class="panel right-sidebar" style="width: 100%; height: 100%;">
+        <div class="panel-title">Settings</div>
+
+        <div class="setting-row">
+          <label for="shortcut">Shortcut</label>
+          <input type="checkbox" id="shortcut" onchange="toggleShortcut()">
+        </div>
+        <div class="setting-row">
+          <label for="autoserver">Auto Server</label>
+          <input type="checkbox" id="autoserver" onchange="toggleAutoServer()">
+        </div>
+        <div class="setting-row">
+          <label for="loglogins">Log Logins</label>
+          <input type="checkbox" id="loglogins" onchange="toggleLogLogins()">
+        </div>
+        <div class="setting-row">
+          <label for="litemode">Lite Mode</label>
+          <input type="checkbox" id="litemode" onchange="toggleLiteMode()">
+        </div>
+        <div class="setting-row">
+          <label for="showconsole">Console</label>
+          <input type="checkbox" id="showconsole" onchange="toggleShowConsole()">
+        </div>
+        <div class="setting-row" style="margin-top: 4px;">
+          <label for="selver">Version</label>
+          <select id="selver" onchange="changeVersion()">
+            <option value="">Default</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <label for="maxram">Memory</label>
+          <input type="number" id="maxram" value="4096" step="512" min="1024" onchange="changeMemory()">
+        </div>
+
+        <hr style="border: none; border-top: 1px solid var(--card-border); margin: 8px 0 8px 0;">
+
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <button class="btn-secondary" onclick="launchServer()">Launch Server</button>
+        </div>
+
+        <div class="login-section">
+          <div class="login-msg" id="loginMsg"></div>
+          <div style="border-top: 1px solid var(--card-border); padding-top: 8px;">
+            <div class="panel-title" style="margin-bottom: 6px;">Login</div>
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+              <span style="font-size: 12px; color: var(--text-muted); width: 35px;">User</span>
+              <input type="text" class="input-field" id="username" placeholder="Username" style="margin-bottom: 0;">
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+              <span style="font-size: 12px; color: var(--text-muted); width: 35px;">Pass</span>
+              <input type="password" class="input-field" id="password" placeholder="Password" style="margin-bottom: 0;">
+            </div>
+            <button class="btn-login" onclick="performLogin()">Login</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var isInitialized = false;
+
+    function initLauncher() {
+      if (!window.pywebview || !window.pywebview.api) return;
+      window.pywebview.api.init_launcher().then(function(data) {
+        if (!data) return;
+
+        // 1. User
+        if (data.user) {
+          document.getElementById('username').value = data.user;
+        }
+
+        // 2. Settings Checkboxes
+        if (data.settings) {
+          document.getElementById('shortcut').checked = (data.settings.shortcut === "1");
+          document.getElementById('autoserver').checked = (data.settings.autoserver === "1");
+          document.getElementById('loglogins').checked = (data.settings.log_logins === "1" || data.settings['log-logins'] === "1");
+          document.getElementById('litemode').checked = (data.settings.lite === "1");
+          document.getElementById('showconsole').checked = (data.settings.showconsole === "1");
+          if (data.settings.memory) {
+            document.getElementById('maxram').value = data.settings.memory;
+          }
+        }
+
+        // 3. Mod count
+        if (data.modcount !== undefined) {
+          document.getElementById('modcount').innerText = data.modcount;
+        }
+
+        // 4. Version footer
+        if (data.launcher_version && data.pack_version) {
+          document.getElementById('versionFooter').innerText = "Launcher: " + data.launcher_version + " / Pack: " + data.pack_version;
+        }
+
+        // 5. Version dropdown select
+        if (data.versions_list && data.versions_list.length > 0) {
+          var select = document.getElementById('selver');
+          select.innerHTML = "";
+          for (var i = 0; i < data.versions_list.length; i++) {
+            var v = data.versions_list[i];
+            var opt = document.createElement('option');
+            opt.value = i + " " + v.name;
+            opt.text = v.name;
+            if (v.name === (data.settings ? data.settings.pack : '')) {
+              opt.selected = true;
+            }
+            select.add(opt);
+          }
+        }
+
+        // 6. Refresh players online asynchronously without blocking UI
+        refreshPlayers();
+      });
+    }
+
+    var initInterval = setInterval(function() {
+      if (window.pywebview && window.pywebview.api && !isInitialized) {
+        clearInterval(initInterval);
+        isInitialized = true;
+        initLauncher();
+      }
+    }, 100);
+
+    window.addEventListener('pywebviewready', function() {
+      clearInterval(initInterval);
+      if (!isInitialized) {
+        isInitialized = true;
+        initLauncher();
+      }
+    });
+
+    function toggleShortcut() {
+      var val = document.getElementById('shortcut').checked ? "1" : "0";
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_setting('shortcut', val);
+      }
+    }
+
+    function toggleAutoServer() {
+      var val = document.getElementById('autoserver').checked ? "1" : "0";
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_setting('autoserver', val);
+      }
+    }
+
+    function toggleLogLogins() {
+      var val = document.getElementById('loglogins').checked ? "1" : "0";
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_setting('log-logins', val);
+      }
+    }
+
+    function toggleLiteMode() {
+      var val = document.getElementById('litemode').checked ? "1" : "0";
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_lite_mode(val).then(function() {
+          initLauncher();
+        });
+      }
+    }
+
+    function toggleShowConsole() {
+      var val = document.getElementById('showconsole').checked ? "1" : "0";
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_setting('showconsole', val);
+      }
+    }
+
+    function changeMemory() {
+      var val = document.getElementById('maxram').value;
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_memory(val).then(function() {
+          initLauncher();
+        });
+      }
+    }
+
+    function changeVersion() {
+      var select = document.getElementById('selver');
+      var val = select.value;
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_version_select(val).then(function() {
+          initLauncher();
+        });
+      }
+    }
+
+    function refreshPlayers() {
+      document.getElementById('playerList').innerText = 'Refreshing...';
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.refresh_players().then(function(html) {
+          document.getElementById('playerList').innerHTML = (html && html.trim() !== "") ? html : "No Players Online";
+        });
+      }
+    }
+
+    function performLogin() {
+      var u = document.getElementById('username').value;
+      var p = document.getElementById('password').value;
+      var msgDiv = document.getElementById('loginMsg');
+      msgDiv.style.display = 'block';
+      msgDiv.style.color = '#eab308';
+      msgDiv.innerText = 'Logging in...';
+
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.verify_login(u, p).then(function(res) {
+          if (res && res.success) {
+            msgDiv.style.color = '#10b981';
+            msgDiv.innerText = 'Login successful!';
+            initLauncher();
+          } else {
+            msgDiv.style.color = '#ef4444';
+            msgDiv.innerText = (res && res.message) ? res.message : 'Login failed';
+          }
+        });
+      }
+    }
+
+    function openModlist() {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.open_modlist();
+      }
+    }
+
+    function openWeb(site) {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.open_web(site);
+      }
+    }
+
+    function launchGame() {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.launch_game();
+      }
+    }
+
+    function updateGame() {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.update_game();
+      }
+    }
+
+    function launchServer() {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.launch_server();
+      }
+    }
+  </script>
+</body>
+</html>
