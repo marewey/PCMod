@@ -162,6 +162,34 @@ def get_pack_name():
             pass
     return "2-5-x"
 
+def read_version_indexes(pack_name):
+    launcher_ver = "1.2a"
+    pack_ver = "2.5.3a"
+
+    version_files = [
+        os.path.join(DATA_DIR, "indexes", "version"),
+        os.path.join(DATA_DIR, "indexes", "version.tmp")
+    ]
+
+    for vfile in version_files:
+        if os.path.exists(vfile):
+            try:
+                with open(vfile, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        parts = line.strip().split(";")
+                        if len(parts) >= 2:
+                            key = parts[0].strip()
+                            ver = parts[1].strip()
+                            if key == "Launcher":
+                                launcher_ver = ver
+                            elif key == pack_name:
+                                pack_ver = ver
+            except Exception as e:
+                log_init(f"Error reading version file {vfile}: {e}")
+
+    log_init(f"Resolved Versions: Launcher={launcher_ver} | Pack ({pack_name})={pack_ver}")
+    return launcher_ver, pack_ver
+
 def get_offline_uuid(username):
     s = f"OfflinePlayer:{username}"
     md5 = hashlib.md5(s.encode('utf-8')).digest()
@@ -283,7 +311,8 @@ class Api:
         s = read_settings()
         pack = get_pack_name()
         modcount = self.get_mod_count()
-        log_init(f"Launcher State: Pack={pack} | ModCount={modcount} | Username={s.get('username', '')}")
+        launcher_ver, pack_ver = read_version_indexes(pack)
+        log_init(f"Launcher State: Pack={pack} | LauncherVer={launcher_ver} | PackVer={pack_ver} | ModCount={modcount} | Username={s.get('username', '')}")
 
         return {
             "user": s.get("username", ""),
@@ -298,8 +327,8 @@ class Api:
                 "pack": pack
             },
             "modcount": str(modcount),
-            "launcher_version": "2.5",
-            "pack_version": pack,
+            "launcher_version": launcher_ver,
+            "pack_version": pack_ver,
             "versions_list": get_versions_list(),
             "online_players": "Loading...",
             "news_url": "news.html"
@@ -452,7 +481,6 @@ class Api:
 
     def get_players_online(self, *args, **kwargs):
         pack = get_pack_name()
-        # Correct Batch URL format: http://pcmod.ddns.me/players/list-%pack%
         url = f"http://pcmod.ddns.me/players/list-{pack}"
         log_init(f"Fetching online players list from batch-specified URL: {url}")
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
