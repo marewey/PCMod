@@ -43,9 +43,9 @@ if %errorlevel% neq 0 (
 echo Python installation [DONE]
 
 :: Refresh system path variables
-if exist "cmd\refreshenv.cmd" (
+if exist "bin\refreshenv.cmd" (
     echo Refreshing environment variables...
-    call "cmd\refreshenv.cmd" >nul
+    call "bin\refreshenv.cmd" >nul
 )
 
 :: Recheck Python

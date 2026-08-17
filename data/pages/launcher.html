@@ -42,7 +42,7 @@
       position: relative;
     }
 
-    /* Ambient background glow elements */
+    /* Ambient background glow */
     body::before {
       content: '';
       position: absolute;
@@ -60,11 +60,20 @@
       width: 1140px;
       height: 650px;
       padding: 14px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .view-panel {
+      width: 100%;
+      height: 100%;
+    }
+
+    .main-grid {
       display: grid;
       grid-template-columns: 210px 1fr 210px;
       gap: 14px;
-      position: relative;
-      z-index: 1;
+      height: 100%;
     }
 
     .panel {
@@ -200,16 +209,23 @@
       box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
       transition: all 0.2s;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 2px;
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
     }
 
-    .btn-launch:hover {
+    .btn-launch:hover:not(:disabled) {
       transform: translateY(-2px);
       box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5);
       background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+    }
+
+    .btn-launch:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
     }
 
     .btn-update {
@@ -344,103 +360,331 @@
       text-align: center;
       display: none;
     }
+
+    /* Modal Update Notification */
+    .modal-overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal-card {
+      background: #1e293b;
+      border: 1px solid var(--accent-blue);
+      border-radius: 12px;
+      padding: 20px 24px;
+      width: 420px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+      text-align: center;
+    }
+
+    /* Modlist & Updater Views */
+    .header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .btn-back {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-back:hover {
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    .table-container {
+      flex: 1;
+      overflow-y: auto;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 10px;
+    }
+
+    table.mod-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    table.mod-table th {
+      position: sticky;
+      top: 0;
+      background: #1e293b;
+      color: #38bdf8;
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    table.mod-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: #f8fafc;
+    }
+
+    /* Updater Grid Menu */
+    .updater-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .updater-btn {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 16px 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      text-align: center;
+    }
+
+    .updater-btn:hover {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: var(--accent-blue);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 18px;
+      background: rgba(0,0,0,0.5);
+      border-radius: 9px;
+      overflow: hidden;
+      border: 1px solid var(--card-border);
+      margin: 10px 0 6px 0;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
+      transition: width 0.2s ease-in-out;
+    }
   </style>
 </head>
 <body>
   <div class="app-container">
-    <!-- Left Column: Navigation & Server Info -->
-    <div class="main-content" style="grid-column: 1;">
-      <div class="panel left-sidebar" style="width: 100%; height: 100%;">
-        <div class="panel-title">Tasks / Links</div>
-        <button class="nav-btn" onclick="openModlist()" id="modlistBtn">Modlist (<span id="modcount">--</span> mods)</button>
-        <button class="nav-btn" onclick="openWeb('pcmod')">PCMod Website</button>
-        <button class="nav-btn" onclick="openWeb('discord')">Join Discord</button>
-        <button class="nav-btn" onclick="openWeb('auth')">My Account</button>
+    <!-- 1. MAIN LAUNCHER VIEW -->
+    <div id="mainView" class="view-panel main-grid">
+      <!-- Left Column: Navigation & Server Info -->
+      <div class="main-content" style="grid-column: 1;">
+        <div class="panel left-sidebar" style="width: 100%; height: 100%;">
+          <div class="panel-title">Tasks / Links</div>
+          <button class="nav-btn" onclick="showModList()" id="modlistBtn">Mod List ( -- mods)</button>
+          <button class="nav-btn" onclick="openWeb('pcmod')">PCMod Website</button>
+          <button class="nav-btn" onclick="openWeb('discord')">Join Discord</button>
+          <button class="nav-btn" onclick="openWeb('auth')">My Account</button>
 
-        <div style="margin-top: 10px; border-top: 1px solid var(--card-border); padding-top: 10px; flex: 1; display: flex; flex-direction: column;">
-          <div class="panel-title" style="margin-bottom: 8px;">Players Online</div>
-          <button class="nav-btn" style="padding: 6px; font-size: 12px;" onclick="refreshPlayers()">Refresh</button>
-          <div class="player-list" id="playerList">
-            Loading...
+          <div style="margin-top: 10px; border-top: 1px solid var(--card-border); padding-top: 10px; flex: 1; display: flex; flex-direction: column;">
+            <div class="panel-title" style="margin-bottom: 8px;">Players Online</div>
+            <button class="nav-btn" style="padding: 6px; font-size: 12px;" onclick="refreshPlayers()">Refresh</button>
+            <div class="player-list" id="playerList">
+              Loading...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Middle Column: Logo, News & Main Actions -->
+      <div class="main-content" style="grid-column: 2;">
+        <div class="logo-header">
+          <img src="../icons/pcmod.png" alt="PCMod Client" id="logoImg">
+        </div>
+
+        <div class="panel news-card">
+          <iframe src="news.html" class="news-iframe" id="newsIframe"></iframe>
+        </div>
+
+        <div class="action-bar">
+          <button class="btn-launch" id="launchBtn" onclick="launchGame()">
+            <span id="launchBtnText">LAUNCH</span>
+            <span id="launchBtnSubText" style="display: none; font-size: 10px; font-weight: 500; margin-top: 2px; color: #bae6fd;">Downloading Missing Resources...</span>
+          </button>
+          <button class="btn-update" onclick="showUpdateView()">UPDATE</button>
+        </div>
+
+        <div class="version-footer" id="versionFooter">Launcher: 1.2a / Pack: 2.5.3a</div>
+      </div>
+
+      <!-- Right Column: Settings & Account Login -->
+      <div class="main-content" style="grid-column: 3;">
+        <div class="panel right-sidebar" style="width: 100%; height: 100%;">
+          <div class="panel-title">Settings</div>
+
+          <div class="setting-row">
+            <label for="shortcut">Shortcut</label>
+            <input type="checkbox" id="shortcut" onchange="toggleShortcut()">
+          </div>
+          <div class="setting-row">
+            <label for="autoserver">Auto Server</label>
+            <input type="checkbox" id="autoserver" onchange="toggleAutoServer()">
+          </div>
+          <div class="setting-row">
+            <label for="loglogins">Log Logins</label>
+            <input type="checkbox" id="loglogins" onchange="toggleLogLogins()">
+          </div>
+          <div class="setting-row">
+            <label for="litemode">Lite Mode</label>
+            <input type="checkbox" id="litemode" onchange="toggleLiteMode()">
+          </div>
+          <div class="setting-row">
+            <label for="showconsole">Console</label>
+            <input type="checkbox" id="showconsole" onchange="toggleShowConsole()">
+          </div>
+          <div class="setting-row" style="margin-top: 4px;">
+            <label for="selver">Version</label>
+            <select id="selver" onchange="changeVersion()">
+              <option value="">Default</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="maxram">Memory</label>
+            <input type="number" id="maxram" value="4096" step="512" min="1024" onchange="changeMemory()">
+          </div>
+
+          <hr style="border: none; border-top: 1px solid var(--card-border); margin: 8px 0 8px 0;">
+
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <button class="btn-secondary" onclick="launchServer()">Launch Server</button>
+          </div>
+
+          <div class="login-section">
+            <div class="login-msg" id="loginMsg"></div>
+            <div style="border-top: 1px solid var(--card-border); padding-top: 8px;">
+              <div class="panel-title" style="margin-bottom: 6px;">Login</div>
+              <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                <span style="font-size: 12px; color: var(--text-muted); width: 35px;">User</span>
+                <input type="text" class="input-field" id="username" placeholder="Username" style="margin-bottom: 0;">
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                <span style="font-size: 12px; color: var(--text-muted); width: 35px;">Pass</span>
+                <input type="password" class="input-field" id="password" placeholder="Password" style="margin-bottom: 0;">
+              </div>
+              <button class="btn-login" onclick="performLogin()">Login</button>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Middle Column: Logo, News & Main Actions -->
-    <div class="main-content" style="grid-column: 2;">
-      <div class="logo-header">
-        <img src="../icons/pcmod.png" alt="PCMod Client" id="logoImg">
+    <!-- 2. MODLIST VIEW -->
+    <div id="modlistView" class="view-panel panel" style="display: none; flex-direction: column;">
+      <div class="header-bar">
+        <button class="btn-back" onclick="showMainView()">← Back to Launcher</button>
+        <div style="font-weight: 700; font-size: 16px; color: #38bdf8;" id="modlistTitle">
+          Mod List (<span id="modlistCount">0</span> mods) - Pack: <span id="modlistPack">2-5-x</span>
+        </div>
+        <input type="text" class="input-field" id="modSearch" placeholder="Filter mods..." oninput="filterModList()" style="width: 180px; margin-bottom: 0;">
       </div>
-
-      <div class="panel news-card">
-        <iframe src="news.html" class="news-iframe" id="newsIframe"></iframe>
+      <div class="table-container">
+        <table class="mod-table">
+          <thead>
+            <tr>
+              <th>Mod Name</th>
+              <th>Requirement / Side</th>
+              <th>Version Added/Updated</th>
+            </tr>
+          </thead>
+          <tbody id="modTableBody">
+            <tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Loading mod list...</td></tr>
+          </tbody>
+        </table>
       </div>
-
-      <div class="action-bar">
-        <button class="btn-launch" onclick="launchGame()">LAUNCH</button>
-        <button class="btn-update" onclick="updateGame()">UPDATE</button>
-      </div>
-
-      <div class="version-footer" id="versionFooter">Launcher: 1.2a / Pack: 2.5.3a</div>
     </div>
 
-    <!-- Right Column: Settings & Account Login -->
-    <div class="main-content" style="grid-column: 3;">
-      <div class="panel right-sidebar" style="width: 100%; height: 100%;">
-        <div class="panel-title">Settings</div>
+    <!-- 3. UPDATER VIEW -->
+    <div id="updateView" class="view-panel panel" style="display: none; flex-direction: column;">
+      <div class="header-bar">
+        <button class="btn-back" onclick="showMainView()">← Back to Launcher</button>
+        <div style="font-weight: 700; font-size: 16px; color: #38bdf8;">PCMod GUI Updater</div>
+        <div style="font-size: 12px; color: var(--text-muted);" id="updaterVersionText">Checking versions...</div>
+      </div>
 
-        <div class="setting-row">
-          <label for="shortcut">Shortcut</label>
-          <input type="checkbox" id="shortcut" onchange="toggleShortcut()">
-        </div>
-        <div class="setting-row">
-          <label for="autoserver">Auto Server</label>
-          <input type="checkbox" id="autoserver" onchange="toggleAutoServer()">
-        </div>
-        <div class="setting-row">
-          <label for="loglogins">Log Logins</label>
-          <input type="checkbox" id="loglogins" onchange="toggleLogLogins()">
-        </div>
-        <div class="setting-row">
-          <label for="litemode">Lite Mode</label>
-          <input type="checkbox" id="litemode" onchange="toggleLiteMode()">
-        </div>
-        <div class="setting-row">
-          <label for="showconsole">Console</label>
-          <input type="checkbox" id="showconsole" onchange="toggleShowConsole()">
-        </div>
-        <div class="setting-row" style="margin-top: 4px;">
-          <label for="selver">Version</label>
-          <select id="selver" onchange="changeVersion()">
-            <option value="">Default</option>
-          </select>
-        </div>
-        <div class="setting-row">
-          <label for="maxram">Memory</label>
-          <input type="number" id="maxram" value="4096" step="512" min="1024" onchange="changeMemory()">
+      <!-- Updater Status & Progress Card -->
+      <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid var(--card-border); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+        <div style="font-size: 14px; font-weight: 700; color: #38bdf8;" id="updateTitle">Updater Menu</div>
+        <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;" id="updateMessage">Select an update option below.</div>
+
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="updateProgressFill"></div>
         </div>
 
-        <hr style="border: none; border-top: 1px solid var(--card-border); margin: 8px 0 8px 0;">
-
-        <div style="display: flex; flex-direction: column; gap: 6px;">
-          <button class="btn-secondary" onclick="launchServer()">Launch Server</button>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+          <span id="updateProgressText">0%</span>
         </div>
+      </div>
 
-        <div class="login-section">
-          <div class="login-msg" id="loginMsg"></div>
-          <div style="border-top: 1px solid var(--card-border); padding-top: 8px;">
-            <div class="panel-title" style="margin-bottom: 6px;">Login</div>
-            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-              <span style="font-size: 12px; color: var(--text-muted); width: 35px;">User</span>
-              <input type="text" class="input-field" id="username" placeholder="Username" style="margin-bottom: 0;">
-            </div>
-            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
-              <span style="font-size: 12px; color: var(--text-muted); width: 35px;">Pass</span>
-              <input type="password" class="input-field" id="password" placeholder="Password" style="margin-bottom: 0;">
-            </div>
-            <button class="btn-login" onclick="performLogin()">Login</button>
-          </div>
+      <!-- Pack Downloader Sub-Panel Container -->
+      <div id="packCardsContainer" style="display: none; margin-top: 10px; flex: 1; overflow-y: auto; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 10px; padding: 10px;">
+        <div style="font-size: 13px; font-weight: 700; color: #38bdf8; margin-bottom: 8px;">Available Packs Manifest</div>
+        <div id="packCardsList" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;"></div>
+      </div>
+
+      <!-- 6 Menu Action Buttons -->
+      <div class="updater-grid" style="margin-top: auto;">
+        <button class="updater-btn" onclick="showPackDownloaderCards()">
+          <span style="font-size: 18px;">📦</span>
+          <span>Pack Downloader</span>
+        </button>
+        <button class="updater-btn" onclick="hidePackCards(); runUpdateAction('refresh_mods');">
+          <span style="font-size: 18px;">🔄</span>
+          <span>Refresh Mods</span>
+        </button>
+        <button class="updater-btn" onclick="hidePackCards(); runUpdateAction('auto');">
+          <span style="font-size: 18px;">⚡</span>
+          <span>Auto Update</span>
+        </button>
+        <button class="updater-btn" onclick="hidePackCards(); runUpdateAction('launcher_update');">
+          <span style="font-size: 18px;">🚀</span>
+          <span>Launcher Update</span>
+        </button>
+        <button class="updater-btn" onclick="hidePackCards(); runUpdateAction('pack_update');">
+          <span style="font-size: 18px;">🎮</span>
+          <span>Pack Update</span>
+        </button>
+        <button class="updater-btn" onclick="cancelOrCloseUpdate()">
+          <span style="font-size: 18px;">❌</span>
+          <span>Cancel Install</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 4. UPDATE NOTIFICATION MODAL -->
+    <div id="updateAlertModal" class="modal-overlay" style="display: none;">
+      <div class="modal-card">
+        <div style="font-size: 18px; font-weight: 800; color: #38bdf8; margin-bottom: 8px;">New Update Available!</div>
+        <div style="font-size: 13px; color: var(--text-main); margin-bottom: 16px;" id="updateAlertDetails">
+          A new update was found for PCMod.
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+          <button class="btn-login" style="width: 140px; margin-top:0;" onclick="startModalAutoUpdate()">Update Now</button>
+          <button class="btn-secondary" style="width: 100px;" onclick="closeUpdateModal()">Later</button>
         </div>
       </div>
     </div>
@@ -448,15 +692,80 @@
 
   <script>
     var isInitialized = false;
+    var allModsCache = [];
+
+    var currentGameLaunchState = 'idle';
+    var isUpdateActive = false;
+
+    function onGameLaunchState(state) {
+      currentGameLaunchState = state;
+      var launchBtn = document.getElementById('launchBtn');
+      var mainText = document.getElementById('launchBtnText');
+      var subText = document.getElementById('launchBtnSubText');
+      var u = document.getElementById('username').value;
+
+      if (!launchBtn) return;
+
+      if (state === 'downloading') {
+        launchBtn.disabled = true;
+        launchBtn.style.opacity = '0.7';
+        launchBtn.style.cursor = 'not-allowed';
+        if (mainText) mainText.innerText = 'LAUNCHING...';
+        if (subText) subText.style.display = 'block';
+      } else if (state === 'running') {
+        launchBtn.disabled = true;
+        launchBtn.style.opacity = '0.5';
+        launchBtn.style.cursor = 'not-allowed';
+        if (mainText) mainText.innerText = 'GAME RUNNING...';
+        if (subText) subText.style.display = 'none';
+      } else {
+        // Idle
+        if (mainText) mainText.innerText = 'LAUNCH';
+        if (subText) subText.style.display = 'none';
+        updateLaunchButtonState(u);
+      }
+    }
+
+    function updateLaunchButtonState(username) {
+      if (currentGameLaunchState !== 'idle') return;
+      var launchBtn = document.getElementById('launchBtn');
+      var isLoggedIn = username && username.trim() !== "";
+
+      if (isUpdateActive) {
+        if (launchBtn) {
+          launchBtn.disabled = true;
+          launchBtn.style.opacity = '0.5';
+          launchBtn.style.cursor = 'not-allowed';
+          launchBtn.title = 'Update in progress...';
+        }
+        return;
+      }
+
+      if (launchBtn) {
+        launchBtn.disabled = !isLoggedIn;
+        if (!isLoggedIn) {
+          launchBtn.style.opacity = '0.5';
+          launchBtn.style.cursor = 'not-allowed';
+          launchBtn.title = 'Please enter a username and login first!';
+        } else {
+          launchBtn.style.opacity = '1.0';
+          launchBtn.style.cursor = 'pointer';
+          launchBtn.title = 'Launch Game';
+        }
+      }
+    }
 
     function initLauncher() {
       if (!window.pywebview || !window.pywebview.api) return;
       window.pywebview.api.init_launcher().then(function(data) {
         if (!data) return;
 
-        // 1. User
+        // 1. User & Launch restriction
         if (data.user) {
           document.getElementById('username').value = data.user;
+          updateLaunchButtonState(data.user);
+        } else {
+          updateLaunchButtonState("");
         }
 
         // 2. Settings Checkboxes
@@ -471,14 +780,22 @@
           }
         }
 
-        // 3. Mod count
+        // 3. Mod count label: Mod List (--- mods)
         if (data.modcount !== undefined) {
-          document.getElementById('modcount').innerText = data.modcount;
+          document.getElementById('modlistBtn').innerText = "Mod List (" + data.modcount + " mods)";
         }
 
         // 4. Version footer
         if (data.launcher_version && data.pack_version) {
           document.getElementById('versionFooter').innerText = "Launcher: " + data.launcher_version + " / Pack: " + data.pack_version;
+        }
+
+        // Prompt if main default pack from line 2 of version file is missing
+        if (data.main_pack && data.main_pack_installed === false) {
+          if (confirm("Main Pack (" + data.main_pack + ") is not installed.\n\nDo you want to Download Main Pack: (" + data.main_pack + ")?")) {
+            openUpdateViewWithAction('download_full_pack', data.main_pack);
+            return;
+          }
         }
 
         // 5. Version dropdown select
@@ -497,8 +814,8 @@
           }
         }
 
-        // 6. Refresh players online asynchronously without blocking UI
         refreshPlayers();
+        checkUpdatesOnStartup();
       });
     }
 
@@ -518,6 +835,194 @@
       }
     });
 
+    // View Navigation
+    function showMainView() {
+      document.getElementById('mainView').style.display = 'grid';
+      document.getElementById('modlistView').style.display = 'none';
+      document.getElementById('updateView').style.display = 'none';
+      initLauncher();
+    }
+
+    function showModList() {
+      document.getElementById('mainView').style.display = 'none';
+      document.getElementById('modlistView').style.display = 'flex';
+      document.getElementById('updateView').style.display = 'none';
+
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.get_modlist().then(function(res) {
+          if (!res) return;
+          allModsCache = res.mods || [];
+          document.getElementById('modlistCount').innerText = res.count || allModsCache.length;
+          document.getElementById('modlistBtn').innerText = "Mod List (" + (res.count || allModsCache.length) + " mods)";
+          document.getElementById('modlistPack').innerText = res.pack || '';
+          renderModTable(allModsCache);
+        });
+      }
+    }
+
+    function renderModTable(mods) {
+      var tbody = document.getElementById('modTableBody');
+      tbody.innerHTML = '';
+      if (!mods || mods.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">No mods found.</td></tr>';
+        return;
+      }
+      for (var i = 0; i < mods.length; i++) {
+        var m = mods[i];
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td>' + m.name + '</td><td>' + m.side + '</td><td>' + m.version + '</td>';
+        tbody.appendChild(tr);
+      }
+    }
+
+    function filterModList() {
+      var query = document.getElementById('modSearch').value.toLowerCase();
+      var filtered = allModsCache.filter(function(m) {
+        return m.name.toLowerCase().includes(query) || m.side.toLowerCase().includes(query) || m.version.toLowerCase().includes(query);
+      });
+      renderModTable(filtered);
+    }
+
+    function hidePackCards() {
+      var container = document.getElementById('packCardsContainer');
+      if (container) container.style.display = 'none';
+    }
+
+    function showPackDownloaderCards() {
+      var container = document.getElementById('packCardsContainer');
+      if (!container) return;
+      if (container.style.display === 'block') {
+        container.style.display = 'none';
+        return;
+      }
+      container.style.display = 'block';
+
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.get_available_packs_manifest().then(function(res) {
+          var listDiv = document.getElementById('packCardsList');
+          if (!listDiv || !res || !res.packs) return;
+          listDiv.innerHTML = '';
+          for (var i = 0; i < res.packs.length; i++) {
+            var p = res.packs[i];
+            var card = document.createElement('div');
+            card.style.background = 'rgba(15, 23, 42, 0.9)';
+            card.style.border = '1px solid var(--card-border)';
+            card.style.borderRadius = '8px';
+            card.style.padding = '10px';
+            card.style.display = 'flex';
+            card.style.flexDirection = 'column';
+            card.style.justifySpaceBetween = 'space-between';
+
+            var statusBadge = p.installed ? '<span style="color:#10b981; font-size:11px; font-weight:bold;">[Installed]</span>' : '<span style="color:#eab308; font-size:11px; font-weight:bold;">[Not Installed]</span>';
+
+            card.innerHTML = '<div style="font-weight:bold; color:#f8fafc; font-size:13px;">Pack: ' + p.name + ' ' + statusBadge + '</div>' +
+                             '<div style="font-size:11px; color:var(--text-muted); margin: 4px 0 8px 0;">Version: ' + p.version + ' | Loader: ' + p.modloader + '</div>' +
+                             '<button class="btn-secondary" style="padding:6px; font-size:11px;" onclick="runUpdateAction(\'download_full_pack\', \'' + p.name + '\')">Download Pack (' + p.name + ')</button>';
+            listDiv.appendChild(card);
+          }
+        });
+      }
+    }
+
+    function showUpdateView() {
+      document.getElementById('mainView').style.display = 'none';
+      document.getElementById('modlistView').style.display = 'none';
+      document.getElementById('updateView').style.display = 'flex';
+
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.check_updates().then(function(info) {
+          if (!info) return;
+          var text = "Launcher: v" + info.current_launcher + " / Pack " + info.pack + ": v" + info.current_pack;
+          if (info.launcher_update) text += " [New Launcher v" + info.launcher_update + " available!]";
+          if (info.pack_update) text += " [New Pack v" + info.pack_update + " available!]";
+          document.getElementById('updaterVersionText').innerText = text;
+        });
+      }
+    }
+
+    function openUpdateViewWithAction(action, targetVer) {
+      showUpdateView();
+      runUpdateAction(action, targetVer);
+    }
+
+    function cancelOrCloseUpdate() {
+      hidePackCards();
+      if (isUpdateActive && window.pywebview && window.pywebview.api) {
+        window.pywebview.api.cancel_update_action();
+        document.getElementById('updateTitle').innerText = "Cancelling Update...";
+        document.getElementById('updateMessage').innerText = "Cleaning up...";
+      } else {
+        showMainView();
+      }
+    }
+
+    function runUpdateAction(action, targetVer) {
+      isUpdateActive = true;
+      updateLaunchButtonState(document.getElementById('username').value);
+      document.getElementById('updateTitle').innerText = "Running " + action + "...";
+      document.getElementById('updateMessage').innerText = "Starting task...";
+      document.getElementById('updateProgressFill').style.width = "0%";
+      document.getElementById('updateProgressText').innerText = "0%";
+
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.run_update_action(action, targetVer);
+      }
+    }
+
+    // Progress updates from Python
+    window.onUpdateProgress = function(info) {
+      if (!info) return;
+      if (info.title) document.getElementById('updateTitle').innerText = info.title;
+      if (info.message) document.getElementById('updateMessage').innerText = info.message;
+      if (info.percent !== undefined) {
+        document.getElementById('updateProgressFill').style.width = info.percent + "%";
+        document.getElementById('updateProgressText').innerText = info.percent + "%";
+      }
+
+      if (info.update_in_progress !== undefined) {
+        isUpdateActive = info.update_in_progress;
+        updateLaunchButtonState(document.getElementById('username').value);
+      } else if (info.status === 'downloading' || info.status === 'extracting' || info.status === 'installing') {
+        isUpdateActive = true;
+        updateLaunchButtonState(document.getElementById('username').value);
+      } else if (info.status === 'complete' || info.status === 'error' || info.status === 'cancelled') {
+        isUpdateActive = false;
+        updateLaunchButtonState(document.getElementById('username').value);
+        initLauncher();
+        var container = document.getElementById('packCardsContainer');
+        if (container && container.style.display === 'block') {
+          container.style.display = 'none';
+          showPackDownloaderCards();
+        }
+      }
+    };
+
+    function checkUpdatesOnStartup() {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.check_updates().then(function(info) {
+          if (info && info.update_available) {
+            var details = "";
+            if (info.launcher_update) details += "New Launcher Update v" + info.launcher_update + " is available.<br>";
+            if (info.pack_update) details += "New Pack Update v" + info.pack_update + " is available.<br>";
+            details += "Click Update Now to install.";
+            document.getElementById('updateAlertDetails').innerHTML = details;
+            document.getElementById('updateAlertModal').style.display = 'flex';
+          }
+        });
+      }
+    }
+
+    function closeUpdateModal() {
+      document.getElementById('updateAlertModal').style.display = 'none';
+    }
+
+    function startModalAutoUpdate() {
+      closeUpdateModal();
+      showUpdateView();
+      runUpdateAction('auto');
+    }
+
+    // Settings
     function toggleShortcut() {
       var val = document.getElementById('shortcut').checked ? "1" : "0";
       if (window.pywebview && window.pywebview.api) {
@@ -596,18 +1101,14 @@
           if (res && res.success) {
             msgDiv.style.color = '#10b981';
             msgDiv.innerText = 'Login successful!';
+            updateLaunchButtonState(u);
             initLauncher();
           } else {
             msgDiv.style.color = '#ef4444';
             msgDiv.innerText = (res && res.message) ? res.message : 'Login failed';
+            updateLaunchButtonState("");
           }
         });
-      }
-    }
-
-    function openModlist() {
-      if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.open_modlist();
       }
     }
 
@@ -618,15 +1119,18 @@
     }
 
     function launchGame() {
+      var u = document.getElementById('username').value;
+      if (!u || u.trim() === "") {
+        alert("Please enter a username and login first!");
+        return;
+      }
       if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.launch_game();
       }
     }
 
     function updateGame() {
-      if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.update_game();
-      }
+      showUpdateView();
     }
 
     function launchServer() {
