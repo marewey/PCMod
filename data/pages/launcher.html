@@ -209,9 +209,10 @@
       box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
       transition: all 0.2s;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 2px;
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
     }
 
@@ -521,7 +522,10 @@
         </div>
 
         <div class="action-bar">
-          <button class="btn-launch" id="launchBtn" onclick="launchGame()">LAUNCH</button>
+          <button class="btn-launch" id="launchBtn" onclick="launchGame()">
+            <span id="launchBtnText">LAUNCH</span>
+            <span id="launchBtnSubText" style="display: none; font-size: 10px; font-weight: 500; margin-top: 2px; color: #bae6fd;">Downloading Missing Resources...</span>
+          </button>
           <button class="btn-update" onclick="showUpdateView()">UPDATE</button>
         </div>
 
@@ -685,7 +689,40 @@
     var isInitialized = false;
     var allModsCache = [];
 
+    var currentGameLaunchState = 'idle';
+
+    function onGameLaunchState(state) {
+      currentGameLaunchState = state;
+      var launchBtn = document.getElementById('launchBtn');
+      var mainText = document.getElementById('launchBtnText');
+      var subText = document.getElementById('launchBtnSubText');
+      var u = document.getElementById('username').value;
+      var isLoggedIn = u && u.trim() !== "";
+
+      if (!launchBtn) return;
+
+      if (state === 'downloading') {
+        launchBtn.disabled = true;
+        launchBtn.style.opacity = '0.7';
+        launchBtn.style.cursor = 'not-allowed';
+        if (mainText) mainText.innerText = 'LAUNCHING...';
+        if (subText) subText.style.display = 'block';
+      } else if (state === 'running') {
+        launchBtn.disabled = true;
+        launchBtn.style.opacity = '0.5';
+        launchBtn.style.cursor = 'not-allowed';
+        if (mainText) mainText.innerText = 'GAME RUNNING...';
+        if (subText) subText.style.display = 'none';
+      } else {
+        // Idle
+        if (mainText) mainText.innerText = 'LAUNCH';
+        if (subText) subText.style.display = 'none';
+        updateLaunchButtonState(u);
+      }
+    }
+
     function updateLaunchButtonState(username) {
+      if (currentGameLaunchState !== 'idle') return;
       var launchBtn = document.getElementById('launchBtn');
       var isLoggedIn = username && username.trim() !== "";
       if (launchBtn) {

@@ -303,20 +303,37 @@ def rot13_5(text):
             res.append(ch)
     return "".join(res)
 
-def run_xcode_auth_index(username):
+def read_auth_token(username):
     auth_file = os.path.join(DATA_DIR, "indexes", "auth")
     xcode_exe = os.path.join(BIN_DIR, "xcode.exe")
-    if os.path.exists(xcode_exe):
+    if not os.path.exists(auth_file):
+        return None
+    token = None
+    if os.path.exists(xcode_exe) and username:
         try:
+            # Decrypt auth file temporarily
             proc = subprocess.Popen([xcode_exe, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
             proc.communicate(input=f"{username}\r\n".encode('utf-8'), timeout=2)
-            log_init(f"Wrote xcode auth file to {auth_file}")
-        except Exception as e:
-            log_init(f"xcode auth file creation error: {e}")
+            with open(auth_file, "r", encoding="utf-8", errors="ignore") as f:
+                token = f.readline().strip()
+            # Re-encrypt auth file
+            proc2 = subprocess.Popen([xcode_exe, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
+            proc2.communicate(input=f"{username}\r\n".encode('utf-8'), timeout=2)
+        except Exception:
+            pass
+    if not token and os.path.exists(auth_file):
+        try:
+            with open(auth_file, "r", encoding="utf-8", errors="ignore") as f:
+                token = f.readline().strip()
+        except Exception:
+            pass
+    return token
 
-def get_xcode_auth(username, password):
+def write_encrypted_auth(username, password):
     if not username or not password:
         return ""
+    auth_file = os.path.join(DATA_DIR, "indexes", "auth")
+    os.makedirs(os.path.dirname(auth_file), exist_ok=True)
 
     raw_hash = hashlib.md5(password.encode('utf-8')).hexdigest()
 
@@ -336,8 +353,29 @@ def get_xcode_auth(username, password):
         except Exception:
             pass
 
+    try:
+        with open(auth_file, "w", encoding="utf-8") as f:
+            f.write(raw_hash + "\n")
+        log_init(f"Saved plain auth token to {auth_file}")
+    except Exception as e:
+        log_init(f"Error writing auth file: {e}")
+
+    if os.path.exists(xcode_exe):
+        try:
+            proc = subprocess.Popen([xcode_exe, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
+            proc.communicate(input=f"{username}\r\n".encode('utf-8'), timeout=2)
+            log_init(f"Encrypted auth file with xcode.exe at {auth_file}")
+        except Exception as e:
+            log_init(f"xcode auth file encryption error: {e}")
+
+    return raw_hash
+
+def get_xcode_auth(username, password):
+    if not username or not password:
+        return ""
+
+    raw_hash = write_encrypted_auth(username, password)
     log_init(f"Auth token generated: {raw_hash}")
-    run_xcode_auth_index(username)
 
     if not raw_hash.startswith("\\"):
         return f"\\{raw_hash}"
@@ -361,12 +399,66 @@ def get_uuid_tool_uuid(username):
     return get_offline_uuid(username)
 
 def load_user_info():
+    auth_file = os.path.join(DATA_DIR, "indexes", "auth")
     s = read_settings()
-    u = s.get("username", "")
-    p = s.get("password", "")
-    if u:
+    u = s.get("username", "").strip()
+
+    if not os.path.exists(auth_file) or not u:
+        USER_INFO["username"] = ""
+        USER_INFO["auth_token"] = ""
+        USER_INFO["valid"] = False
+        if u:
+            s["username"] = ""
+            write_settings(s)
+        return
+
+    token = read_auth_token(u)
+    if not token:
+        USER_INFO["username"] = ""
+        USER_INFO["auth_token"] = ""
+        USER_INFO["valid"] = False
+        s["username"] = ""
+        write_settings(s)
+        return
+
+    formatted_token = token if token.startswith("\\") else f"\\{token}"
+
+    # Test server connection if online
+    auth_url = "http://pcmod.ddns.me/commands/authp.php"
+    post_data = urllib.parse.urlencode({
+        'x': formatted_token,
+        'u': u,
+        'z': 'auth'
+    }).encode('utf-8')
+
+    server_rejected = False
+    try:
+        req = urllib.request.Request(auth_url, data=post_data, headers={'User-Agent': 'Mozilla/5.0'})
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(req, timeout=2.0, context=ctx) as resp:
+            body = resp.read().decode('utf-8', errors='ignore').strip()
+            if "401.auth" in body or "incorrect" in body.lower():
+                server_rejected = True
+    except Exception:
+        # Offline: allow launch since auth file exists!
+        pass
+
+    if server_rejected:
+        if os.path.exists(auth_file):
+            try:
+                os.remove(auth_file)
+            except Exception:
+                pass
+        USER_INFO["username"] = ""
+        USER_INFO["auth_token"] = ""
+        USER_INFO["valid"] = False
+        s["username"] = ""
+        write_settings(s)
+    else:
         USER_INFO["username"] = u
-        USER_INFO["auth_token"] = get_xcode_auth(u, p)
+        USER_INFO["auth_token"] = formatted_token
         USER_INFO["uuid"] = get_uuid_tool_uuid(u)
         USER_INFO["valid"] = True
         update_console_title(u)
@@ -908,23 +1000,20 @@ class Api:
 
                 if "401.auth" in body or "incorrect" in body.lower():
                     log_init(f"Login REJECTED: Password incorrect for {username} ({body})")
-                    return {"success": False, "message": "Password was incorrect. Try again."}
-                elif "200.auth" in body or "200" in body or "Login Successful" in body or body == "1":
-                    server_auth_success = True
-                    USER_INFO["username"] = username
-                    USER_INFO["auth_token"] = auth_token
-                    USER_INFO["uuid"] = get_uuid_tool_uuid(username)
-                    USER_INFO["valid"] = True
-                    update_console_title(username)
+                    auth_file = os.path.join(DATA_DIR, "indexes", "auth")
+                    if os.path.exists(auth_file):
+                        try:
+                            os.remove(auth_file)
+                        except Exception:
+                            pass
+                    USER_INFO["username"] = ""
+                    USER_INFO["auth_token"] = ""
+                    USER_INFO["valid"] = False
                     s = read_settings()
-                    s["username"] = username
+                    s["username"] = ""
                     write_settings(s)
-                    log_init(f"Login SUCCESSFUL for {username}")
-                    # Telemetry reporting with 'in' state
-                    threading.Thread(target=send_login2_telemetry, args=("in",), daemon=True).start()
-                    return {"success": True, "message": "Login successful!"}
+                    return {"success": False, "message": "Password was incorrect. Try again."}
                 else:
-                    log_init(f"Login status string: {body}")
                     server_auth_success = True
                     USER_INFO["username"] = username
                     USER_INFO["auth_token"] = auth_token
@@ -939,7 +1028,7 @@ class Api:
         except Exception as e:
             log_init(f"Auth Network Exception ({e})")
 
-        # Offline Mode logic: Allow offline login ONLY if user was previously logged in and auth file exists!
+        # Offline Mode logic: Allow offline login ONLY if auth file exists!
         auth_file = os.path.join(DATA_DIR, "indexes", "auth")
         if os.path.exists(auth_file) and not server_auth_success:
             USER_INFO["username"] = username
@@ -954,6 +1043,11 @@ class Api:
             return {"success": True, "message": "Offline mode login set"}
 
         log_init(f"Login REJECTED: Unable to authenticate user {username}")
+        s = read_settings()
+        s["username"] = ""
+        write_settings(s)
+        USER_INFO["username"] = ""
+        USER_INFO["valid"] = False
         return {"success": False, "message": "Login failed: Server offline and no saved authentication session."}
 
     def launch_game(self, *args, **kwargs):
@@ -1023,7 +1117,20 @@ class Api:
             autoserver_args = ["--server", "plattecraft.ddns.net", "--server-port", port]
             cmd.extend(autoserver_args)
 
-        log_init(f"Executing PMC command: {' '.join(cmd)}")
+        # Check if modloader/assets/version structure is missing
+        needs_install = False
+        vinfo = read_version_info(pack)
+        modloader = vinfo.get("modloader", "").lower()
+        mcversion = vinfo.get("mcversion", "")
+        mlversion = vinfo.get("mlversion", "")
+
+        pack_dir = os.path.join(DATA_DIR, "packs", pack)
+        if not os.path.exists(pack_dir):
+            needs_install = True
+        elif not os.path.exists(os.path.join(pack_dir, "assets", "indexes")):
+            needs_install = True
+        elif modloader != "vanilla" and not os.path.exists(os.path.join(pack_dir, "versions", f"{modloader}-{mcversion}-{mlversion}")):
+            needs_install = True
 
         proc_env = os.environ.copy()
         pmc_dir = os.path.join(BIN_DIR, "pmc")
@@ -1032,24 +1139,42 @@ class Api:
         else:
             proc_env["PYTHONPATH"] = pmc_dir
 
-        try:
-            launch_log = os.path.join(DATA_DIR, "launch.log")
-            with open(launch_log, "a", encoding="utf-8") as lf:
-                lf.write(f"\n=== PMC Launch {datetime.now()} ===\n")
+        def launch_runner():
+            try:
+                if needs_install:
+                    log_init(f"Modloader/assets missing for pack '{pack}'. Downloading missing resources...")
+                    if self._window:
+                        self._window.evaluate_js("onGameLaunchState('downloading');")
+                    dry_cmd = [sys.executable, "-m", "portablemc", "--main-dir", DATA_DIR, "--work-dir", pack_dir, "start", "--dry", m_version]
+                    try:
+                        p_dry = subprocess.Popen(dry_cmd, env=proc_env, cwd=BASE_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+                        for line in iter(p_dry.stdout.readline, ''):
+                            sys.stdout.write(line)
+                            sys.stdout.flush()
+                        p_dry.wait()
+                    except Exception as e:
+                        log_init(f"Dry run resource setup error: {e}")
 
-            proc = subprocess.Popen(cmd, env=proc_env, cwd=BASE_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+                if self._window:
+                    self._window.evaluate_js("onGameLaunchState('running');")
 
-            def stream_output(process):
+                log_init(f"Executing PMC command: {' '.join(cmd)}")
+                launch_log = os.path.join(DATA_DIR, "launch.log")
                 with open(launch_log, "a", encoding="utf-8") as lf:
-                    for line in iter(process.stdout.readline, ''):
+                    lf.write(f"\n=== PMC Launch {datetime.now()} ===\n")
+
+                proc = subprocess.Popen(cmd, env=proc_env, cwd=BASE_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+
+                with open(launch_log, "a", encoding="utf-8") as lf:
+                    for line in iter(proc.stdout.readline, ''):
                         sys.stdout.write(line)
                         sys.stdout.flush()
                         lf.write(line)
                         lf.flush()
-                process.wait()
-                log_init(f"Game process exited with code {process.returncode}")
+                proc.wait()
+                log_init(f"Game process exited with code {proc.returncode}")
 
-                if process.returncode != 0:
+                if proc.returncode != 0:
                     threading.Thread(target=send_login2_telemetry, args=("crash",), daemon=True).start()
                     try:
                         ftp_str = rot13_5("cg32.3pzbq.qqaf.zr")
@@ -1064,8 +1189,12 @@ class Api:
                         log_init("Crash log uploaded via FTP successfully")
                     except Exception:
                         pass
+            finally:
+                if self._window:
+                    self._window.evaluate_js("onGameLaunchState('idle');")
 
-            t = threading.Thread(target=stream_output, args=(proc,))
+        try:
+            t = threading.Thread(target=launch_runner)
             t.daemon = True
             t.start()
             return True
