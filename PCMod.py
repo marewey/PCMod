@@ -490,7 +490,7 @@ def send_login2_telemetry(state="launcher"):
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
-        with urllib.request.urlopen(req, timeout=3.0, context=ctx) as resp:
+        with urllib.request.urlopen(req, timeout=12.0, context=ctx) as resp:
             resp.read()
     except Exception as e:
         log_init(f"login2.php telemetry exception: {e}")
@@ -961,7 +961,7 @@ class Api:
             pass
 
         # Execution using PYTHONPATH=bin/pmc and python -m portablemc to prevent http.py import shadowing!
-        cmd = [sys.executable, "-m", "portablemc", "--main-dir", DATA_DIR, "--work-dir", os.path.join(DATA_DIR, "packs", pack), "start", f"fabric:{pack}", "-u", username, "-i", mcuuid, "--jvm-args", f"-Xmx{maxram}M"]
+        cmd = [sys.executable, "-m", "portablemc", "--main-dir", DATA_DIR, "--work-dir", os.path.join(DATA_DIR, "packs", pack), "start", f"fabric:{pack}", "-u", username, "-i", mcuuid, f"--jvm-args=-Xmx{maxram}M"]
 
         if autoserver:
             port = "25565"
@@ -1233,7 +1233,7 @@ class Api:
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=3.0, context=ctx) as resp:
+        with urllib.request.urlopen(req, timeout=12.0, context=ctx) as resp:
                 resp.read()
             log_init("Server launch command sent successfully.")
             return True
