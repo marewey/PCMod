@@ -656,7 +656,7 @@ def toggle_desktop_shortcut(enable):
                 vbs_script = (
                     'Set ws = WScript.CreateObject("WScript.Shell")\n'
                     'desktopPath = ws.SpecialFolders("Desktop")\n'
-                    'shortcutPath = ws.BuildPath(desktopPath, "PCMod Client.lnk")\n'
+                    'shortcutPath = desktopPath & "\\PCMod Client.lnk"\n'
                     'Set sc = ws.CreateShortcut(shortcutPath)\n'
                     f'sc.TargetPath = "{target}"\n'
                     f'sc.Arguments = "{script_file}"\n'
@@ -674,7 +674,7 @@ def toggle_desktop_shortcut(enable):
                 vbs_script = (
                     'Set ws = WScript.CreateObject("WScript.Shell")\n'
                     'desktopPath = ws.SpecialFolders("Desktop")\n'
-                    'shortcutPath = ws.BuildPath(desktopPath, "PCMod Client.lnk")\n'
+                    'shortcutPath = desktopPath & "\\PCMod Client.lnk"\n'
                     'Set fso = CreateObject("Scripting.FileSystemObject")\n'
                     'If fso.FileExists(shortcutPath) Then fso.DeleteFile(shortcutPath)\n'
                 )
