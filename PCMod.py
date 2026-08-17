@@ -162,9 +162,12 @@ def get_pack_name():
             pass
     return "2-5-x"
 
-def read_version_indexes(pack_name):
+def read_version_info(pack_name):
     launcher_ver = "1.2a"
     pack_ver = "2.5.3a"
+    modloader = "forge"
+    mcversion = "1.20.1"
+    mlversion = "47.4.10"
 
     version_files = [
         os.path.join(DATA_DIR, "indexes", "version"),
@@ -184,10 +187,41 @@ def read_version_indexes(pack_name):
                                 launcher_ver = ver
                             elif key == pack_name:
                                 pack_ver = ver
+                                if len(parts) >= 3 and parts[2].strip():
+                                    modloader = parts[2].strip()
+                                if len(parts) >= 4 and parts[3].strip():
+                                    mcversion = parts[3].strip()
+                                if len(parts) >= 5 and parts[4].strip():
+                                    mlversion = parts[4].strip()
             except Exception:
                 pass
 
-    return launcher_ver, pack_ver
+    return {
+        "launcher_ver": launcher_ver,
+        "pack_ver": pack_ver,
+        "modloader": modloader,
+        "mcversion": mcversion,
+        "mlversion": mlversion
+    }
+
+def read_version_indexes(pack_name):
+    info = read_version_info(pack_name)
+    return info["launcher_ver"], info["pack_ver"]
+
+def get_portablemc_version_spec(pack_name):
+    info = read_version_info(pack_name)
+    ml = info["modloader"].lower()
+    mc = info["mcversion"]
+    mver = info["mlversion"]
+
+    if ml == "vanilla":
+        return mc
+    elif ml == "fabric":
+        return f"fabric:{mc}:{mver}" if mver else f"fabric:{mc}"
+    elif ml == "#-btw":
+        return mver
+    else: # default forge or other loaders
+        return f"{ml}:{mc}-{mver}" if mver else f"{ml}:{mc}"
 
 def update_version_index(key, new_ver):
     vfile = os.path.join(DATA_DIR, "indexes", "version")
@@ -543,10 +577,12 @@ def check_updates_server():
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
         with urllib.request.urlopen(req, timeout=3.0, context=ctx) as resp:
-            content = resp.read().decode('utf-8', errors='ignore')
-            if content:
+            raw_text = resp.read().decode('utf-8', errors='ignore')
+            if raw_text:
+                lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+                clean_content = "\n".join(lines) + "\n"
                 with open(tmp_file, "w", encoding="utf-8") as f:
-                    f.write(content)
+                    f.write(clean_content)
     except Exception as e:
         log_init(f"Update check network warning: {e}")
 
@@ -973,8 +1009,11 @@ class Api:
             except Exception:
                 pass
 
+        # Resolve portablemc version target spec from version indexes (matching launch.bat %m-version%)
+        m_version = get_portablemc_version_spec(pack)
+
         # Execution using PYTHONPATH=bin/pmc and python -m portablemc to prevent http.py import shadowing!
-        cmd = [sys.executable, "-m", "portablemc", "--main-dir", DATA_DIR, "--work-dir", os.path.join(DATA_DIR, "packs", pack), "start", f"fabric:{pack}", "-u", username, "-i", mcuuid, f"--jvm-args={jvm_args_str}"]
+        cmd = [sys.executable, "-m", "portablemc", "--main-dir", DATA_DIR, "--work-dir", os.path.join(DATA_DIR, "packs", pack), "start", m_version, "-u", username, "-i", mcuuid, f"--jvm-args={jvm_args_str}"]
 
         if autoserver:
             port = "25565"
