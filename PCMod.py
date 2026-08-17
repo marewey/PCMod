@@ -737,8 +737,7 @@ def check_updates_server():
         "update_available": bool(launcher_update or pack_update)
     }
 
-def download_with_progress_and_size(url, dst_path, size_url=None, progress_callback=None, title="Downloading..."):
-    total_bytes = 0
+def get_remote_file_size(url, size_url=None):
     if size_url:
         try:
             req = urllib.request.Request(size_url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -748,9 +747,26 @@ def download_with_progress_and_size(url, dst_path, size_url=None, progress_callb
             with urllib.request.urlopen(req, timeout=2.5, context=ctx) as resp:
                 raw = resp.read().decode('utf-8', errors='ignore').strip()
                 if raw.isdigit():
-                    total_bytes = int(raw)
+                    return int(raw)
         except Exception:
             pass
+
+    try:
+        req = urllib.request.Request(url, method='HEAD', headers={'User-Agent': 'Mozilla/5.0'})
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(req, timeout=3.0, context=ctx) as resp:
+            cl = resp.headers.get('Content-Length')
+            if cl and cl.isdigit():
+                return int(cl)
+    except Exception:
+        pass
+
+    return 0
+
+def download_with_progress_and_size(url, dst_path, size_url=None, progress_callback=None, title="Downloading..."):
+    total_bytes = get_remote_file_size(url, size_url)
 
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
     ctx = ssl.create_default_context()
@@ -827,6 +843,22 @@ class Api:
         modcount = self.get_mod_count()
         launcher_ver, pack_ver = read_version_indexes(pack)
 
+        # Check line 2 of version file to determine main default pack
+        main_pack = pack
+        version_file = os.path.join(DATA_DIR, "indexes", "version")
+        if os.path.exists(version_file):
+            try:
+                with open(version_file, "r", encoding="utf-8", errors="ignore") as f:
+                    lines = [l.strip() for l in f if l.strip()]
+                    if len(lines) >= 2:
+                        parts = lines[1].split(";")
+                        if parts[0].strip():
+                            main_pack = parts[0].strip()
+            except Exception:
+                pass
+
+        main_pack_installed = os.path.exists(os.path.join(DATA_DIR, "packs", main_pack))
+
         return {
             "user": s.get("username", ""),
             "settings": {
@@ -843,6 +875,8 @@ class Api:
             "launcher_version": launcher_ver,
             "pack_version": pack_ver,
             "versions_list": get_versions_list(),
+            "main_pack": main_pack,
+            "main_pack_installed": main_pack_installed,
             "online_players": "Loading...",
             "news_url": "news.html"
         }
@@ -910,6 +944,40 @@ class Api:
             except Exception:
                 pass
         return 0
+
+    def get_available_packs_manifest(self, *args, **kwargs):
+        packs = []
+        vfile = os.path.join(DATA_DIR, "indexes", "version")
+        if os.path.exists(vfile):
+            try:
+                with open(vfile, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        parts = line.strip().split(";")
+                        if len(parts) >= 2:
+                            k = parts[0].strip()
+                            if k.lower() == "launcher":
+                                continue
+                            ver = parts[1].strip()
+                            loader = parts[2].strip() if len(parts) >= 3 else "forge"
+                            installed = os.path.exists(os.path.join(DATA_DIR, "packs", k))
+                            packs.append({
+                                "name": k,
+                                "version": ver,
+                                "modloader": loader,
+                                "installed": installed
+                            })
+            except Exception:
+                pass
+
+        if not packs:
+            packs = [{
+                "name": "2-5-x",
+                "version": "2.5.3a",
+                "modloader": "forge",
+                "installed": os.path.exists(os.path.join(DATA_DIR, "packs", "2-5-x"))
+            }]
+
+        return {"packs": packs}
 
     def get_modlist(self, *args, **kwargs):
         pack = get_pack_name()
@@ -1374,66 +1442,145 @@ class Api:
                 ver = target_version or "latest"
                 notify_progress({"status": "downloading", "title": f"Updating Launcher (v{ver})...", "percent": 10})
                 zip_path = os.path.join(DATA_DIR, "update", f"launcher_{ver}.zip")
-                url = f"http://pcmod.ddns.me/updates/launcher/launcher_{ver}.zip"
-                size_url = f"http://pcmod.ddns.me/updates/launcher/sizes/launcher_{ver}.size"
-                try:
-                    download_with_progress_and_size(url, zip_path, size_url, notify_progress, f"Downloading Launcher v{ver}")
-                    ext_dir = os.path.join(DATA_DIR, "update", f"launcher_{ver}")
-                    extract_zip_with_progress(zip_path, ext_dir, notify_progress, f"Extracting Launcher v{ver}")
-                    notify_progress({"status": "installing", "title": "Installing Launcher Update...", "percent": 90})
-                    for root, dirs, files in os.walk(ext_dir):
-                        rel_path = os.path.relpath(root, ext_dir)
-                        dst_dir = BASE_DIR if rel_path == "." else os.path.join(BASE_DIR, rel_path)
-                        os.makedirs(dst_dir, exist_ok=True)
-                        for file in files:
-                            src_file = os.path.join(root, file)
-                            dst_file = os.path.join(dst_dir, file)
-                            try:
-                                with open(src_file, "rb") as sf, open(dst_file, "wb") as df:
-                                    df.write(sf.read())
-                            except Exception:
-                                pass
-                    update_version_index("Launcher", ver)
-                    notify_progress({"status": "complete", "title": "Launcher Update Complete!", "message": "Restarting PCMod...", "percent": 100})
-                    threading.Thread(target=send_login2_telemetry, args=("updated",), daemon=True).start()
-                    time.sleep(1.5)
-                    restart_launcher()
-                    return
-                except Exception as e:
-                    notify_progress({"status": "error", "title": "Launcher Update Error", "message": str(e), "percent": 0})
+                urls = [
+                    f"http://pcmod.ddns.me/download/launcher/launcher-{ver}.zip",
+                    f"http://pcmod.ddns.me/updates/launcher/launcher_{ver}.zip"
+                ]
+                size_urls = [
+                    f"http://pcmod.ddns.me/download/launcher/sizes/launcher-{ver}.size",
+                    f"http://pcmod.ddns.me/updates/launcher/sizes/launcher_{ver}.size"
+                ]
+
+                downloaded = False
+                for u, su in zip(urls, size_urls):
+                    try:
+                        download_with_progress_and_size(u, zip_path, su, notify_progress, f"Downloading Launcher v{ver}")
+                        downloaded = True
+                        break
+                    except Exception as e:
+                        log_init(f"Launcher update download failed for {u}: {e}")
+
+                if downloaded and os.path.exists(zip_path):
+                    try:
+                        ext_dir = os.path.join(DATA_DIR, "update", f"launcher_{ver}")
+                        extract_zip_with_progress(zip_path, ext_dir, notify_progress, f"Extracting Launcher v{ver}")
+                        notify_progress({"status": "installing", "title": "Installing Launcher Update...", "percent": 90})
+                        for root, dirs, files in os.walk(ext_dir):
+                            rel_path = os.path.relpath(root, ext_dir)
+                            dst_dir = BASE_DIR if rel_path == "." else os.path.join(BASE_DIR, rel_path)
+                            os.makedirs(dst_dir, exist_ok=True)
+                            for file in files:
+                                src_file = os.path.join(root, file)
+                                dst_file = os.path.join(dst_dir, file)
+                                try:
+                                    with open(src_file, "rb") as sf, open(dst_file, "wb") as df:
+                                        df.write(sf.read())
+                                except Exception:
+                                    pass
+                        update_version_index("Launcher", ver)
+                        notify_progress({"status": "complete", "title": "Launcher Update Complete!", "message": "Restarting PCMod...", "percent": 100})
+                        threading.Thread(target=send_login2_telemetry, args=("updated",), daemon=True).start()
+                        time.sleep(1.5)
+                        restart_launcher()
+                        return
+                    except Exception as e:
+                        notify_progress({"status": "error", "title": "Launcher Update Error", "message": str(e), "percent": 0})
+                else:
+                    notify_progress({"status": "error", "title": "Launcher Update Error", "message": "Failed to download launcher update zip.", "percent": 0})
 
             elif action == "pack_update":
                 ver = target_version or "latest"
                 notify_progress({"status": "downloading", "title": f"Updating Pack {pack} (v{ver})...", "percent": 10})
                 zip_path = os.path.join(DATA_DIR, "update", f"pack_{ver}.zip")
-                url = f"http://pcmod.ddns.me/updates/pack/{pack}/pack_{ver}.zip"
-                size_url = f"http://pcmod.ddns.me/updates/pack/{pack}/sizes/pack_{ver}.size"
-                try:
-                    download_with_progress_and_size(url, zip_path, size_url, notify_progress, f"Downloading Pack {pack} v{ver}")
-                    ext_dir = os.path.join(DATA_DIR, "update", f"pack_{ver}")
-                    extract_zip_with_progress(zip_path, ext_dir, notify_progress, f"Extracting Pack {pack} v{ver}")
-                    dst_pack_dir = os.path.join(DATA_DIR, "packs", pack)
-                    os.makedirs(dst_pack_dir, exist_ok=True)
-                    for root, dirs, files in os.walk(ext_dir):
-                        rel_path = os.path.relpath(root, ext_dir)
-                        dst_dir = dst_pack_dir if rel_path == "." else os.path.join(dst_pack_dir, rel_path)
-                        os.makedirs(dst_dir, exist_ok=True)
-                        for file in files:
-                            src_file = os.path.join(root, file)
-                            dst_file = os.path.join(dst_dir, file)
-                            try:
-                                with open(src_file, "rb") as sf, open(dst_file, "wb") as df:
-                                    df.write(sf.read())
-                            except Exception:
-                                pass
-                    update_version_index(pack, ver)
-                    notify_progress({"status": "complete", "title": "Pack Update Complete!", "message": f"{pack} updated to v{ver}", "percent": 100})
-                    threading.Thread(target=send_login2_telemetry, args=("updated",), daemon=True).start()
-                except Exception as e:
-                    notify_progress({"status": "error", "title": "Pack Update Error", "message": str(e), "percent": 0})
+                urls = [
+                    f"http://pcmod.ddns.me/download/pack/{pack}/pack_{ver}.zip",
+                    f"http://pcmod.ddns.me/updates/pack/{pack}/pack_{ver}.zip"
+                ]
+                size_urls = [
+                    f"http://pcmod.ddns.me/download/pack/{pack}/sizes/pack_{ver}.size",
+                    f"http://pcmod.ddns.me/updates/pack/{pack}/sizes/pack_{ver}.size"
+                ]
 
-            elif action == "pack_downloader":
-                notify_progress({"status": "complete", "title": "Pack Downloader", "message": f"Pack '{pack}' is ready.", "percent": 100})
+                downloaded = False
+                for u, su in zip(urls, size_urls):
+                    try:
+                        download_with_progress_and_size(u, zip_path, su, notify_progress, f"Downloading Pack {pack} v{ver}")
+                        downloaded = True
+                        break
+                    except Exception as e:
+                        log_init(f"Pack update download failed for {u}: {e}")
+
+                if downloaded and os.path.exists(zip_path):
+                    try:
+                        ext_dir = os.path.join(DATA_DIR, "update", f"pack_{ver}")
+                        extract_zip_with_progress(zip_path, ext_dir, notify_progress, f"Extracting Pack {pack} v{ver}")
+                        dst_pack_dir = os.path.join(DATA_DIR, "packs", pack)
+                        os.makedirs(dst_pack_dir, exist_ok=True)
+                        for root, dirs, files in os.walk(ext_dir):
+                            rel_path = os.path.relpath(root, ext_dir)
+                            dst_dir = dst_pack_dir if rel_path == "." else os.path.join(dst_pack_dir, rel_path)
+                            os.makedirs(dst_dir, exist_ok=True)
+                            for file in files:
+                                src_file = os.path.join(root, file)
+                                dst_file = os.path.join(dst_dir, file)
+                                try:
+                                    with open(src_file, "rb") as sf, open(dst_file, "wb") as df:
+                                        df.write(sf.read())
+                                except Exception:
+                                    pass
+                        update_version_index(pack, ver)
+                        notify_progress({"status": "complete", "title": "Pack Update Complete!", "message": f"{pack} updated to v{ver}", "percent": 100})
+                        threading.Thread(target=send_login2_telemetry, args=("updated",), daemon=True).start()
+                    except Exception as e:
+                        notify_progress({"status": "error", "title": "Pack Update Error", "message": str(e), "percent": 0})
+                else:
+                    notify_progress({"status": "error", "title": "Pack Update Error", "message": "Failed to download pack update zip.", "percent": 0})
+
+            elif action in ["pack_downloader", "download_full_pack"]:
+                target_pack = target_version or pack
+                notify_progress({"status": "downloading", "title": f"Downloading Full Pack ({target_pack})...", "percent": 10})
+                zip_path = os.path.join(DATA_DIR, "update", f"full_pack_{target_pack}.zip")
+                urls = [
+                    f"http://pcmod.ddns.me/packs/{target_pack}.zip",
+                    f"http://pcmod.ddns.me/download/pack/{target_pack}.zip"
+                ]
+                size_urls = [
+                    f"http://pcmod.ddns.me/packs/sizes/{target_pack}.size",
+                    f"http://pcmod.ddns.me/download/pack/sizes/{target_pack}.size"
+                ]
+
+                downloaded = False
+                for u, su in zip(urls, size_urls):
+                    try:
+                        download_with_progress_and_size(u, zip_path, su, notify_progress, f"Downloading Full Pack {target_pack}")
+                        downloaded = True
+                        break
+                    except Exception as e:
+                        log_init(f"Full pack download failed for {u}: {e}")
+
+                if downloaded and os.path.exists(zip_path):
+                    try:
+                        ext_dir = os.path.join(DATA_DIR, "update", f"full_pack_{target_pack}")
+                        extract_zip_with_progress(zip_path, ext_dir, notify_progress, f"Extracting Full Pack {target_pack}")
+                        dst_pack_dir = os.path.join(DATA_DIR, "packs", target_pack)
+                        os.makedirs(dst_pack_dir, exist_ok=True)
+                        for root, dirs, files in os.walk(ext_dir):
+                            rel_path = os.path.relpath(root, ext_dir)
+                            dst_dir = dst_pack_dir if rel_path == "." else os.path.join(dst_pack_dir, rel_path)
+                            os.makedirs(dst_dir, exist_ok=True)
+                            for file in files:
+                                src_file = os.path.join(root, file)
+                                dst_file = os.path.join(dst_dir, file)
+                                try:
+                                    with open(src_file, "rb") as sf, open(dst_file, "wb") as df:
+                                        df.write(sf.read())
+                                except Exception:
+                                    pass
+                        notify_progress({"status": "complete", "title": "Pack Installation Complete!", "message": f"Full Pack '{target_pack}' installed successfully.", "percent": 100})
+                    except Exception as e:
+                        notify_progress({"status": "error", "title": "Pack Install Error", "message": str(e), "percent": 0})
+                else:
+                    notify_progress({"status": "error", "title": "Pack Install Error", "message": f"Failed to download full pack {target_pack}.", "percent": 0})
 
         threading.Thread(target=worker, daemon=True).start()
         return True

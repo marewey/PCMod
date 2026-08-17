@@ -641,29 +641,35 @@
         </div>
       </div>
 
+      <!-- Pack Downloader Sub-Panel Container -->
+      <div id="packCardsContainer" style="display: none; margin-top: 10px; flex: 1; overflow-y: auto; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 10px; padding: 10px;">
+        <div style="font-size: 13px; font-weight: 700; color: #38bdf8; margin-bottom: 8px;">Available Packs Manifest</div>
+        <div id="packCardsList" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;"></div>
+      </div>
+
       <!-- 6 Menu Action Buttons -->
-      <div class="updater-grid">
-        <button class="updater-btn" onclick="runUpdateAction('pack_downloader')">
+      <div class="updater-grid" style="margin-top: auto;">
+        <button class="updater-btn" onclick="showPackDownloaderCards()">
           <span style="font-size: 18px;">📦</span>
           <span>Pack Downloader</span>
         </button>
-        <button class="updater-btn" onclick="runUpdateAction('refresh_mods')">
+        <button class="updater-btn" onclick="hidePackCards(); runUpdateAction('refresh_mods');">
           <span style="font-size: 18px;">🔄</span>
           <span>Refresh Mods</span>
         </button>
-        <button class="updater-btn" onclick="runUpdateAction('auto')">
+        <button class="updater-btn" onclick="hidePackCards(); runUpdateAction('auto');">
           <span style="font-size: 18px;">⚡</span>
           <span>Auto Update</span>
         </button>
-        <button class="updater-btn" onclick="runUpdateAction('launcher_update')">
+        <button class="updater-btn" onclick="hidePackCards(); runUpdateAction('launcher_update');">
           <span style="font-size: 18px;">🚀</span>
           <span>Launcher Update</span>
         </button>
-        <button class="updater-btn" onclick="runUpdateAction('pack_update')">
+        <button class="updater-btn" onclick="hidePackCards(); runUpdateAction('pack_update');">
           <span style="font-size: 18px;">🎮</span>
           <span>Pack Update</span>
         </button>
-        <button class="updater-btn" onclick="showMainView()">
+        <button class="updater-btn" onclick="hidePackCards(); showMainView();">
           <span style="font-size: 18px;">❌</span>
           <span>Cancel / Exit</span>
         </button>
@@ -774,6 +780,14 @@
           document.getElementById('versionFooter').innerText = "Launcher: " + data.launcher_version + " / Pack: " + data.pack_version;
         }
 
+        // Prompt if main default pack from line 2 of version file is missing
+        if (data.main_pack && data.main_pack_installed === false) {
+          if (confirm("Main Pack (" + data.main_pack + ") is not installed.\n\nDo you want to Download Main Pack: (" + data.main_pack + ")?")) {
+            openUpdateViewWithAction('download_full_pack', data.main_pack);
+            return;
+          }
+        }
+
         // 5. Version dropdown select
         if (data.versions_list && data.versions_list.length > 0) {
           var select = document.getElementById('selver');
@@ -858,6 +872,42 @@
       renderModTable(filtered);
     }
 
+    function hidePackCards() {
+      var container = document.getElementById('packCardsContainer');
+      if (container) container.style.display = 'none';
+    }
+
+    function showPackDownloaderCards() {
+      var container = document.getElementById('packCardsContainer');
+      if (container) container.style.display = 'block';
+
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.get_available_packs_manifest().then(function(res) {
+          var listDiv = document.getElementById('packCardsList');
+          if (!listDiv || !res || !res.packs) return;
+          listDiv.innerHTML = '';
+          for (var i = 0; i < res.packs.length; i++) {
+            var p = res.packs[i];
+            var card = document.createElement('div');
+            card.style.background = 'rgba(15, 23, 42, 0.9)';
+            card.style.border = '1px solid var(--card-border)';
+            card.style.borderRadius = '8px';
+            card.style.padding = '10px';
+            card.style.display = 'flex';
+            card.style.flexDirection = 'column';
+            card.style.justifySpaceBetween = 'space-between';
+
+            var statusBadge = p.installed ? '<span style="color:#10b981; font-size:11px; font-weight:bold;">[Installed]</span>' : '<span style="color:#eab308; font-size:11px; font-weight:bold;">[Not Installed]</span>';
+
+            card.innerHTML = '<div style="font-weight:bold; color:#f8fafc; font-size:13px;">Pack: ' + p.name + ' ' + statusBadge + '</div>' +
+                             '<div style="font-size:11px; color:var(--text-muted); margin: 4px 0 8px 0;">Version: ' + p.version + ' | Loader: ' + p.modloader + '</div>' +
+                             '<button class="btn-secondary" style="padding:6px; font-size:11px;" onclick="runUpdateAction(\'download_full_pack\', \'' + p.name + '\')">Download Pack (' + p.name + ')</button>';
+            listDiv.appendChild(card);
+          }
+        });
+      }
+    }
+
     function showUpdateView() {
       document.getElementById('mainView').style.display = 'none';
       document.getElementById('modlistView').style.display = 'none';
@@ -874,7 +924,12 @@
       }
     }
 
-    function runUpdateAction(action) {
+    function openUpdateViewWithAction(action, targetVer) {
+      showUpdateView();
+      runUpdateAction(action, targetVer);
+    }
+
+    function runUpdateAction(action, targetVer) {
       document.getElementById('updateTitle').innerText = "Running " + action + "...";
       document.getElementById('updateMessage').innerText = "Starting task...";
       document.getElementById('updateProgressFill').style.width = "0%";
@@ -882,7 +937,7 @@
       document.getElementById('updateSizeText').innerText = "0.00 MB / 0.00 MB";
 
       if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.run_update_action(action);
+        window.pywebview.api.run_update_action(action, targetVer);
       }
     }
 
