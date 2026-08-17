@@ -1508,7 +1508,107 @@ def apply_win32_window_icons():
         except Exception:
             pass
 
+def bootstrap_missing_files():
+    required_files = [
+        os.path.join(DATA_DIR, "pages", "launcher.html"),
+        os.path.join(DATA_DIR, "indexes", "version")
+    ]
+    missing = [f for f in required_files if not os.path.exists(f)]
+
+    if not missing:
+        return
+
+    log_init("=== Initializing PCMod Launcher Bootstrap ===")
+    log_init(f"Missing required base files: {[os.path.basename(m) for m in missing]}")
+    log_init("Downloading launcher core files from server...")
+
+    os.makedirs(os.path.join(DATA_DIR, "indexes"), exist_ok=True)
+    os.makedirs(os.path.join(DATA_DIR, "update"), exist_ok=True)
+    os.makedirs(os.path.join(DATA_DIR, "pages"), exist_ok=True)
+
+    tmp_ver_file = os.path.join(DATA_DIR, "indexes", "version.tmp")
+    version_url = "http://pcmod.ddns.me/version"
+    launcher_ver = "1.2a"
+
+    try:
+        log_init(f"Fetching version manifest from {version_url}...")
+        req = urllib.request.Request(version_url, headers={'User-Agent': 'Mozilla/5.0'})
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(req, timeout=5.0, context=ctx) as resp:
+            raw_text = resp.read().decode('utf-8', errors='ignore')
+            lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
+            with open(tmp_ver_file, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines) + "\n")
+
+            ver_file = os.path.join(DATA_DIR, "indexes", "version")
+            if not os.path.exists(ver_file):
+                with open(ver_file, "w", encoding="utf-8") as f:
+                    f.write("\n".join(lines) + "\n")
+
+            for line in lines:
+                parts = line.split(";")
+                if len(parts) >= 2 and parts[0].strip() == "Launcher":
+                    launcher_ver = parts[1].strip()
+                    break
+        log_init(f"Resolved Launcher version for bootstrap: {launcher_ver}")
+    except Exception as e:
+        log_init(f"Bootstrap version fetch warning ({e}). Using default version {launcher_ver}")
+
+    download_urls = [
+        f"https://pcmod.ddns.me/download/launcher/launcher-{launcher_ver}.zip",
+        f"http://pcmod.ddns.me/download/launcher/launcher-{launcher_ver}.zip",
+        f"http://pcmod.ddns.me/updates/launcher/launcher_{launcher_ver}.zip"
+    ]
+
+    zip_path = os.path.join(DATA_DIR, "update", f"bootstrap_launcher_{launcher_ver}.zip")
+    download_success = False
+
+    for url in download_urls:
+        try:
+            log_init(f"Downloading launcher archive: {url}")
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=15.0, context=ctx) as resp:
+                with open(zip_path, "wb") as f:
+                    f.write(resp.read())
+            log_init(f"Successfully downloaded archive from {url}")
+            download_success = True
+            break
+        except Exception as e:
+            log_init(f"Failed download from {url}: {e}")
+
+    if download_success and os.path.exists(zip_path):
+        try:
+            log_init("Extracting launcher core files to root directory...")
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(BASE_DIR)
+            log_init("Core files extracted successfully.")
+        except Exception as e:
+            log_init(f"Error extracting bootstrap zip archive: {e}")
+
+    # Verify news.html
+    news_file = os.path.join(DATA_DIR, "pages", "news.html")
+    if not os.path.exists(news_file):
+        try:
+            log_init("Fetching default news page...")
+            req = urllib.request.Request("https://pcmod.ddns.me/updates/news.html", headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=3.0, context=ctx) as resp:
+                with open(news_file, "wb") as f:
+                    f.write(resp.read())
+        except Exception as e:
+            log_init(f"News fetch warning: {e}")
+
+    log_init("=== Launcher Bootstrap Completed ===")
+
 def main():
+    bootstrap_missing_files()
     api = Api()
     html_path = os.path.join(DATA_DIR, "pages", "launcher.html")
     window = webview.create_window(
