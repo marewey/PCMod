@@ -961,7 +961,7 @@ class Api:
             pass
 
         # Execution using PYTHONPATH=bin/pmc and python -m portablemc to prevent http.py import shadowing!
-        cmd = [sys.executable, "-m", "portablemc", "--main-dir", DATA_DIR, "--work-dir", os.path.join(DATA_DIR, "packs", pack), "start", f"fabric:{pack}", "-u", username, "-i", mcuuid, "-jvm-args", f"-Xmx{maxram}M"]
+        cmd = [sys.executable, "-m", "portablemc", "--main-dir", DATA_DIR, "--work-dir", os.path.join(DATA_DIR, "packs", pack), "start", f"fabric:{pack}", "-u", username, "-i", mcuuid, "--jvm-args", f"-Xmx{maxram}M"]
 
         if autoserver:
             port = "25565"
