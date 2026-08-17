@@ -637,7 +637,6 @@
 
         <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
           <span id="updateProgressText">0%</span>
-          <span id="updateSizeText">0.00 MB / 0.00 MB</span>
         </div>
       </div>
 
@@ -669,9 +668,9 @@
           <span style="font-size: 18px;">🎮</span>
           <span>Pack Update</span>
         </button>
-        <button class="updater-btn" onclick="hidePackCards(); showMainView();">
+        <button class="updater-btn" onclick="cancelOrCloseUpdate()">
           <span style="font-size: 18px;">❌</span>
-          <span>Cancel / Exit</span>
+          <span>Cancel Install</span>
         </button>
       </div>
     </div>
@@ -696,6 +695,7 @@
     var allModsCache = [];
 
     var currentGameLaunchState = 'idle';
+    var isUpdateActive = false;
 
     function onGameLaunchState(state) {
       currentGameLaunchState = state;
@@ -703,7 +703,6 @@
       var mainText = document.getElementById('launchBtnText');
       var subText = document.getElementById('launchBtnSubText');
       var u = document.getElementById('username').value;
-      var isLoggedIn = u && u.trim() !== "";
 
       if (!launchBtn) return;
 
@@ -731,6 +730,17 @@
       if (currentGameLaunchState !== 'idle') return;
       var launchBtn = document.getElementById('launchBtn');
       var isLoggedIn = username && username.trim() !== "";
+
+      if (isUpdateActive) {
+        if (launchBtn) {
+          launchBtn.disabled = true;
+          launchBtn.style.opacity = '0.5';
+          launchBtn.style.cursor = 'not-allowed';
+          launchBtn.title = 'Update in progress...';
+        }
+        return;
+      }
+
       if (launchBtn) {
         launchBtn.disabled = !isLoggedIn;
         if (!isLoggedIn) {
@@ -830,6 +840,7 @@
       document.getElementById('mainView').style.display = 'grid';
       document.getElementById('modlistView').style.display = 'none';
       document.getElementById('updateView').style.display = 'none';
+      initLauncher();
     }
 
     function showModList() {
@@ -879,7 +890,12 @@
 
     function showPackDownloaderCards() {
       var container = document.getElementById('packCardsContainer');
-      if (container) container.style.display = 'block';
+      if (!container) return;
+      if (container.style.display === 'block') {
+        container.style.display = 'none';
+        return;
+      }
+      container.style.display = 'block';
 
       if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.get_available_packs_manifest().then(function(res) {
@@ -929,12 +945,24 @@
       runUpdateAction(action, targetVer);
     }
 
+    function cancelOrCloseUpdate() {
+      hidePackCards();
+      if (isUpdateActive && window.pywebview && window.pywebview.api) {
+        window.pywebview.api.cancel_update_action();
+        document.getElementById('updateTitle').innerText = "Cancelling Update...";
+        document.getElementById('updateMessage').innerText = "Cleaning up...";
+      } else {
+        showMainView();
+      }
+    }
+
     function runUpdateAction(action, targetVer) {
+      isUpdateActive = true;
+      updateLaunchButtonState(document.getElementById('username').value);
       document.getElementById('updateTitle').innerText = "Running " + action + "...";
       document.getElementById('updateMessage').innerText = "Starting task...";
       document.getElementById('updateProgressFill').style.width = "0%";
       document.getElementById('updateProgressText').innerText = "0%";
-      document.getElementById('updateSizeText').innerText = "0.00 MB / 0.00 MB";
 
       if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.run_update_action(action, targetVer);
@@ -950,8 +978,22 @@
         document.getElementById('updateProgressFill').style.width = info.percent + "%";
         document.getElementById('updateProgressText').innerText = info.percent + "%";
       }
-      if (info.downloaded_str && info.total_str) {
-        document.getElementById('updateSizeText').innerText = info.downloaded_str + " / " + info.total_str;
+
+      if (info.update_in_progress !== undefined) {
+        isUpdateActive = info.update_in_progress;
+        updateLaunchButtonState(document.getElementById('username').value);
+      } else if (info.status === 'downloading' || info.status === 'extracting' || info.status === 'installing') {
+        isUpdateActive = true;
+        updateLaunchButtonState(document.getElementById('username').value);
+      } else if (info.status === 'complete' || info.status === 'error' || info.status === 'cancelled') {
+        isUpdateActive = false;
+        updateLaunchButtonState(document.getElementById('username').value);
+        initLauncher();
+        var container = document.getElementById('packCardsContainer');
+        if (container && container.style.display === 'block') {
+          container.style.display = 'none';
+          showPackDownloaderCards();
+        }
       }
     };
 
