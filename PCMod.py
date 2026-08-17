@@ -329,19 +329,19 @@ def read_auth_token(username):
             pass
     return token
 
-def write_encrypted_auth(username, password):
-    if not username or not password:
+def write_encrypted_auth(username, token_val):
+    if not username or not token_val:
         return ""
     auth_file = os.path.join(DATA_DIR, "indexes", "auth")
     os.makedirs(os.path.dirname(auth_file), exist_ok=True)
 
-    raw_hash = hashlib.md5(password.encode('utf-8')).hexdigest()
-
+    raw_hash = token_val
     xcode_exe = os.path.join(BIN_DIR, "xcode.exe")
-    if os.path.exists(xcode_exe):
+
+    if token_val != "404" and os.path.exists(xcode_exe):
         try:
             proc = subprocess.Popen([xcode_exe], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
-            input_data = f"{username}\r\n{password}\r\n".encode('utf-8')
+            input_data = f"{username}\r\n{token_val}\r\n".encode('utf-8')
             out, err = proc.communicate(input=input_data, timeout=2)
             lines = [l.strip() for l in out.decode('utf-8', errors='ignore').splitlines() if l.strip()]
             for l in lines:
@@ -352,6 +352,8 @@ def write_encrypted_auth(username, password):
                     break
         except Exception:
             pass
+    elif token_val == "404":
+        raw_hash = "404"
 
     try:
         with open(auth_file, "w", encoding="utf-8") as f:
@@ -371,10 +373,15 @@ def write_encrypted_auth(username, password):
     return raw_hash
 
 def get_xcode_auth(username, password):
-    if not username or not password:
+    if not username:
         return ""
 
-    raw_hash = write_encrypted_auth(username, password)
+    if not password:
+        raw_token = "404"
+    else:
+        raw_token = hashlib.md5(password.encode('utf-8')).hexdigest()
+
+    raw_hash = write_encrypted_auth(username, raw_token)
     log_init(f"Auth token generated: {raw_hash}")
 
     if not raw_hash.startswith("\\"):
@@ -413,6 +420,8 @@ def load_user_info():
         return
 
     token = read_auth_token(u)
+    log_init(f"Checking Saved Auth Token for '{u}': {token}")
+
     if not token:
         USER_INFO["username"] = ""
         USER_INFO["auth_token"] = ""
@@ -423,7 +432,7 @@ def load_user_info():
 
     formatted_token = token if token.startswith("\\") else f"\\{token}"
 
-    # Test server connection if online
+    log_init(f"Authorizing User ({u})...")
     auth_url = "http://pcmod.ddns.me/commands/authp.php"
     post_data = urllib.parse.urlencode({
         'x': formatted_token,
@@ -431,19 +440,29 @@ def load_user_info():
         'z': 'auth'
     }).encode('utf-8')
 
+    log_init(f"Sending Boot Auth POST Request to {auth_url}: u={u}, x={formatted_token}")
+
     server_rejected = False
+    server_is_404 = False
     try:
         req = urllib.request.Request(auth_url, data=post_data, headers={'User-Agent': 'Mozilla/5.0'})
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
-        with urllib.request.urlopen(req, timeout=2.0, context=ctx) as resp:
+        with urllib.request.urlopen(req, timeout=2.5, context=ctx) as resp:
             body = resp.read().decode('utf-8', errors='ignore').strip()
+            log_init(f"Boot Auth server response: {body}")
+
             if "401.auth" in body or "incorrect" in body.lower():
                 server_rejected = True
-    except Exception:
-        # Offline: allow launch since auth file exists!
-        pass
+                log_init(f"Boot Auth REJECTED: 401 response for {u}")
+            elif "404.auth" in body or "404" in body:
+                server_is_404 = True
+                log_init(f"Boot Auth SERVER 404: No server auth file found for user {u} ({body})")
+            elif "200" in body or body == "":
+                log_init(f"Boot Auth SUCCESS (200 OK) for user {u}")
+    except Exception as e:
+        log_init(f"Boot Auth Network Exception ({e}) - Falling back to offline auth check")
 
     if server_rejected:
         if os.path.exists(auth_file):
@@ -457,6 +476,10 @@ def load_user_info():
         s["username"] = ""
         write_settings(s)
     else:
+        if server_is_404:
+            write_encrypted_auth(u, "404")
+            formatted_token = "\\404"
+
         USER_INFO["username"] = u
         USER_INFO["auth_token"] = formatted_token
         USER_INFO["uuid"] = get_uuid_tool_uuid(u)
@@ -624,31 +647,43 @@ def send_login2_telemetry(state="launcher"):
 def toggle_desktop_shortcut(enable):
     if OS_NAME == "win32":
         try:
-            desktop = os.path.join(os.path.expanduser("~"), "Desktop")
-            shortcut_path = os.path.join(desktop, "PCMod Client.lnk")
+            target = sys.executable
+            script_file = os.path.abspath(__file__)
+            icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
+            vbs_file = os.path.join(DATA_DIR, "create_shortcut.vbs")
+
             if enable:
-                target = sys.executable
-                icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
                 vbs_script = (
-                    f'Set ws = WScript.CreateObject("WScript.Shell")\n'
-                    f'Set sc = ws.CreateShortcut("{shortcut_path}")\n'
+                    'Set ws = WScript.CreateObject("WScript.Shell")\n'
+                    'desktopPath = ws.SpecialFolders("Desktop")\n'
+                    'shortcutPath = ws.BuildPath(desktopPath, "PCMod Client.lnk")\n'
+                    'Set sc = ws.CreateShortcut(shortcutPath)\n'
                     f'sc.TargetPath = "{target}"\n'
-                    f'sc.Arguments = "{os.path.abspath(__file__)}"\n'
+                    f'sc.Arguments = "{script_file}"\n'
                     f'sc.WorkingDirectory = "{BASE_DIR}"\n'
                     f'sc.IconLocation = "{icon_path}"\n'
-                    f'sc.Save\n'
+                    'sc.Save\n'
                 )
-                vbs_file = os.path.join(DATA_DIR, "create_shortcut.vbs")
                 with open(vbs_file, "w", encoding="utf-8") as f:
                     f.write(vbs_script)
                 subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5)
                 if os.path.exists(vbs_file):
                     os.remove(vbs_file)
-                log_init("Created desktop shortcut: PCMod Client.lnk")
+                log_init("Created desktop shortcut: PCMod Client.lnk via WScript SpecialFolders")
             else:
-                if os.path.exists(shortcut_path):
-                    os.remove(shortcut_path)
-                    log_init("Removed desktop shortcut: PCMod Client.lnk")
+                vbs_script = (
+                    'Set ws = WScript.CreateObject("WScript.Shell")\n'
+                    'desktopPath = ws.SpecialFolders("Desktop")\n'
+                    'shortcutPath = ws.BuildPath(desktopPath, "PCMod Client.lnk")\n'
+                    'Set fso = CreateObject("Scripting.FileSystemObject")\n'
+                    'If fso.FileExists(shortcutPath) Then fso.DeleteFile(shortcutPath)\n'
+                )
+                with open(vbs_file, "w", encoding="utf-8") as f:
+                    f.write(vbs_script)
+                subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5)
+                if os.path.exists(vbs_file):
+                    os.remove(vbs_file)
+                log_init("Removed desktop shortcut: PCMod Client.lnk via WScript SpecialFolders")
         except Exception as e:
             log_init(f"Desktop shortcut error: {e}")
 
@@ -1014,6 +1049,11 @@ class Api:
                     write_settings(s)
                     return {"success": False, "message": "Password was incorrect. Try again."}
                 else:
+                    if "404.auth" in body or "404" in body:
+                        log_init(f"Login 404 response ({body}): No auth file on server for user {username}. Saving 404 placeholder.")
+                        write_encrypted_auth(username, "404")
+                        auth_token = "\\404"
+
                     server_auth_success = True
                     USER_INFO["username"] = username
                     USER_INFO["auth_token"] = auth_token
