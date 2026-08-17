@@ -960,8 +960,21 @@ class Api:
         except Exception:
             pass
 
+        jvm_args_str = f"-Xmx{maxram}M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M"
+
+        # Load extra JVM args from data/indexes/jvm_args if present
+        extra_jvm_args_file = os.path.join(DATA_DIR, "indexes", "jvm_args")
+        if os.path.exists(extra_jvm_args_file):
+            try:
+                with open(extra_jvm_args_file, "r", encoding="utf-8") as f:
+                    content = f.read().strip()
+                    if content:
+                        jvm_args_str += " " + content
+            except Exception:
+                pass
+
         # Execution using PYTHONPATH=bin/pmc and python -m portablemc to prevent http.py import shadowing!
-        cmd = [sys.executable, "-m", "portablemc", "--main-dir", DATA_DIR, "--work-dir", os.path.join(DATA_DIR, "packs", pack), "start", f"fabric:{pack}", "-u", username, "-i", mcuuid, f"--jvm-args=-Xmx{maxram}M"]
+        cmd = [sys.executable, "-m", "portablemc", "--main-dir", DATA_DIR, "--work-dir", os.path.join(DATA_DIR, "packs", pack), "start", f"fabric:{pack}", "-u", username, "-i", mcuuid, f"--jvm-args={jvm_args_str}"]
 
         if autoserver:
             port = "25565"
@@ -1233,7 +1246,7 @@ class Api:
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-        with urllib.request.urlopen(req, timeout=12.0, context=ctx) as resp:
+            with urllib.request.urlopen(req, timeout=12.0, context=ctx) as resp:
                 resp.read()
             log_init("Server launch command sent successfully.")
             return True
