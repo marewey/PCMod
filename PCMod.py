@@ -157,6 +157,49 @@ def update_console_title(username):
         except Exception:
             pass
 
+def toggle_desktop_shortcut(enable):
+    if OS_NAME == "win32":
+        try:
+            target = sys.executable
+            script_file = os.path.abspath(__file__)
+            icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
+            vbs_file = os.path.join(DATA_DIR, "create_shortcut.vbs")
+
+            if enable:
+                vbs_script = (
+                    'Set ws = WScript.CreateObject("WScript.Shell")\n'
+                    'desktopPath = ws.SpecialFolders("Desktop")\n'
+                    'shortcutPath = desktopPath & "\\PCMod Client.lnk"\n'
+                    'Set sc = ws.CreateShortcut(shortcutPath)\n'
+                    f'sc.TargetPath = "{target}"\n'
+                    f'sc.Arguments = "{script_file}"\n'
+                    f'sc.WorkingDirectory = "{BASE_DIR}"\n'
+                    f'sc.IconLocation = "{icon_path}"\n'
+                    'sc.Save\n'
+                )
+                with open(vbs_file, "w", encoding="utf-8") as f:
+                    f.write(vbs_script)
+                subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5)
+                if os.path.exists(vbs_file):
+                    os.remove(vbs_file)
+                log_init("Created desktop shortcut: PCMod Client.lnk via WScript SpecialFolders")
+            else:
+                vbs_script = (
+                    'Set ws = WScript.CreateObject("WScript.Shell")\n'
+                    'desktopPath = ws.SpecialFolders("Desktop")\n'
+                    'shortcutPath = desktopPath & "\\PCMod Client.lnk"\n'
+                    'Set fso = CreateObject("Scripting.FileSystemObject")\n'
+                    'If fso.FileExists(shortcutPath) Then fso.DeleteFile(shortcutPath)\n'
+                )
+                with open(vbs_file, "w", encoding="utf-8") as f:
+                    f.write(vbs_script)
+                subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5)
+                if os.path.exists(vbs_file):
+                    os.remove(vbs_file)
+                log_init("Removed desktop shortcut: PCMod Client.lnk via WScript SpecialFolders")
+        except Exception as e:
+            log_init(f"Desktop shortcut error: {e}")
+
 SETTINGS_FILE = os.path.join(BASE_DIR, "settings.txt")
 
 def get_default_settings():
@@ -206,6 +249,8 @@ def write_settings(settings):
         with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
             f.writelines(lines)
         log_init("Wrote settings.txt successfully")
+
+        apply_console_visibility()
     except Exception:
         pass
 
