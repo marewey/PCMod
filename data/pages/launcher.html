@@ -618,6 +618,22 @@
       </div>
     </div>
 
+    <!-- 2.5 CRASH REPORT VIEW -->
+    <div id="crashView" class="view-panel panel" style="display: none; flex-direction: column;">
+      <div class="header-bar">
+        <button class="btn-back" onclick="showMainView()">← Back to Launcher</button>
+        <div style="font-weight: 700; font-size: 16px; color: #ef4444;">Game Crashed! Crash Report Viewer</div>
+        <div></div>
+      </div>
+      <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+        <button class="btn-secondary" id="tabCrashBtn" onclick="switchCrashTab('crash_report')" style="width: 160px; background: rgba(59, 130, 246, 0.3);">Crash Report</button>
+        <button class="btn-secondary" id="tabLaunchBtn" onclick="switchCrashTab('launch_log')" style="width: 160px;">Launch Log</button>
+      </div>
+      <div class="table-container" style="padding: 12px; font-family: monospace; white-space: pre-wrap; word-break: break-all; color: #f8fafc;" id="crashTextContent">
+        Loading crash report...
+      </div>
+    </div>
+
     <!-- 3. UPDATER VIEW -->
     <div id="updateView" class="view-panel panel" style="display: none; flex-direction: column;">
       <div class="header-bar">
@@ -646,6 +662,18 @@
         <div id="packCardsList" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;"></div>
       </div>
 
+      <!-- Custom Version Input Fields -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); border: 1px solid var(--card-border); border-radius: 8px; padding: 6px 10px;">
+          <span style="font-size: 12px; font-weight: 600; color: #38bdf8; white-space: nowrap;">Launcher Ver:</span>
+          <input type="text" class="input-field" id="launcherVersionInput" placeholder="Auto (or e.g. 1.2a)" style="margin-bottom: 0; padding: 4px 8px; font-size: 12px;">
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); border: 1px solid var(--card-border); border-radius: 8px; padding: 6px 10px;">
+          <span style="font-size: 12px; font-weight: 600; color: #38bdf8; white-space: nowrap;">Pack Ver:</span>
+          <input type="text" class="input-field" id="packVersionInput" placeholder="Auto (or e.g. 2.5.3a)" style="margin-bottom: 0; padding: 4px 8px; font-size: 12px;">
+        </div>
+      </div>
+
       <!-- 6 Menu Action Buttons -->
       <div class="updater-grid" style="margin-top: auto;">
         <button class="updater-btn" onclick="showPackDownloaderCards()">
@@ -660,11 +688,11 @@
           <span style="font-size: 18px;">⚡</span>
           <span>Auto Update</span>
         </button>
-        <button class="updater-btn" onclick="hidePackCards(); runUpdateAction('launcher_update');">
+        <button class="updater-btn" onclick="hidePackCards(); runUpdateAction('launcher_update', document.getElementById('launcherVersionInput').value);">
           <span style="font-size: 18px;">🚀</span>
           <span>Launcher Update</span>
         </button>
-        <button class="updater-btn" onclick="hidePackCards(); runUpdateAction('pack_update');">
+        <button class="updater-btn" onclick="hidePackCards(); runUpdateAction('pack_update', document.getElementById('packVersionInput').value);">
           <span style="font-size: 18px;">🎮</span>
           <span>Pack Update</span>
         </button>
@@ -763,6 +791,11 @@
         // 1. User & Launch restriction
         if (data.user) {
           document.getElementById('username').value = data.user;
+        }
+
+        if (data.game_running) {
+          onGameLaunchState('running');
+        } else if (data.user) {
           updateLaunchButtonState(data.user);
         } else {
           updateLaunchButtonState("");
@@ -839,8 +872,47 @@
     function showMainView() {
       document.getElementById('mainView').style.display = 'grid';
       document.getElementById('modlistView').style.display = 'none';
+      document.getElementById('crashView').style.display = 'none';
       document.getElementById('updateView').style.display = 'none';
       initLauncher();
+    }
+
+    var crashLogsCache = { launch_log: '', crash_report: '' };
+
+    function onGameCrashed() {
+      onGameLaunchState('idle');
+      showCrashView();
+    }
+
+    function showCrashView() {
+      document.getElementById('mainView').style.display = 'none';
+      document.getElementById('modlistView').style.display = 'none';
+      document.getElementById('crashView').style.display = 'flex';
+      document.getElementById('updateView').style.display = 'none';
+
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.get_latest_crash_logs().then(function(res) {
+          if (!res) return;
+          crashLogsCache = res;
+          switchCrashTab('crash_report');
+        });
+      }
+    }
+
+    function switchCrashTab(tab) {
+      var tabCrashBtn = document.getElementById('tabCrashBtn');
+      var tabLaunchBtn = document.getElementById('tabLaunchBtn');
+      var contentDiv = document.getElementById('crashTextContent');
+
+      if (tab === 'crash_report') {
+        tabCrashBtn.style.background = 'rgba(59, 130, 246, 0.4)';
+        tabLaunchBtn.style.background = 'rgba(255, 255, 255, 0.06)';
+        contentDiv.innerText = crashLogsCache.crash_report || 'No crash report available.';
+      } else {
+        tabCrashBtn.style.background = 'rgba(255, 255, 255, 0.06)';
+        tabLaunchBtn.style.background = 'rgba(59, 130, 246, 0.4)';
+        contentDiv.innerText = crashLogsCache.launch_log || 'No launch log available.';
+      }
     }
 
     function showModList() {
@@ -1119,6 +1191,16 @@
     }
 
     function launchGame() {
+      if (currentGameLaunchState === 'running') {
+        if (confirm("Minecraft appears to be running in this folder. Do you want to force unlock and terminate the active instance?")) {
+          if (window.pywebview && window.pywebview.api) {
+            window.pywebview.api.force_unlock().then(function() {
+              onGameLaunchState('idle');
+            });
+          }
+        }
+        return;
+      }
       var u = document.getElementById('username').value;
       if (!u || u.trim() === "") {
         alert("Please enter a username and login first!");

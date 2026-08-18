@@ -146,14 +146,18 @@ def write_settings(settings):
         pass
 
 init_settings = read_settings(log_event=True)
-if OS_NAME == "win32" and str(init_settings.get("showconsole", "1")).strip() in ["0", "false", "False"]:
-    try:
-        import ctypes
-        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-        if hwnd:
-            ctypes.windll.user32.ShowWindow(hwnd, 0)
-    except Exception:
-        pass
+
+def apply_console_visibility():
+    if OS_NAME == "win32":
+        try:
+            import ctypes
+            s = read_settings()
+            hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+            if hwnd:
+                show = 1 if str(s.get("showconsole", "0")).strip() in ["1", "true", "True"] else 0
+                ctypes.windll.user32.ShowWindow(hwnd, show)
+        except Exception:
+            pass
 
 def get_pack_name():
     s = read_settings()
@@ -215,6 +219,67 @@ def read_version_info(pack_name):
 def read_version_indexes(pack_name):
     info = read_version_info(pack_name)
     return info["launcher_ver"], info["pack_ver"]
+
+def is_pid_running(pid):
+    if pid <= 0:
+        return False
+    if OS_NAME == "win32":
+        try:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            h_proc = kernel32.OpenProcess(0x1000, False, pid)
+            if h_proc:
+                exit_code = ctypes.c_ulong()
+                kernel32.GetExitCodeProcess(h_proc, ctypes.byref(exit_code))
+                kernel32.CloseHandle(h_proc)
+                return exit_code.value == 259 # STILL_ACTIVE
+            return False
+        except Exception:
+            return False
+    else:
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+
+def get_running_game_info():
+    lock_file = os.path.join(DATA_DIR, "game.lock")
+    if os.path.exists(lock_file):
+        try:
+            with open(lock_file, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                if content.isdigit():
+                    pid = int(content)
+                    if is_pid_running(pid):
+                        return {"running": True, "pid": pid}
+            try:
+                os.remove(lock_file)
+            except Exception:
+                pass
+        except Exception:
+            pass
+    return {"running": False, "pid": 0}
+
+def force_unlock_game():
+    lock_file = os.path.join(DATA_DIR, "game.lock")
+    info = get_running_game_info()
+    if info["running"] and info["pid"] > 0:
+        pid = info["pid"]
+        log_init(f"Force unlocking game. Terminating process PID {pid}...")
+        try:
+            if OS_NAME == "win32":
+                subprocess.run(["taskkill", "/F", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                os.kill(pid, 9)
+        except Exception as e:
+            log_init(f"Error terminating PID {pid}: {e}")
+    if os.path.exists(lock_file):
+        try:
+            os.remove(lock_file)
+        except Exception:
+            pass
+    return True
 
 def get_portablemc_version_spec(pack_name):
     info = read_version_info(pack_name)
@@ -652,48 +717,6 @@ def send_login2_telemetry(state="launcher"):
     except Exception as e:
         log_init(f"login2.php telemetry exception: {e}")
 
-def toggle_desktop_shortcut(enable):
-    if OS_NAME == "win32":
-        try:
-            target = sys.executable
-            script_file = os.path.abspath(__file__)
-            icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
-            vbs_file = os.path.join(DATA_DIR, "create_shortcut.vbs")
-
-            if enable:
-                vbs_script = (
-                    'Set ws = WScript.CreateObject("WScript.Shell")\n'
-                    'desktopPath = ws.SpecialFolders("Desktop")\n'
-                    'shortcutPath = desktopPath & "\\PCMod Client.lnk"\n'
-                    'Set sc = ws.CreateShortcut(shortcutPath)\n'
-                    f'sc.TargetPath = "{target}"\n'
-                    f'sc.Arguments = "{script_file}"\n'
-                    f'sc.WorkingDirectory = "{BASE_DIR}"\n'
-                    f'sc.IconLocation = "{icon_path}"\n'
-                    'sc.Save\n'
-                )
-                with open(vbs_file, "w", encoding="utf-8") as f:
-                    f.write(vbs_script)
-                subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5)
-                if os.path.exists(vbs_file):
-                    os.remove(vbs_file)
-                log_init("Created desktop shortcut: PCMod Client.lnk via WScript SpecialFolders")
-            else:
-                vbs_script = (
-                    'Set ws = WScript.CreateObject("WScript.Shell")\n'
-                    'desktopPath = ws.SpecialFolders("Desktop")\n'
-                    'shortcutPath = desktopPath & "\\PCMod Client.lnk"\n'
-                    'Set fso = CreateObject("Scripting.FileSystemObject")\n'
-                    'If fso.FileExists(shortcutPath) Then fso.DeleteFile(shortcutPath)\n'
-                )
-                with open(vbs_file, "w", encoding="utf-8") as f:
-                    f.write(vbs_script)
-                subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5)
-                if os.path.exists(vbs_file):
-                    os.remove(vbs_file)
-                log_init("Removed desktop shortcut: PCMod Client.lnk via WScript SpecialFolders")
-        except Exception as e:
-            log_init(f"Desktop shortcut error: {e}")
 
 UPDATE_IN_PROGRESS = False
 UPDATE_CANCEL_REQUESTED = False
@@ -895,9 +918,12 @@ class Api:
                 pass
 
         main_pack_installed = os.path.exists(os.path.join(DATA_DIR, "packs", main_pack))
+        game_info = get_running_game_info()
 
         return {
             "user": s.get("username", ""),
+            "game_running": game_info["running"],
+            "game_pid": game_info["pid"],
             "settings": {
                 "shortcut": "1" if str(s.get("shortcut")).strip() in ["1", "true", "True"] else "0",
                 "autoserver": "1" if str(s.get("autoserver")).strip() in ["1", "true", "True"] else "0",
@@ -931,6 +957,44 @@ class Api:
         write_settings(current)
         load_user_info()
         return True
+
+    def check_game_running(self, *args, **kwargs):
+        return get_running_game_info()
+
+    def force_unlock(self, *args, **kwargs):
+        return force_unlock_game()
+
+    def get_latest_crash_logs(self, *args, **kwargs):
+        pack = get_pack_name()
+        launch_log_path = os.path.join(DATA_DIR, "launch.log")
+        launch_log_text = "No launch log available."
+        if os.path.exists(launch_log_path):
+            try:
+                with open(launch_log_path, "r", encoding="utf-8", errors="ignore") as f:
+                    lines = f.readlines()
+                    launch_log_text = "".join(lines[-300:])
+            except Exception as e:
+                launch_log_text = f"Error reading launch log: {e}"
+
+        crash_report_text = "No crash reports found in crash-reports folder."
+        crash_dir = os.path.join(DATA_DIR, "packs", pack, "crash-reports")
+        if not os.path.exists(crash_dir):
+            crash_dir = os.path.join(DATA_DIR, "crash-reports")
+
+        if os.path.exists(crash_dir):
+            try:
+                files = [os.path.join(crash_dir, f) for f in os.listdir(crash_dir) if os.path.isfile(os.path.join(crash_dir, f))]
+                if files:
+                    latest_file = max(files, key=os.path.getmtime)
+                    with open(latest_file, "r", encoding="utf-8", errors="ignore") as f:
+                        crash_report_text = f"=== File: {os.path.basename(latest_file)} ===\n\n" + f.read()
+            except Exception as e:
+                crash_report_text = f"Error reading crash report: {e}"
+
+        return {
+            "launch_log": launch_log_text,
+            "crash_report": crash_report_text
+        }
 
     def save_settings_btn(self, *args, **kwargs):
         return self.save_settings(*args, **kwargs)
@@ -1285,6 +1349,8 @@ class Api:
             proc_env["PYTHONPATH"] = pmc_dir
 
         def launch_runner():
+            lock_file = os.path.join(DATA_DIR, "game.lock")
+            crashed = False
             try:
                 if needs_install:
                     log_init(f"Modloader/assets missing for pack '{pack}'. Downloading missing resources...")
@@ -1310,6 +1376,19 @@ class Api:
 
                 proc = subprocess.Popen(cmd, env=proc_env, cwd=BASE_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
 
+                try:
+                    with open(lock_file, "w", encoding="utf-8") as lf_lock:
+                        lf_lock.write(str(proc.pid))
+                except Exception:
+                    pass
+
+                # Hide launcher window while game is running
+                if self._window:
+                    try:
+                        self._window.hide()
+                    except Exception:
+                        pass
+
                 with open(launch_log, "a", encoding="utf-8") as lf:
                     for line in iter(proc.stdout.readline, ''):
                         sys.stdout.write(line)
@@ -1320,6 +1399,7 @@ class Api:
                 log_init(f"Game process exited with code {proc.returncode}")
 
                 if proc.returncode != 0:
+                    crashed = True
                     threading.Thread(target=send_login2_telemetry, args=("crash",), daemon=True).start()
                     try:
                         ftp_str = rot13_5("cg32.3pzbq.qqaf.zr")
@@ -1335,8 +1415,20 @@ class Api:
                     except Exception:
                         pass
             finally:
+                if os.path.exists(lock_file):
+                    try:
+                        os.remove(lock_file)
+                    except Exception:
+                        pass
                 if self._window:
-                    self._window.evaluate_js("onGameLaunchState('idle');")
+                    try:
+                        self._window.show()
+                    except Exception:
+                        pass
+                    if crashed:
+                        self._window.evaluate_js("onGameCrashed();")
+                    else:
+                        self._window.evaluate_js("onGameLaunchState('idle');")
 
         try:
             t = threading.Thread(target=launch_runner)
@@ -1504,7 +1596,10 @@ class Api:
                     notify_progress({"status": "complete", "title": "Refresh Mods Complete!", "message": f"Verified {total_mods} mods.", "percent": 100, "update_in_progress": False})
 
                 elif action == "launcher_update":
-                    ver = target_version or "latest"
+                    ver = (target_version or "").strip()
+                    if not ver or ver.lower() == "latest":
+                        up_info = check_updates_server()
+                        ver = up_info.get("launcher_update") or up_info.get("current_launcher") or "1.2a"
                     notify_progress({"status": "downloading", "title": f"Updating Launcher (v{ver})...", "percent": 10, "update_in_progress": True})
                     zip_path = os.path.join(DATA_DIR, "update", f"launcher_{ver}.zip")
                     urls = [
@@ -1563,7 +1658,10 @@ class Api:
                             notify_progress({"status": "error", "title": "Launcher Update Error", "message": "Failed to download launcher update zip.", "percent": 0, "update_in_progress": False})
 
                 elif action == "pack_update":
-                    ver = target_version or "latest"
+                    ver = (target_version or "").strip()
+                    if not ver or ver.lower() == "latest":
+                        up_info = check_updates_server()
+                        ver = up_info.get("pack_update") or up_info.get("current_pack") or "2.5.3a"
                     notify_progress({"status": "downloading", "title": f"Updating Pack {pack} (v{ver})...", "percent": 10, "update_in_progress": True})
                     zip_path = os.path.join(DATA_DIR, "update", f"pack_{ver}.zip")
                     urls = [
@@ -1719,6 +1817,11 @@ def apply_win32_window_icons():
             GCLP_HICON = -14
             GCLP_HICONSM = -34
 
+            try:
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("PCMod.Client.1.0")
+            except Exception:
+                pass
+
             icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
             if os.path.exists(icon_path):
                 hicon_small = user32.LoadImageW(None, icon_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
@@ -1850,6 +1953,7 @@ def bootstrap_missing_files():
 
 def main():
     bootstrap_missing_files()
+    apply_console_visibility()
     api = Api()
     html_path = os.path.join(DATA_DIR, "pages", "launcher.html")
     window = webview.create_window(
