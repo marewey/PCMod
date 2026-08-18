@@ -206,16 +206,6 @@ def write_settings(settings):
         with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
             f.writelines(lines)
         log_init("Wrote settings.txt successfully")
-
-        if OS_NAME == "win32" and "showconsole" in settings:
-            try:
-                import ctypes
-                hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-                if hwnd:
-                    show = 1 if str(settings["showconsole"]).strip() in ["1", "true", "True"] else 0
-                    ctypes.windll.user32.ShowWindow(hwnd, show)
-            except Exception:
-                pass
     except Exception:
         pass
 
@@ -340,10 +330,10 @@ def force_unlock_game():
     info = get_running_game_info()
     if info["running"] and info["pid"] > 0:
         pid = info["pid"]
-        log_init(f"Force unlocking game. Terminating process PID {pid}...")
+        log_init(f"Force unlocking game. Terminating process tree for PID {pid}...")
         try:
             if OS_NAME == "win32":
-                subprocess.run(["taskkill", "/F", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             else:
                 os.kill(pid, 9)
         except Exception as e:
@@ -1940,6 +1930,7 @@ def main():
     apply_console_visibility()
     api = Api()
     html_path = os.path.join(DATA_DIR, "pages", "launcher.html")
+    icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
     window = webview.create_window(
         "PCMod Client",
         url=f"file://{html_path}",

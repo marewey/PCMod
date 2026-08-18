@@ -1,18 +1,22 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-import sys
 import os
+import sys
 
 block_cipher = None
+
+# Only bundle essential source icon assets, excluding heavy data/packs, data/update, or log files
+datas_list = []
+if os.path.exists('data/icons'):
+    datas_list.append(('data/icons', 'data/icons'))
+if os.path.exists('bin'):
+    datas_list.append(('bin', 'bin'))
 
 a = Analysis(
     ['PCMod.py'],
     pathex=[],
     binaries=[],
-    datas=[
-        ('data', 'data'),
-        ('bin', 'bin'),
-    ],
+    datas=datas_list,
     hiddenimports=[
         'clr',
         'System',
@@ -26,7 +30,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['tkinter', 'unittest', 'email', 'http.server'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
