@@ -741,9 +741,9 @@
         if (mainText) mainText.innerText = 'LAUNCHING...';
         if (subText) subText.style.display = 'block';
       } else if (state === 'running') {
-        launchBtn.disabled = true;
-        launchBtn.style.opacity = '0.5';
-        launchBtn.style.cursor = 'not-allowed';
+        launchBtn.disabled = false;
+        launchBtn.style.opacity = '0.7';
+        launchBtn.style.cursor = 'pointer';
         if (mainText) mainText.innerText = 'GAME RUNNING...';
         if (subText) subText.style.display = 'none';
       } else {
@@ -1191,16 +1191,29 @@
     }
 
     function launchGame() {
-      if (currentGameLaunchState === 'running') {
-        if (confirm("Minecraft appears to be running in this folder. Do you want to force unlock and terminate the active instance?")) {
-          if (window.pywebview && window.pywebview.api) {
-            window.pywebview.api.force_unlock().then(function() {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.check_game_running().then(function(res) {
+          if (res && res.running) {
+            if (confirm("Minecraft is currently running (PID: " + res.pid + ").\n\nDo you want to force kill the active instance and unlock the launcher?")) {
+              window.pywebview.api.force_unlock().then(function() {
+                onGameLaunchState('idle');
+              });
+            }
+          } else {
+            if (currentGameLaunchState === 'running') {
               onGameLaunchState('idle');
-            });
+            }
+            var u = document.getElementById('username').value;
+            if (!u || u.trim() === "") {
+              alert("Please enter a username and login first!");
+              return;
+            }
+            window.pywebview.api.launch_game();
           }
-        }
+        });
         return;
       }
+
       var u = document.getElementById('username').value;
       if (!u || u.trim() === "") {
         alert("Please enter a username and login first!");
