@@ -33,12 +33,15 @@ a = Analysis(
         'email.mime.multipart',
         'urllib.request',
         'urllib.parse',
-        'urllib.error'
+        'urllib.error',
+        'http.server',
+        'wsgiref',
+        'wsgiref.simple_server'
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['tkinter', 'unittest', 'http.server'],
+    excludes=['tkinter', 'unittest'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

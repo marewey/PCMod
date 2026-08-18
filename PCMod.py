@@ -1914,6 +1914,7 @@ def apply_win32_window_icons():
     if OS_NAME == "win32":
         try:
             import ctypes
+            from ctypes import wintypes
             user32 = ctypes.windll.user32
             kernel32 = ctypes.windll.kernel32
             current_pid = kernel32.GetCurrentProcessId()
@@ -1925,6 +1926,16 @@ def apply_win32_window_icons():
             ICON_BIG = 1
             GCLP_HICON = -14
             GCLP_HICONSM = -34
+
+            # Explicit 64-bit argument and return type definitions for Win32 API calls
+            user32.LoadImageW.argtypes = [wintypes.HINSTANCE, wintypes.LPCWSTR, wintypes.UINT, ctypes.c_int, ctypes.c_int, wintypes.UINT]
+            user32.LoadImageW.restype = wintypes.HANDLE
+            user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+            user32.SendMessageW.restype = wintypes.LRESULT
+
+            if hasattr(user32, 'SetClassLongPtrW'):
+                user32.SetClassLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
+                user32.SetClassLongPtrW.restype = ctypes.c_ssize_t
 
             try:
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("PCMod.Client.1.0")
@@ -1946,7 +1957,7 @@ def apply_win32_window_icons():
                     if hicon_big:
                         user32.SendMessageW(console_hwnd, WM_SETICON, ICON_BIG, hicon_big)
 
-                WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+                WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
 
                 def enum_windows_callback(hwnd, lparam):
                     pid = ctypes.c_ulong()

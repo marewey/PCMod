@@ -823,14 +823,6 @@
           document.getElementById('versionFooter').innerText = "Launcher: " + data.launcher_version + " / Pack: " + data.pack_version;
         }
 
-        // Prompt if main default pack from line 2 of version file is missing
-        if (data.main_pack && data.main_pack_installed === false) {
-          if (confirm("Main Pack (" + data.main_pack + ") is not installed.\n\nDo you want to Download Main Pack: (" + data.main_pack + ")?")) {
-            openUpdateViewWithAction('download_full_pack', data.main_pack);
-            return;
-          }
-        }
-
         // 5. Version dropdown select
         if (data.versions_list && data.versions_list.length > 0) {
           var select = document.getElementById('selver');
@@ -849,6 +841,15 @@
 
         refreshPlayers();
         checkUpdatesOnStartup();
+
+        // Prompt if main default pack from line 2 of version file is missing (checked LAST after UI is populated)
+        if (data.main_pack && data.main_pack_installed === false) {
+          setTimeout(function() {
+            if (confirm("Main Pack (" + data.main_pack + ") is not installed.\n\nDo you want to Download Main Pack: (" + data.main_pack + ")?")) {
+              openUpdateViewWithAction('download_full_pack', data.main_pack);
+            }
+          }, 200);
+        }
       });
     }
 
