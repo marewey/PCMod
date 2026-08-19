@@ -16,9 +16,54 @@ import zipfile
 import webview
 from datetime import datetime
 
-# Ensure data directory exists
+# Dynamic working directory (BASE_DIR) resolution
 OS_NAME = sys.platform
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+EXEC_DIR = os.path.dirname(os.path.abspath(sys.argv[0] if getattr(sys, 'frozen', False) else __file__))
+
+def resolve_base_directory():
+    # If base launcher assets or data folder already exist locally, keep EXEC_DIR as BASE_DIR
+    local_launcher = os.path.join(EXEC_DIR, "data", "pages", "launcher.html")
+    local_data = os.path.join(EXEC_DIR, "data")
+    local_bin = os.path.join(EXEC_DIR, "bin")
+
+    if os.path.exists(local_launcher) or os.path.exists(local_data) or os.path.exists(local_bin):
+        return EXEC_DIR
+
+    # When missing base files, determine if Option A (local folder) or Option B (%APPDATA%\PCMod3) applies
+    norm_exec_dir = os.path.normpath(EXEC_DIR).lower()
+    user_home = os.path.normpath(os.path.expanduser("~")).lower()
+    desktop_dir = os.path.join(user_home, "desktop")
+    downloads_dir = os.path.join(user_home, "downloads")
+
+    is_desktop_or_downloads = (
+        norm_exec_dir == desktop_dir or
+        norm_exec_dir == downloads_dir or
+        norm_exec_dir.startswith(desktop_dir + os.sep) or
+        norm_exec_dir.startswith(downloads_dir + os.sep)
+    )
+
+    allowed_entries = {"pcmod.exe", "pcmod.py", "data", "bin", "settings.txt", "pcmod.spec", "build.bat", "readme.md", ".git", ".gitignore", ".gitattributes"}
+    has_unrelated_files = False
+    try:
+        entries = os.listdir(EXEC_DIR)
+        for entry in entries:
+            if entry.lower() not in allowed_entries and not entry.startswith("bootstrap_"):
+                has_unrelated_files = True
+                break
+    except Exception:
+        pass
+
+    if is_desktop_or_downloads or has_unrelated_files:
+        appdata_dir = os.environ.get("APPDATA")
+        if not appdata_dir:
+            appdata_dir = os.path.expanduser("~/.config")
+        target_dir = os.path.join(appdata_dir, "PCMod3")
+        os.makedirs(target_dir, exist_ok=True)
+        return target_dir
+
+    return EXEC_DIR
+
+BASE_DIR = resolve_base_directory()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 BIN_DIR = os.path.join(BASE_DIR, "bin")
 OLD_CMD_DIR = os.path.join(BASE_DIR, "_old")
@@ -39,41 +84,115 @@ def log_init(msg):
 
 log_init("=== PCMod Client Starting ===")
 
-# Dynamic Windows Console Title, Icon & Taskbar Grouping setup
+# Explicit AppUserModelID set FIRST before any windows or processes initialize
 if OS_NAME == "win32":
     try:
         import ctypes
-        import ctypes.wintypes
-
-        IMAGE_ICON = 1
-        LR_LOADFROMFILE = 0x00000010
-        WM_SETICON = 0x0080
-        ICON_SMALL = 0
-        ICON_BIG = 1
-        GCLP_HICON = -14
-        GCLP_HICONSM = -34
-
-        user32 = ctypes.windll.user32
-        kernel32 = ctypes.windll.kernel32
-
-        try:
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("PCMod.Client.1.0")
-        except Exception:
-            pass
-
-        console_hwnd = kernel32.GetConsoleWindow()
-        if console_hwnd:
-            kernel32.SetConsoleTitleW("PCMod Console")
-            icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
-            if os.path.exists(icon_path):
-                hicon_small = user32.LoadImageW(None, icon_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
-                hicon_big = user32.LoadImageW(None, icon_path, IMAGE_ICON, 32, 32, LR_LOADFROMFILE)
-                if hicon_small:
-                    user32.SendMessageW(console_hwnd, WM_SETICON, ICON_SMALL, hicon_small)
-                if hicon_big:
-                    user32.SendMessageW(console_hwnd, WM_SETICON, ICON_BIG, hicon_big)
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("PCMod.Client.1.0")
     except Exception:
         pass
+
+def bootstrap_missing_files():
+    required_files = [
+        os.path.join(DATA_DIR, "pages", "launcher.html"),
+        os.path.join(DATA_DIR, "indexes", "version")
+    ]
+    missing = [f for f in required_files if not os.path.exists(f)]
+
+    if not missing:
+        return
+
+    log_init("=== Initializing PCMod Launcher Bootstrap ===")
+    log_init(f"Missing required base files: {[os.path.basename(m) for m in missing]}")
+    log_init("Downloading launcher core files from server...")
+
+    os.makedirs(os.path.join(DATA_DIR, "indexes"), exist_ok=True)
+    os.makedirs(os.path.join(DATA_DIR, "update"), exist_ok=True)
+    os.makedirs(os.path.join(DATA_DIR, "pages"), exist_ok=True)
+
+    tmp_ver_file = os.path.join(DATA_DIR, "indexes", "version.tmp")
+    version_url = "https://pcmod.ddns.me/version"
+    launcher_ver = "1.2a"
+
+    try:
+        log_init(f"Fetching version manifest from {version_url}...")
+        req = urllib.request.Request(version_url, headers={'User-Agent': 'Mozilla/5.0'})
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(req, timeout=5.0, context=ctx) as resp:
+            raw_text = resp.read().decode('utf-8', errors='ignore')
+            lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
+            with open(tmp_ver_file, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines) + "\n")
+
+            ver_file = os.path.join(DATA_DIR, "indexes", "version")
+            if not os.path.exists(ver_file):
+                with open(ver_file, "w", encoding="utf-8") as f:
+                    f.write("\n".join(lines) + "\n")
+
+            for line in lines:
+                parts = line.split(";")
+                if len(parts) >= 2 and parts[0].strip() == "Launcher":
+                    launcher_ver = parts[1].strip()
+                    break
+        log_init(f"Resolved Launcher version for bootstrap: {launcher_ver}")
+    except Exception as e:
+        log_init(f"Bootstrap version fetch warning ({e}). Using default version {launcher_ver}")
+
+    download_urls = [
+        f"https://pcmod.ddns.me/download/launcher/launcher-{launcher_ver}.zip",
+        f"https://pcmod.ddns.me/download/launcher/launcher-{launcher_ver}.zip",
+        f"https://pcmod.ddns.me/updates/launcher/launcher_{launcher_ver}.zip"
+    ]
+
+    zip_path = os.path.join(DATA_DIR, "update", f"bootstrap_launcher_{launcher_ver}.zip")
+    download_success = False
+
+    for url in download_urls:
+        try:
+            log_init(f"Downloading launcher archive: {url}")
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=15.0, context=ctx) as resp:
+                with open(zip_path, "wb") as f:
+                    f.write(resp.read())
+            log_init(f"Successfully downloaded archive from {url}")
+            download_success = True
+            break
+        except Exception as e:
+            log_init(f"Failed download from {url}: {e}")
+
+    if download_success and os.path.exists(zip_path):
+        try:
+            log_init("Extracting launcher core files to root directory...")
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(BASE_DIR)
+            log_init("Core files extracted successfully.")
+        except Exception as e:
+            log_init(f"Error extracting bootstrap zip archive: {e}")
+
+    # Verify news.html
+    news_file = os.path.join(DATA_DIR, "pages", "news.html")
+    if not os.path.exists(news_file):
+        try:
+            log_init("Fetching default news page...")
+            req = urllib.request.Request("https://pcmod.ddns.me/updates/news.html", headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=3.0, context=ctx) as resp:
+                with open(news_file, "wb") as f:
+                    f.write(resp.read())
+        except Exception as e:
+            log_init(f"News fetch warning: {e}")
+
+    log_init("=== Launcher Bootstrap Completed ===")
+
+# Run bootstrap check before anything else
+bootstrap_missing_files()
 
 def update_console_title(username):
     if OS_NAME == "win32":
@@ -82,6 +201,49 @@ def update_console_title(username):
             ctypes.windll.kernel32.SetConsoleTitleW(f"PCMod Console - {username}")
         except Exception:
             pass
+
+def toggle_desktop_shortcut(enable):
+    if OS_NAME == "win32":
+        try:
+            target = sys.executable
+            script_file = os.path.abspath(__file__)
+            icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
+            vbs_file = os.path.join(DATA_DIR, "create_shortcut.vbs")
+
+            if enable:
+                vbs_script = (
+                    'Set ws = WScript.CreateObject("WScript.Shell")\n'
+                    'desktopPath = ws.SpecialFolders("Desktop")\n'
+                    'shortcutPath = desktopPath & "\\PCMod Client.lnk"\n'
+                    'Set sc = ws.CreateShortcut(shortcutPath)\n'
+                    f'sc.TargetPath = "{target}"\n'
+                    f'sc.Arguments = "{script_file}"\n'
+                    f'sc.WorkingDirectory = "{BASE_DIR}"\n'
+                    f'sc.IconLocation = "{icon_path}"\n'
+                    'sc.Save\n'
+                )
+                with open(vbs_file, "w", encoding="utf-8") as f:
+                    f.write(vbs_script)
+                subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5)
+                if os.path.exists(vbs_file):
+                    os.remove(vbs_file)
+                log_init("Created desktop shortcut: PCMod Client.lnk via WScript SpecialFolders")
+            else:
+                vbs_script = (
+                    'Set ws = WScript.CreateObject("WScript.Shell")\n'
+                    'desktopPath = ws.SpecialFolders("Desktop")\n'
+                    'shortcutPath = desktopPath & "\\PCMod Client.lnk"\n'
+                    'Set fso = CreateObject("Scripting.FileSystemObject")\n'
+                    'If fso.FileExists(shortcutPath) Then fso.DeleteFile(shortcutPath)\n'
+                )
+                with open(vbs_file, "w", encoding="utf-8") as f:
+                    f.write(vbs_script)
+                subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5)
+                if os.path.exists(vbs_file):
+                    os.remove(vbs_file)
+                log_init("Removed desktop shortcut: PCMod Client.lnk via WScript SpecialFolders")
+        except Exception as e:
+            log_init(f"Desktop shortcut error: {e}")
 
 SETTINGS_FILE = os.path.join(BASE_DIR, "settings.txt")
 
@@ -133,27 +295,32 @@ def write_settings(settings):
             f.writelines(lines)
         log_init("Wrote settings.txt successfully")
 
-        if OS_NAME == "win32" and "showconsole" in settings:
-            try:
-                import ctypes
-                hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-                if hwnd:
-                    show = 1 if str(settings["showconsole"]).strip() in ["1", "true", "True"] else 0
-                    ctypes.windll.user32.ShowWindow(hwnd, show)
-            except Exception:
-                pass
+        apply_console_visibility()
     except Exception:
         pass
 
 init_settings = read_settings(log_event=True)
-if OS_NAME == "win32" and str(init_settings.get("showconsole", "1")).strip() in ["0", "false", "False"]:
-    try:
-        import ctypes
-        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-        if hwnd:
-            ctypes.windll.user32.ShowWindow(hwnd, 0)
-    except Exception:
-        pass
+
+def apply_console_visibility():
+    if OS_NAME == "win32":
+        try:
+            import ctypes
+            s = read_settings()
+            hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+            if hwnd:
+                show = str(s.get("showconsole", "0")).strip() in ["1", "true", "True"]
+                SW_SHOW = 5
+                SW_HIDE = 0
+                SWP_NOMOVE = 0x0002
+                SWP_NOSIZE = 0x0001
+                SWP_NOZORDER = 0x0004
+                SWP_FRAMECHANGED = 0x0020
+                cmd = SW_SHOW if show else SW_HIDE
+                ctypes.windll.user32.ShowWindow(hwnd, cmd)
+                if show:
+                    ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED)
+        except Exception:
+            pass
 
 def get_pack_name():
     s = read_settings()
@@ -215,6 +382,68 @@ def read_version_info(pack_name):
 def read_version_indexes(pack_name):
     info = read_version_info(pack_name)
     return info["launcher_ver"], info["pack_ver"]
+
+def is_pid_running(pid):
+    if pid <= 0:
+        return False
+    if OS_NAME == "win32":
+        try:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            h_proc = kernel32.OpenProcess(0x1000, False, pid)
+            if h_proc:
+                exit_code = ctypes.c_ulong()
+                kernel32.GetExitCodeProcess(h_proc, ctypes.byref(exit_code))
+                kernel32.CloseHandle(h_proc)
+                return exit_code.value == 259 # STILL_ACTIVE
+            return False
+        except Exception:
+            return False
+    else:
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+
+def get_running_game_info():
+    lock_file = os.path.join(DATA_DIR, "game.lock")
+    if os.path.exists(lock_file):
+        try:
+            with open(lock_file, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                if content.isdigit():
+                    pid = int(content)
+                    if is_pid_running(pid):
+                        return {"running": True, "pid": pid}
+            try:
+                os.remove(lock_file)
+            except Exception:
+                pass
+        except Exception:
+            pass
+    return {"running": False, "pid": 0}
+
+def force_unlock_game():
+    lock_file = os.path.join(DATA_DIR, "game.lock")
+    info = get_running_game_info()
+    if info["running"] and info["pid"] > 0:
+        pid = info["pid"]
+        log_init(f"Force unlocking game. Terminating process tree for PID {pid}...")
+        try:
+            if OS_NAME == "win32":
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["taskkill", "/F", "/IM", "javaw.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                os.kill(pid, 9)
+        except Exception as e:
+            log_init(f"Error terminating PID {pid}: {e}")
+    if os.path.exists(lock_file):
+        try:
+            os.remove(lock_file)
+        except Exception:
+            pass
+    return True
 
 def get_portablemc_version_spec(pack_name):
     info = read_version_info(pack_name)
@@ -311,30 +540,42 @@ def rot13_5(text):
             res.append(ch)
     return "".join(res)
 
+def xor_crypt(data_bytes, key_bytes):
+    if not key_bytes:
+        return data_bytes
+    res = bytearray()
+    key_len = len(key_bytes)
+    for i, b in enumerate(data_bytes):
+        res.append(b ^ key_bytes[i % key_len])
+    return bytes(res)
+
 def read_auth_token(username):
     auth_file = os.path.join(DATA_DIR, "indexes", "auth")
-    xcode_exe = os.path.join(BIN_DIR, "xcode.exe")
     if not os.path.exists(auth_file):
         return None
     token = None
-    if os.path.exists(xcode_exe) and username:
+    try:
+        with open(auth_file, "rb") as f:
+            raw = f.read().strip()
+        if raw == b"404":
+            return "404"
+
+        # Check if plain text ASCII
         try:
-            # Decrypt auth file temporarily
-            proc = subprocess.Popen([xcode_exe, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
-            proc.communicate(input=f"{username}\r\n".encode('utf-8'), timeout=2)
-            with open(auth_file, "r", encoding="utf-8", errors="ignore") as f:
-                token = f.readline().strip()
-            # Re-encrypt auth file
-            proc2 = subprocess.Popen([xcode_exe, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
-            proc2.communicate(input=f"{username}\r\n".encode('utf-8'), timeout=2)
+            decoded = raw.decode('utf-8').strip()
+            if decoded == "404" or (len(decoded) in [32, 33] and re.match(r'^\\[0-9a-fA-F]{32}$', decoded) or re.match(r'^[0-9a-fA-F]{32}$', decoded)):
+                return decoded
         except Exception:
             pass
-    if not token and os.path.exists(auth_file):
-        try:
-            with open(auth_file, "r", encoding="utf-8", errors="ignore") as f:
-                token = f.readline().strip()
-        except Exception:
-            pass
+
+        # Perform XOR decryption using username key
+        key = username.encode('utf-8')
+        decrypted = xor_crypt(raw, key).decode('utf-8', errors='ignore').strip()
+        if decrypted == "404" or re.match(r'^\\[0-9a-fA-F]{32}$', decrypted) or re.match(r'^[0-9a-fA-F]{32}$', decrypted):
+            token = decrypted
+    except Exception as e:
+        log_init(f"Error reading auth token: {e}")
+
     return token
 
 def write_encrypted_auth(username, token_val):
@@ -343,42 +584,27 @@ def write_encrypted_auth(username, token_val):
     auth_file = os.path.join(DATA_DIR, "indexes", "auth")
     os.makedirs(os.path.dirname(auth_file), exist_ok=True)
 
-    raw_hash = token_val
-    xcode_exe = os.path.join(BIN_DIR, "xcode.exe")
-
-    if token_val != "404" and os.path.exists(xcode_exe):
+    raw_token = token_val.strip()
+    if raw_token != "404":
+        # Save XOR encrypted auth token
+        key = username.encode('utf-8')
+        data = raw_token.encode('utf-8')
+        encrypted = xor_crypt(data, key)
         try:
-            proc = subprocess.Popen([xcode_exe], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
-            input_data = f"{username}\r\n{token_val}\r\n".encode('utf-8')
-            out, err = proc.communicate(input=input_data, timeout=2)
-            lines = [l.strip() for l in out.decode('utf-8', errors='ignore').splitlines() if l.strip()]
-            for l in lines:
-                if "XOR Tool" in l or "Enter string" in l or "Enter key" in l:
-                    continue
-                if len(l) == 32:
-                    raw_hash = l
-                    break
-        except Exception:
-            pass
-    elif token_val == "404":
-        raw_hash = "404"
-
-    try:
-        with open(auth_file, "w", encoding="utf-8") as f:
-            f.write(raw_hash + "\n")
-        log_init(f"Saved plain auth token to {auth_file}")
-    except Exception as e:
-        log_init(f"Error writing auth file: {e}")
-
-    if os.path.exists(xcode_exe):
-        try:
-            proc = subprocess.Popen([xcode_exe, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
-            proc.communicate(input=f"{username}\r\n".encode('utf-8'), timeout=2)
-            log_init(f"Encrypted auth file with xcode.exe at {auth_file}")
+            with open(auth_file, "wb") as f:
+                f.write(encrypted)
+            log_init(f"Saved XOR-encrypted auth token to {auth_file}")
         except Exception as e:
-            log_init(f"xcode auth file encryption error: {e}")
+            log_init(f"Error writing encrypted auth file: {e}")
+    else:
+        try:
+            with open(auth_file, "w", encoding="utf-8") as f:
+                f.write("404\n")
+            log_init(f"Saved 404 auth placeholder to {auth_file}")
+        except Exception as e:
+            log_init(f"Error writing 404 auth file: {e}")
 
-    return raw_hash
+    return raw_token
 
 def get_xcode_auth(username, password):
     if not username:
@@ -399,18 +625,6 @@ def get_xcode_auth(username, password):
 def get_uuid_tool_uuid(username):
     if not username:
         return ""
-    uuid_jar = os.path.join(BIN_DIR, "uuid-tool-1.0.jar")
-    if os.path.exists(uuid_jar):
-        try:
-            proc = subprocess.Popen(["java", "-jar", uuid_jar], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
-            input_data = f"{username}\r\n".encode('utf-8')
-            out, err = proc.communicate(input=input_data, timeout=2)
-            out_str = out.decode('utf-8', errors='ignore').strip()
-            match = re.search(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', out_str, re.I)
-            if match:
-                return match.group(0)
-        except Exception:
-            pass
     return get_offline_uuid(username)
 
 def load_user_info():
@@ -441,7 +655,7 @@ def load_user_info():
     formatted_token = token if token.startswith("\\") else f"\\{token}"
 
     log_init(f"Authorizing User ({u})...")
-    auth_url = "http://pcmod.ddns.me/commands/authp.php"
+    auth_url = "https://pcmod.ddns.me/commands/authp.php"
     post_data = urllib.parse.urlencode({
         'x': formatted_token,
         'u': u,
@@ -640,7 +854,7 @@ def send_login2_telemetry(state="launcher"):
             'memory': memory
         }).encode('utf-8')
 
-        url = "http://pcmod.ddns.me/commands/login2.php"
+        url = "https://pcmod.ddns.me/commands/login2.php"
         log_init(f"Sending telemetry data to server... (state: {state})")
 
         req = urllib.request.Request(url, data=post_data, headers={'User-Agent': 'Mozilla/5.0'})
@@ -652,48 +866,6 @@ def send_login2_telemetry(state="launcher"):
     except Exception as e:
         log_init(f"login2.php telemetry exception: {e}")
 
-def toggle_desktop_shortcut(enable):
-    if OS_NAME == "win32":
-        try:
-            target = sys.executable
-            script_file = os.path.abspath(__file__)
-            icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
-            vbs_file = os.path.join(DATA_DIR, "create_shortcut.vbs")
-
-            if enable:
-                vbs_script = (
-                    'Set ws = WScript.CreateObject("WScript.Shell")\n'
-                    'desktopPath = ws.SpecialFolders("Desktop")\n'
-                    'shortcutPath = desktopPath & "\\PCMod Client.lnk"\n'
-                    'Set sc = ws.CreateShortcut(shortcutPath)\n'
-                    f'sc.TargetPath = "{target}"\n'
-                    f'sc.Arguments = "{script_file}"\n'
-                    f'sc.WorkingDirectory = "{BASE_DIR}"\n'
-                    f'sc.IconLocation = "{icon_path}"\n'
-                    'sc.Save\n'
-                )
-                with open(vbs_file, "w", encoding="utf-8") as f:
-                    f.write(vbs_script)
-                subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5)
-                if os.path.exists(vbs_file):
-                    os.remove(vbs_file)
-                log_init("Created desktop shortcut: PCMod Client.lnk via WScript SpecialFolders")
-            else:
-                vbs_script = (
-                    'Set ws = WScript.CreateObject("WScript.Shell")\n'
-                    'desktopPath = ws.SpecialFolders("Desktop")\n'
-                    'shortcutPath = desktopPath & "\\PCMod Client.lnk"\n'
-                    'Set fso = CreateObject("Scripting.FileSystemObject")\n'
-                    'If fso.FileExists(shortcutPath) Then fso.DeleteFile(shortcutPath)\n'
-                )
-                with open(vbs_file, "w", encoding="utf-8") as f:
-                    f.write(vbs_script)
-                subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5)
-                if os.path.exists(vbs_file):
-                    os.remove(vbs_file)
-                log_init("Removed desktop shortcut: PCMod Client.lnk via WScript SpecialFolders")
-        except Exception as e:
-            log_init(f"Desktop shortcut error: {e}")
 
 UPDATE_IN_PROGRESS = False
 UPDATE_CANCEL_REQUESTED = False
@@ -703,7 +875,7 @@ def check_updates_server():
     pack = get_pack_name()
     l_ver, p_ver = read_version_indexes(pack)
 
-    url = "http://pcmod.ddns.me/version"
+    url = "https://pcmod.ddns.me/version"
     tmp_file = os.path.join(DATA_DIR, "indexes", "version.tmp")
 
     remote_versions = {}
@@ -895,9 +1067,12 @@ class Api:
                 pass
 
         main_pack_installed = os.path.exists(os.path.join(DATA_DIR, "packs", main_pack))
+        game_info = get_running_game_info()
 
         return {
             "user": s.get("username", ""),
+            "game_running": game_info["running"],
+            "game_pid": game_info["pid"],
             "settings": {
                 "shortcut": "1" if str(s.get("shortcut")).strip() in ["1", "true", "True"] else "0",
                 "autoserver": "1" if str(s.get("autoserver")).strip() in ["1", "true", "True"] else "0",
@@ -931,6 +1106,44 @@ class Api:
         write_settings(current)
         load_user_info()
         return True
+
+    def check_game_running(self, *args, **kwargs):
+        return get_running_game_info()
+
+    def force_unlock(self, *args, **kwargs):
+        return force_unlock_game()
+
+    def get_latest_crash_logs(self, *args, **kwargs):
+        pack = get_pack_name()
+        launch_log_path = os.path.join(DATA_DIR, "launch.log")
+        launch_log_text = "No launch log available."
+        if os.path.exists(launch_log_path):
+            try:
+                with open(launch_log_path, "r", encoding="utf-8", errors="ignore") as f:
+                    lines = f.readlines()
+                    launch_log_text = "".join(lines[-300:])
+            except Exception as e:
+                launch_log_text = f"Error reading launch log: {e}"
+
+        crash_report_text = "No crash reports found in crash-reports folder."
+        crash_dir = os.path.join(DATA_DIR, "packs", pack, "crash-reports")
+        if not os.path.exists(crash_dir):
+            crash_dir = os.path.join(DATA_DIR, "crash-reports")
+
+        if os.path.exists(crash_dir):
+            try:
+                files = [os.path.join(crash_dir, f) for f in os.listdir(crash_dir) if os.path.isfile(os.path.join(crash_dir, f))]
+                if files:
+                    latest_file = max(files, key=os.path.getmtime)
+                    with open(latest_file, "r", encoding="utf-8", errors="ignore") as f:
+                        crash_report_text = f"=== File: {os.path.basename(latest_file)} ===\n\n" + f.read()
+            except Exception as e:
+                crash_report_text = f"Error reading crash report: {e}"
+
+        return {
+            "launch_log": launch_log_text,
+            "crash_report": crash_report_text
+        }
 
     def save_settings_btn(self, *args, **kwargs):
         return self.save_settings(*args, **kwargs)
@@ -1029,18 +1242,18 @@ class Api:
         return {"pack": pack, "count": len(mods), "mods": mods}
 
     def open_link(self, *args, **kwargs):
-        url = args[0] if args else "http://pcmod.ddns.me"
+        url = args[0] if args else "https://pcmod.ddns.me"
         import webbrowser
         webbrowser.open(url)
         return True
 
     def open_web(self, *args, **kwargs):
         site = args[0] if args else "pcmod"
-        url = "http://pcmod.ddns.me"
+        url = "https://pcmod.ddns.me"
         if site == "discord":
             url = "https://discord.gg/AJaVhvR"
         elif site == "auth":
-            url = "http://pcmod.ddns.me/account"
+            url = "https://pcmod.ddns.me/account"
         return self.open_link(url)
 
     def get_news_url(self, *args, **kwargs):
@@ -1070,7 +1283,7 @@ class Api:
 
     def get_players_online(self, *args, **kwargs):
         pack = get_pack_name()
-        url = f"http://pcmod.ddns.me/players/list-{pack}"
+        url = f"https://pcmod.ddns.me/players/list-{pack}"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         try:
             ctx = ssl.create_default_context()
@@ -1119,7 +1332,7 @@ class Api:
         auth_token = get_xcode_auth(username, password)
 
         # POST "x=%token%&u=%user%&z=auth" to authp.php
-        auth_url = "http://pcmod.ddns.me/commands/authp.php"
+        auth_url = "https://pcmod.ddns.me/commands/authp.php"
         post_data = urllib.parse.urlencode({
             'x': auth_token,
             'u': username,
@@ -1229,7 +1442,7 @@ class Api:
                 pass
 
         try:
-            skin_url = f"http://pcmod.ddns.me/skins/{username}.png"
+            skin_url = f"https://pcmod.ddns.me/skins/{username}.png"
             skin_dst = os.path.join(DATA_DIR, "cached_skin.png")
             urllib.request.urlretrieve(skin_url, skin_dst)
         except Exception:
@@ -1285,6 +1498,8 @@ class Api:
             proc_env["PYTHONPATH"] = pmc_dir
 
         def launch_runner():
+            lock_file = os.path.join(DATA_DIR, "game.lock")
+            crashed = False
             try:
                 if needs_install:
                     log_init(f"Modloader/assets missing for pack '{pack}'. Downloading missing resources...")
@@ -1310,6 +1525,19 @@ class Api:
 
                 proc = subprocess.Popen(cmd, env=proc_env, cwd=BASE_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
 
+                try:
+                    with open(lock_file, "w", encoding="utf-8") as lf_lock:
+                        lf_lock.write(str(proc.pid))
+                except Exception:
+                    pass
+
+                # Hide launcher window while game is running
+                if self._window:
+                    try:
+                        self._window.hide()
+                    except Exception:
+                        pass
+
                 with open(launch_log, "a", encoding="utf-8") as lf:
                     for line in iter(proc.stdout.readline, ''):
                         sys.stdout.write(line)
@@ -1320,6 +1548,7 @@ class Api:
                 log_init(f"Game process exited with code {proc.returncode}")
 
                 if proc.returncode != 0:
+                    crashed = True
                     threading.Thread(target=send_login2_telemetry, args=("crash",), daemon=True).start()
                     try:
                         ftp_str = rot13_5("cg32.3pzbq.qqaf.zr")
@@ -1335,8 +1564,20 @@ class Api:
                     except Exception:
                         pass
             finally:
+                if os.path.exists(lock_file):
+                    try:
+                        os.remove(lock_file)
+                    except Exception:
+                        pass
                 if self._window:
-                    self._window.evaluate_js("onGameLaunchState('idle');")
+                    try:
+                        self._window.show()
+                    except Exception:
+                        pass
+                    if crashed:
+                        self._window.evaluate_js("onGameCrashed();")
+                    else:
+                        self._window.evaluate_js("onGameLaunchState('idle');")
 
         try:
             t = threading.Thread(target=launch_runner)
@@ -1383,8 +1624,8 @@ class Api:
                     if l_up:
                         notify_progress({"status": "downloading", "title": f"Downloading Launcher Update v{l_up}...", "percent": 10, "update_in_progress": True})
                         zip_path = os.path.join(DATA_DIR, "update", f"launcher_{l_up}.zip")
-                        url = f"http://pcmod.ddns.me/updates/launcher/launcher_{l_up}.zip"
-                        size_url = f"http://pcmod.ddns.me/updates/launcher/sizes/launcher_{l_up}.size"
+                        url = f"https://pcmod.ddns.me/updates/launcher/launcher_{l_up}.zip"
+                        size_url = f"https://pcmod.ddns.me/updates/launcher/sizes/launcher_{l_up}.size"
                         try:
                             download_with_progress_and_size(url, zip_path, size_url, notify_progress, f"Downloading Launcher Update v{l_up}")
                             notify_progress({"status": "extracting", "title": "Extracting Launcher Update...", "percent": 70, "update_in_progress": True})
@@ -1424,8 +1665,8 @@ class Api:
                             p_ver = p_item["new_version"]
                             notify_progress({"status": "downloading", "title": f"Updating Pack {p_name} ({idx}/{total_packs}) v{p_ver}...", "percent": 10, "update_in_progress": True})
                             zip_path = os.path.join(DATA_DIR, "update", f"pack_{p_ver}.zip")
-                            url = f"http://pcmod.ddns.me/updates/pack/{p_name}/pack_{p_ver}.zip"
-                            size_url = f"http://pcmod.ddns.me/updates/pack/{p_name}/sizes/pack_{p_ver}.size"
+                            url = f"https://pcmod.ddns.me/updates/pack/{p_name}/pack_{p_ver}.zip"
+                            size_url = f"https://pcmod.ddns.me/updates/pack/{p_name}/sizes/pack_{p_ver}.size"
                             try:
                                 download_with_progress_and_size(url, zip_path, size_url, notify_progress, f"Downloading Pack {p_name} v{p_ver}")
                                 ext_dir = os.path.join(DATA_DIR, "update", f"pack_{p_ver}")
@@ -1481,7 +1722,7 @@ class Api:
                             notify_progress({"status": "cancelled", "title": "Update Cancelled", "message": "Mod refresh cancelled.", "percent": 0, "update_in_progress": False})
                             return
                         mod_path = os.path.join(mods_dir, mfile)
-                        url = f"http://pcmod.ddns.me/mods/{pack}/{mfile}"
+                        url = f"https://pcmod.ddns.me/mods/{pack}/{mfile}"
                         pct = int((idx / total_mods) * 100) if total_mods > 0 else 100
                         notify_progress({
                             "status": "downloading",
@@ -1504,16 +1745,19 @@ class Api:
                     notify_progress({"status": "complete", "title": "Refresh Mods Complete!", "message": f"Verified {total_mods} mods.", "percent": 100, "update_in_progress": False})
 
                 elif action == "launcher_update":
-                    ver = target_version or "latest"
+                    ver = (target_version or "").strip()
+                    if not ver or ver.lower() == "latest":
+                        up_info = check_updates_server()
+                        ver = up_info.get("launcher_update") or up_info.get("current_launcher") or "1.2a"
                     notify_progress({"status": "downloading", "title": f"Updating Launcher (v{ver})...", "percent": 10, "update_in_progress": True})
                     zip_path = os.path.join(DATA_DIR, "update", f"launcher_{ver}.zip")
                     urls = [
-                        f"http://pcmod.ddns.me/download/launcher/launcher-{ver}.zip",
-                        f"http://pcmod.ddns.me/updates/launcher/launcher_{ver}.zip"
+                        f"https://pcmod.ddns.me/download/launcher/launcher-{ver}.zip",
+                        f"https://pcmod.ddns.me/updates/launcher/launcher_{ver}.zip"
                     ]
                     size_urls = [
-                        f"http://pcmod.ddns.me/download/launcher/sizes/launcher-{ver}.size",
-                        f"http://pcmod.ddns.me/updates/launcher/sizes/launcher_{ver}.size"
+                        f"https://pcmod.ddns.me/download/launcher/sizes/launcher-{ver}.size",
+                        f"https://pcmod.ddns.me/updates/launcher/sizes/launcher_{ver}.size"
                     ]
 
                     downloaded = False
@@ -1563,16 +1807,19 @@ class Api:
                             notify_progress({"status": "error", "title": "Launcher Update Error", "message": "Failed to download launcher update zip.", "percent": 0, "update_in_progress": False})
 
                 elif action == "pack_update":
-                    ver = target_version or "latest"
+                    ver = (target_version or "").strip()
+                    if not ver or ver.lower() == "latest":
+                        up_info = check_updates_server()
+                        ver = up_info.get("pack_update") or up_info.get("current_pack") or "2.5.3a"
                     notify_progress({"status": "downloading", "title": f"Updating Pack {pack} (v{ver})...", "percent": 10, "update_in_progress": True})
                     zip_path = os.path.join(DATA_DIR, "update", f"pack_{ver}.zip")
                     urls = [
-                        f"http://pcmod.ddns.me/download/pack/{pack}/pack_{ver}.zip",
-                        f"http://pcmod.ddns.me/updates/pack/{pack}/pack_{ver}.zip"
+                        f"https://pcmod.ddns.me/download/pack/{pack}/pack_{ver}.zip",
+                        f"https://pcmod.ddns.me/updates/pack/{pack}/pack_{ver}.zip"
                     ]
                     size_urls = [
-                        f"http://pcmod.ddns.me/download/pack/{pack}/sizes/pack_{ver}.size",
-                        f"http://pcmod.ddns.me/updates/pack/{pack}/sizes/pack_{ver}.size"
+                        f"https://pcmod.ddns.me/download/pack/{pack}/sizes/pack_{ver}.size",
+                        f"https://pcmod.ddns.me/updates/pack/{pack}/sizes/pack_{ver}.size"
                     ]
 
                     downloaded = False
@@ -1624,12 +1871,12 @@ class Api:
                     notify_progress({"status": "downloading", "title": f"Downloading Full Pack ({target_pack})...", "percent": 10, "update_in_progress": True})
                     zip_path = os.path.join(DATA_DIR, "update", f"full_pack_{target_pack}.zip")
                     urls = [
-                        f"http://pcmod.ddns.me/packs/{target_pack}.zip",
-                        f"http://pcmod.ddns.me/download/pack/{target_pack}.zip"
+                        f"https://pcmod.ddns.me/packs/{target_pack}.zip",
+                        f"https://pcmod.ddns.me/download/pack/{target_pack}.zip"
                     ]
                     size_urls = [
-                        f"http://pcmod.ddns.me/packs/sizes/{target_pack}.size",
-                        f"http://pcmod.ddns.me/download/pack/sizes/{target_pack}.size"
+                        f"https://pcmod.ddns.me/packs/sizes/{target_pack}.size",
+                        f"https://pcmod.ddns.me/download/pack/sizes/{target_pack}.size"
                     ]
 
                     downloaded = False
@@ -1688,7 +1935,7 @@ class Api:
     def launch_server(self, *args, **kwargs):
         log_init("Executing server launch request...")
         pack = get_pack_name()
-        url = "http://pcmod.ddns.me/servers/status.php"
+        url = "https://pcmod.ddns.me/servers/status.php"
         post_data = urllib.parse.urlencode({'id': 'PC1', 'pack': pack, 'cmd': '2'}).encode('utf-8')
         try:
             req = urllib.request.Request(url, data=post_data, headers={'User-Agent': 'Mozilla/5.0'})
@@ -1707,6 +1954,7 @@ def apply_win32_window_icons():
     if OS_NAME == "win32":
         try:
             import ctypes
+            from ctypes import wintypes
             user32 = ctypes.windll.user32
             kernel32 = ctypes.windll.kernel32
             current_pid = kernel32.GetCurrentProcessId()
@@ -1719,12 +1967,37 @@ def apply_win32_window_icons():
             GCLP_HICON = -14
             GCLP_HICONSM = -34
 
+            # Explicit 64-bit argument and return type definitions for Win32 API calls
+            user32.LoadImageW.argtypes = [wintypes.HINSTANCE, wintypes.LPCWSTR, wintypes.UINT, ctypes.c_int, ctypes.c_int, wintypes.UINT]
+            user32.LoadImageW.restype = wintypes.HANDLE
+            user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+            user32.SendMessageW.restype = wintypes.LRESULT
+
+            if hasattr(user32, 'SetClassLongPtrW'):
+                user32.SetClassLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
+                user32.SetClassLongPtrW.restype = ctypes.c_ssize_t
+
+            try:
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("PCMod.Client.1.0")
+            except Exception:
+                pass
+
+            console_hwnd = kernel32.GetConsoleWindow()
+            if console_hwnd:
+                kernel32.SetConsoleTitleW("PCMod Console")
+
             icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
             if os.path.exists(icon_path):
                 hicon_small = user32.LoadImageW(None, icon_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
                 hicon_big = user32.LoadImageW(None, icon_path, IMAGE_ICON, 32, 32, LR_LOADFROMFILE)
 
-                WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+                if console_hwnd:
+                    if hicon_small:
+                        user32.SendMessageW(console_hwnd, WM_SETICON, ICON_SMALL, hicon_small)
+                    if hicon_big:
+                        user32.SendMessageW(console_hwnd, WM_SETICON, ICON_BIG, hicon_big)
+
+                WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
 
                 def enum_windows_callback(hwnd, lparam):
                     pid = ctypes.c_ulong()
@@ -1749,109 +2022,11 @@ def apply_win32_window_icons():
         except Exception:
             pass
 
-def bootstrap_missing_files():
-    required_files = [
-        os.path.join(DATA_DIR, "pages", "launcher.html"),
-        os.path.join(DATA_DIR, "indexes", "version")
-    ]
-    missing = [f for f in required_files if not os.path.exists(f)]
-
-    if not missing:
-        return
-
-    log_init("=== Initializing PCMod Launcher Bootstrap ===")
-    log_init(f"Missing required base files: {[os.path.basename(m) for m in missing]}")
-    log_init("Downloading launcher core files from server...")
-
-    os.makedirs(os.path.join(DATA_DIR, "indexes"), exist_ok=True)
-    os.makedirs(os.path.join(DATA_DIR, "update"), exist_ok=True)
-    os.makedirs(os.path.join(DATA_DIR, "pages"), exist_ok=True)
-
-    tmp_ver_file = os.path.join(DATA_DIR, "indexes", "version.tmp")
-    version_url = "http://pcmod.ddns.me/version"
-    launcher_ver = "1.2a"
-
-    try:
-        log_init(f"Fetching version manifest from {version_url}...")
-        req = urllib.request.Request(version_url, headers={'User-Agent': 'Mozilla/5.0'})
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        with urllib.request.urlopen(req, timeout=5.0, context=ctx) as resp:
-            raw_text = resp.read().decode('utf-8', errors='ignore')
-            lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
-            with open(tmp_ver_file, "w", encoding="utf-8") as f:
-                f.write("\n".join(lines) + "\n")
-
-            ver_file = os.path.join(DATA_DIR, "indexes", "version")
-            if not os.path.exists(ver_file):
-                with open(ver_file, "w", encoding="utf-8") as f:
-                    f.write("\n".join(lines) + "\n")
-
-            for line in lines:
-                parts = line.split(";")
-                if len(parts) >= 2 and parts[0].strip() == "Launcher":
-                    launcher_ver = parts[1].strip()
-                    break
-        log_init(f"Resolved Launcher version for bootstrap: {launcher_ver}")
-    except Exception as e:
-        log_init(f"Bootstrap version fetch warning ({e}). Using default version {launcher_ver}")
-
-    download_urls = [
-        f"https://pcmod.ddns.me/download/launcher/launcher-{launcher_ver}.zip",
-        f"http://pcmod.ddns.me/download/launcher/launcher-{launcher_ver}.zip",
-        f"http://pcmod.ddns.me/updates/launcher/launcher_{launcher_ver}.zip"
-    ]
-
-    zip_path = os.path.join(DATA_DIR, "update", f"bootstrap_launcher_{launcher_ver}.zip")
-    download_success = False
-
-    for url in download_urls:
-        try:
-            log_init(f"Downloading launcher archive: {url}")
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=15.0, context=ctx) as resp:
-                with open(zip_path, "wb") as f:
-                    f.write(resp.read())
-            log_init(f"Successfully downloaded archive from {url}")
-            download_success = True
-            break
-        except Exception as e:
-            log_init(f"Failed download from {url}: {e}")
-
-    if download_success and os.path.exists(zip_path):
-        try:
-            log_init("Extracting launcher core files to root directory...")
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(BASE_DIR)
-            log_init("Core files extracted successfully.")
-        except Exception as e:
-            log_init(f"Error extracting bootstrap zip archive: {e}")
-
-    # Verify news.html
-    news_file = os.path.join(DATA_DIR, "pages", "news.html")
-    if not os.path.exists(news_file):
-        try:
-            log_init("Fetching default news page...")
-            req = urllib.request.Request("https://pcmod.ddns.me/updates/news.html", headers={'User-Agent': 'Mozilla/5.0'})
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=3.0, context=ctx) as resp:
-                with open(news_file, "wb") as f:
-                    f.write(resp.read())
-        except Exception as e:
-            log_init(f"News fetch warning: {e}")
-
-    log_init("=== Launcher Bootstrap Completed ===")
-
 def main():
-    bootstrap_missing_files()
+    apply_console_visibility()
     api = Api()
     html_path = os.path.join(DATA_DIR, "pages", "launcher.html")
+    icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
     window = webview.create_window(
         "PCMod Client",
         url=f"file://{html_path}",
