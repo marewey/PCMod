@@ -77,6 +77,11 @@ def check_cli_entrypoint():
 
 check_cli_entrypoint()
 
+def get_clean_env():
+    env = os.environ.copy()
+    env.pop('_MEIPASS2', None)
+    return env
+
 def cleanup_old_files(dirs):
     for d in dirs:
         if not d or not os.path.exists(d):
@@ -121,7 +126,7 @@ def relocate_if_needed(target_dir):
 
             extra_args = [a for a in sys.argv[1:] if a != "--cleanup-old"]
             spawn_cmd = [target_exe] + extra_args + ["--cleanup-old", current_exe]
-            subprocess.Popen(spawn_cmd, cwd=target_dir)
+            subprocess.Popen(spawn_cmd, cwd=target_dir, env=get_clean_env())
             sys.exit(0)
         except Exception as e:
             print(f"Relocation error: {e}")
@@ -1170,13 +1175,14 @@ def extract_zip_with_progress(zip_path, extract_dir, progress_callback=None, tit
 
 def restart_launcher():
     log_init("Restarting PCMod Launcher...")
+    clean_env = get_clean_env()
     if getattr(sys, 'frozen', False):
         clean_args = [a for a in sys.argv[1:] if a != "--cleanup-old"]
-        subprocess.Popen([sys.executable] + clean_args)
+        subprocess.Popen([sys.executable] + clean_args, env=clean_env)
     else:
         python_exe = sys.executable
         script_file = os.path.abspath(__file__)
-        subprocess.Popen([python_exe, script_file] + sys.argv[1:])
+        subprocess.Popen([python_exe, script_file] + sys.argv[1:], env=clean_env)
     os._exit(0)
 
 class Api:
@@ -1630,7 +1636,7 @@ class Api:
         elif modloader != "vanilla" and not os.path.exists(os.path.join(pack_dir, "versions", f"{modloader}-{mcversion}-{mlversion}")):
             needs_install = True
 
-        proc_env = os.environ.copy()
+        proc_env = get_clean_env()
         pmc_dir = os.path.join(BIN_DIR, "pmc")
         if "PYTHONPATH" in proc_env:
             proc_env["PYTHONPATH"] = pmc_dir + os.pathsep + proc_env["PYTHONPATH"]
