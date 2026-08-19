@@ -308,8 +308,17 @@ def apply_console_visibility():
             s = read_settings()
             hwnd = ctypes.windll.kernel32.GetConsoleWindow()
             if hwnd:
-                show = 1 if str(s.get("showconsole", "0")).strip() in ["1", "true", "True"] else 0
-                ctypes.windll.user32.ShowWindow(hwnd, show)
+                show = str(s.get("showconsole", "0")).strip() in ["1", "true", "True"]
+                SW_SHOW = 5
+                SW_HIDE = 0
+                SWP_NOMOVE = 0x0002
+                SWP_NOSIZE = 0x0001
+                SWP_NOZORDER = 0x0004
+                SWP_FRAMECHANGED = 0x0020
+                cmd = SW_SHOW if show else SW_HIDE
+                ctypes.windll.user32.ShowWindow(hwnd, cmd)
+                if show:
+                    ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED)
         except Exception:
             pass
 
@@ -424,6 +433,7 @@ def force_unlock_game():
         try:
             if OS_NAME == "win32":
                 subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["taskkill", "/F", "/IM", "javaw.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             else:
                 os.kill(pid, 9)
         except Exception as e:
@@ -530,30 +540,42 @@ def rot13_5(text):
             res.append(ch)
     return "".join(res)
 
+def xor_crypt(data_bytes, key_bytes):
+    if not key_bytes:
+        return data_bytes
+    res = bytearray()
+    key_len = len(key_bytes)
+    for i, b in enumerate(data_bytes):
+        res.append(b ^ key_bytes[i % key_len])
+    return bytes(res)
+
 def read_auth_token(username):
     auth_file = os.path.join(DATA_DIR, "indexes", "auth")
-    xcode_exe = os.path.join(BIN_DIR, "xcode.exe")
     if not os.path.exists(auth_file):
         return None
     token = None
-    if os.path.exists(xcode_exe) and username:
+    try:
+        with open(auth_file, "rb") as f:
+            raw = f.read().strip()
+        if raw == b"404":
+            return "404"
+
+        # Check if plain text ASCII
         try:
-            # Decrypt auth file temporarily
-            proc = subprocess.Popen([xcode_exe, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
-            proc.communicate(input=f"{username}\r\n".encode('utf-8'), timeout=2)
-            with open(auth_file, "r", encoding="utf-8", errors="ignore") as f:
-                token = f.readline().strip()
-            # Re-encrypt auth file
-            proc2 = subprocess.Popen([xcode_exe, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
-            proc2.communicate(input=f"{username}\r\n".encode('utf-8'), timeout=2)
+            decoded = raw.decode('utf-8').strip()
+            if decoded == "404" or (len(decoded) in [32, 33] and re.match(r'^\\[0-9a-fA-F]{32}$', decoded) or re.match(r'^[0-9a-fA-F]{32}$', decoded)):
+                return decoded
         except Exception:
             pass
-    if not token and os.path.exists(auth_file):
-        try:
-            with open(auth_file, "r", encoding="utf-8", errors="ignore") as f:
-                token = f.readline().strip()
-        except Exception:
-            pass
+
+        # Perform XOR decryption using username key
+        key = username.encode('utf-8')
+        decrypted = xor_crypt(raw, key).decode('utf-8', errors='ignore').strip()
+        if decrypted == "404" or re.match(r'^\\[0-9a-fA-F]{32}$', decrypted) or re.match(r'^[0-9a-fA-F]{32}$', decrypted):
+            token = decrypted
+    except Exception as e:
+        log_init(f"Error reading auth token: {e}")
+
     return token
 
 def write_encrypted_auth(username, token_val):
@@ -562,42 +584,27 @@ def write_encrypted_auth(username, token_val):
     auth_file = os.path.join(DATA_DIR, "indexes", "auth")
     os.makedirs(os.path.dirname(auth_file), exist_ok=True)
 
-    raw_hash = token_val
-    xcode_exe = os.path.join(BIN_DIR, "xcode.exe")
-
-    if token_val != "404" and os.path.exists(xcode_exe):
+    raw_token = token_val.strip()
+    if raw_token != "404":
+        # Save XOR encrypted auth token
+        key = username.encode('utf-8')
+        data = raw_token.encode('utf-8')
+        encrypted = xor_crypt(data, key)
         try:
-            proc = subprocess.Popen([xcode_exe], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
-            input_data = f"{username}\r\n{token_val}\r\n".encode('utf-8')
-            out, err = proc.communicate(input=input_data, timeout=2)
-            lines = [l.strip() for l in out.decode('utf-8', errors='ignore').splitlines() if l.strip()]
-            for l in lines:
-                if "XOR Tool" in l or "Enter string" in l or "Enter key" in l:
-                    continue
-                if len(l) == 32:
-                    raw_hash = l
-                    break
-        except Exception:
-            pass
-    elif token_val == "404":
-        raw_hash = "404"
-
-    try:
-        with open(auth_file, "w", encoding="utf-8") as f:
-            f.write(raw_hash + "\n")
-        log_init(f"Saved plain auth token to {auth_file}")
-    except Exception as e:
-        log_init(f"Error writing auth file: {e}")
-
-    if os.path.exists(xcode_exe):
-        try:
-            proc = subprocess.Popen([xcode_exe, auth_file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
-            proc.communicate(input=f"{username}\r\n".encode('utf-8'), timeout=2)
-            log_init(f"Encrypted auth file with xcode.exe at {auth_file}")
+            with open(auth_file, "wb") as f:
+                f.write(encrypted)
+            log_init(f"Saved XOR-encrypted auth token to {auth_file}")
         except Exception as e:
-            log_init(f"xcode auth file encryption error: {e}")
+            log_init(f"Error writing encrypted auth file: {e}")
+    else:
+        try:
+            with open(auth_file, "w", encoding="utf-8") as f:
+                f.write("404\n")
+            log_init(f"Saved 404 auth placeholder to {auth_file}")
+        except Exception as e:
+            log_init(f"Error writing 404 auth file: {e}")
 
-    return raw_hash
+    return raw_token
 
 def get_xcode_auth(username, password):
     if not username:
@@ -618,18 +625,6 @@ def get_xcode_auth(username, password):
 def get_uuid_tool_uuid(username):
     if not username:
         return ""
-    uuid_jar = os.path.join(BIN_DIR, "uuid-tool-1.0.jar")
-    if os.path.exists(uuid_jar):
-        try:
-            proc = subprocess.Popen(["java", "-jar", uuid_jar], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000 if OS_NAME=="win32" else 0)
-            input_data = f"{username}\r\n".encode('utf-8')
-            out, err = proc.communicate(input=input_data, timeout=2)
-            out_str = out.decode('utf-8', errors='ignore').strip()
-            match = re.search(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', out_str, re.I)
-            if match:
-                return match.group(0)
-        except Exception:
-            pass
     return get_offline_uuid(username)
 
 def load_user_info():

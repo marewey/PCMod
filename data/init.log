@@ -29,3 +29,7 @@
 [2026-08-19 00:00:49] Read settings.txt successfully: {'shortcut': '1', 'autoserver': '0', 'log-logins': '1', 'lite': '0', 'showconsole': '0', 'pack': '2-5-x', 'memory': '4096', 'username': ''}
 [2026-08-19 00:00:49] Checking for updates... Pack 2-5-x [2.5.3a] Launcher [1.2a]
 [2026-08-19 00:00:49] Checking for PORTABLEMC... 4.4.1
+[2026-08-19 01:01:02] === PCMod Client Starting ===
+[2026-08-19 01:01:02] Read settings.txt successfully: {'shortcut': '1', 'autoserver': '0', 'log-logins': '1', 'lite': '0', 'showconsole': '0', 'pack': '2-5-x', 'memory': '4096', 'username': ''}
+[2026-08-19 01:01:02] Checking for updates... Pack 2-5-x [2.5.3a] Launcher [1.2a]
+[2026-08-19 01:01:02] Checking for PORTABLEMC... 4.4.1
