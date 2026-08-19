@@ -9,8 +9,6 @@ block_cipher = None
 datas_list = []
 if os.path.exists('data/icons'):
     datas_list.append(('data/icons', 'data/icons'))
-if os.path.exists('bin'):
-    datas_list.append(('bin', 'bin'))
 
 a = Analysis(
     ['PCMod.py'],
