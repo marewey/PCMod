@@ -16,9 +16,54 @@ import zipfile
 import webview
 from datetime import datetime
 
-# Ensure data directory exists
+# Dynamic working directory (BASE_DIR) resolution
 OS_NAME = sys.platform
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+EXEC_DIR = os.path.dirname(os.path.abspath(sys.argv[0] if getattr(sys, 'frozen', False) else __file__))
+
+def resolve_base_directory():
+    # If base launcher assets or data folder already exist locally, keep EXEC_DIR as BASE_DIR
+    local_launcher = os.path.join(EXEC_DIR, "data", "pages", "launcher.html")
+    local_data = os.path.join(EXEC_DIR, "data")
+    local_bin = os.path.join(EXEC_DIR, "bin")
+
+    if os.path.exists(local_launcher) or os.path.exists(local_data) or os.path.exists(local_bin):
+        return EXEC_DIR
+
+    # When missing base files, determine if Option A (local folder) or Option B (%APPDATA%\PCMod3) applies
+    norm_exec_dir = os.path.normpath(EXEC_DIR).lower()
+    user_home = os.path.normpath(os.path.expanduser("~")).lower()
+    desktop_dir = os.path.join(user_home, "desktop")
+    downloads_dir = os.path.join(user_home, "downloads")
+
+    is_desktop_or_downloads = (
+        norm_exec_dir == desktop_dir or
+        norm_exec_dir == downloads_dir or
+        norm_exec_dir.startswith(desktop_dir + os.sep) or
+        norm_exec_dir.startswith(downloads_dir + os.sep)
+    )
+
+    allowed_entries = {"pcmod.exe", "pcmod.py", "data", "bin", "settings.txt", "pcmod.spec", "build.bat", "readme.md", ".git", ".gitignore", ".gitattributes"}
+    has_unrelated_files = False
+    try:
+        entries = os.listdir(EXEC_DIR)
+        for entry in entries:
+            if entry.lower() not in allowed_entries and not entry.startswith("bootstrap_"):
+                has_unrelated_files = True
+                break
+    except Exception:
+        pass
+
+    if is_desktop_or_downloads or has_unrelated_files:
+        appdata_dir = os.environ.get("APPDATA")
+        if not appdata_dir:
+            appdata_dir = os.path.expanduser("~/.config")
+        target_dir = os.path.join(appdata_dir, "PCMod3")
+        os.makedirs(target_dir, exist_ok=True)
+        return target_dir
+
+    return EXEC_DIR
+
+BASE_DIR = resolve_base_directory()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 BIN_DIR = os.path.join(BASE_DIR, "bin")
 OLD_CMD_DIR = os.path.join(BASE_DIR, "_old")
@@ -66,7 +111,7 @@ def bootstrap_missing_files():
     os.makedirs(os.path.join(DATA_DIR, "pages"), exist_ok=True)
 
     tmp_ver_file = os.path.join(DATA_DIR, "indexes", "version.tmp")
-    version_url = "http://pcmod.ddns.me/version"
+    version_url = "https://pcmod.ddns.me/version"
     launcher_ver = "1.2a"
 
     try:
@@ -97,8 +142,8 @@ def bootstrap_missing_files():
 
     download_urls = [
         f"https://pcmod.ddns.me/download/launcher/launcher-{launcher_ver}.zip",
-        f"http://pcmod.ddns.me/download/launcher/launcher-{launcher_ver}.zip",
-        f"http://pcmod.ddns.me/updates/launcher/launcher_{launcher_ver}.zip"
+        f"https://pcmod.ddns.me/download/launcher/launcher-{launcher_ver}.zip",
+        f"https://pcmod.ddns.me/updates/launcher/launcher_{launcher_ver}.zip"
     ]
 
     zip_path = os.path.join(DATA_DIR, "update", f"bootstrap_launcher_{launcher_ver}.zip")
@@ -615,7 +660,7 @@ def load_user_info():
     formatted_token = token if token.startswith("\\") else f"\\{token}"
 
     log_init(f"Authorizing User ({u})...")
-    auth_url = "http://pcmod.ddns.me/commands/authp.php"
+    auth_url = "https://pcmod.ddns.me/commands/authp.php"
     post_data = urllib.parse.urlencode({
         'x': formatted_token,
         'u': u,
@@ -814,7 +859,7 @@ def send_login2_telemetry(state="launcher"):
             'memory': memory
         }).encode('utf-8')
 
-        url = "http://pcmod.ddns.me/commands/login2.php"
+        url = "https://pcmod.ddns.me/commands/login2.php"
         log_init(f"Sending telemetry data to server... (state: {state})")
 
         req = urllib.request.Request(url, data=post_data, headers={'User-Agent': 'Mozilla/5.0'})
@@ -835,7 +880,7 @@ def check_updates_server():
     pack = get_pack_name()
     l_ver, p_ver = read_version_indexes(pack)
 
-    url = "http://pcmod.ddns.me/version"
+    url = "https://pcmod.ddns.me/version"
     tmp_file = os.path.join(DATA_DIR, "indexes", "version.tmp")
 
     remote_versions = {}
@@ -1202,18 +1247,18 @@ class Api:
         return {"pack": pack, "count": len(mods), "mods": mods}
 
     def open_link(self, *args, **kwargs):
-        url = args[0] if args else "http://pcmod.ddns.me"
+        url = args[0] if args else "https://pcmod.ddns.me"
         import webbrowser
         webbrowser.open(url)
         return True
 
     def open_web(self, *args, **kwargs):
         site = args[0] if args else "pcmod"
-        url = "http://pcmod.ddns.me"
+        url = "https://pcmod.ddns.me"
         if site == "discord":
             url = "https://discord.gg/AJaVhvR"
         elif site == "auth":
-            url = "http://pcmod.ddns.me/account"
+            url = "https://pcmod.ddns.me/account"
         return self.open_link(url)
 
     def get_news_url(self, *args, **kwargs):
@@ -1243,7 +1288,7 @@ class Api:
 
     def get_players_online(self, *args, **kwargs):
         pack = get_pack_name()
-        url = f"http://pcmod.ddns.me/players/list-{pack}"
+        url = f"https://pcmod.ddns.me/players/list-{pack}"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         try:
             ctx = ssl.create_default_context()
@@ -1292,7 +1337,7 @@ class Api:
         auth_token = get_xcode_auth(username, password)
 
         # POST "x=%token%&u=%user%&z=auth" to authp.php
-        auth_url = "http://pcmod.ddns.me/commands/authp.php"
+        auth_url = "https://pcmod.ddns.me/commands/authp.php"
         post_data = urllib.parse.urlencode({
             'x': auth_token,
             'u': username,
@@ -1402,7 +1447,7 @@ class Api:
                 pass
 
         try:
-            skin_url = f"http://pcmod.ddns.me/skins/{username}.png"
+            skin_url = f"https://pcmod.ddns.me/skins/{username}.png"
             skin_dst = os.path.join(DATA_DIR, "cached_skin.png")
             urllib.request.urlretrieve(skin_url, skin_dst)
         except Exception:
@@ -1584,8 +1629,8 @@ class Api:
                     if l_up:
                         notify_progress({"status": "downloading", "title": f"Downloading Launcher Update v{l_up}...", "percent": 10, "update_in_progress": True})
                         zip_path = os.path.join(DATA_DIR, "update", f"launcher_{l_up}.zip")
-                        url = f"http://pcmod.ddns.me/updates/launcher/launcher_{l_up}.zip"
-                        size_url = f"http://pcmod.ddns.me/updates/launcher/sizes/launcher_{l_up}.size"
+                        url = f"https://pcmod.ddns.me/updates/launcher/launcher_{l_up}.zip"
+                        size_url = f"https://pcmod.ddns.me/updates/launcher/sizes/launcher_{l_up}.size"
                         try:
                             download_with_progress_and_size(url, zip_path, size_url, notify_progress, f"Downloading Launcher Update v{l_up}")
                             notify_progress({"status": "extracting", "title": "Extracting Launcher Update...", "percent": 70, "update_in_progress": True})
@@ -1625,8 +1670,8 @@ class Api:
                             p_ver = p_item["new_version"]
                             notify_progress({"status": "downloading", "title": f"Updating Pack {p_name} ({idx}/{total_packs}) v{p_ver}...", "percent": 10, "update_in_progress": True})
                             zip_path = os.path.join(DATA_DIR, "update", f"pack_{p_ver}.zip")
-                            url = f"http://pcmod.ddns.me/updates/pack/{p_name}/pack_{p_ver}.zip"
-                            size_url = f"http://pcmod.ddns.me/updates/pack/{p_name}/sizes/pack_{p_ver}.size"
+                            url = f"https://pcmod.ddns.me/updates/pack/{p_name}/pack_{p_ver}.zip"
+                            size_url = f"https://pcmod.ddns.me/updates/pack/{p_name}/sizes/pack_{p_ver}.size"
                             try:
                                 download_with_progress_and_size(url, zip_path, size_url, notify_progress, f"Downloading Pack {p_name} v{p_ver}")
                                 ext_dir = os.path.join(DATA_DIR, "update", f"pack_{p_ver}")
@@ -1682,7 +1727,7 @@ class Api:
                             notify_progress({"status": "cancelled", "title": "Update Cancelled", "message": "Mod refresh cancelled.", "percent": 0, "update_in_progress": False})
                             return
                         mod_path = os.path.join(mods_dir, mfile)
-                        url = f"http://pcmod.ddns.me/mods/{pack}/{mfile}"
+                        url = f"https://pcmod.ddns.me/mods/{pack}/{mfile}"
                         pct = int((idx / total_mods) * 100) if total_mods > 0 else 100
                         notify_progress({
                             "status": "downloading",
@@ -1712,12 +1757,12 @@ class Api:
                     notify_progress({"status": "downloading", "title": f"Updating Launcher (v{ver})...", "percent": 10, "update_in_progress": True})
                     zip_path = os.path.join(DATA_DIR, "update", f"launcher_{ver}.zip")
                     urls = [
-                        f"http://pcmod.ddns.me/download/launcher/launcher-{ver}.zip",
-                        f"http://pcmod.ddns.me/updates/launcher/launcher_{ver}.zip"
+                        f"https://pcmod.ddns.me/download/launcher/launcher-{ver}.zip",
+                        f"https://pcmod.ddns.me/updates/launcher/launcher_{ver}.zip"
                     ]
                     size_urls = [
-                        f"http://pcmod.ddns.me/download/launcher/sizes/launcher-{ver}.size",
-                        f"http://pcmod.ddns.me/updates/launcher/sizes/launcher_{ver}.size"
+                        f"https://pcmod.ddns.me/download/launcher/sizes/launcher-{ver}.size",
+                        f"https://pcmod.ddns.me/updates/launcher/sizes/launcher_{ver}.size"
                     ]
 
                     downloaded = False
@@ -1774,12 +1819,12 @@ class Api:
                     notify_progress({"status": "downloading", "title": f"Updating Pack {pack} (v{ver})...", "percent": 10, "update_in_progress": True})
                     zip_path = os.path.join(DATA_DIR, "update", f"pack_{ver}.zip")
                     urls = [
-                        f"http://pcmod.ddns.me/download/pack/{pack}/pack_{ver}.zip",
-                        f"http://pcmod.ddns.me/updates/pack/{pack}/pack_{ver}.zip"
+                        f"https://pcmod.ddns.me/download/pack/{pack}/pack_{ver}.zip",
+                        f"https://pcmod.ddns.me/updates/pack/{pack}/pack_{ver}.zip"
                     ]
                     size_urls = [
-                        f"http://pcmod.ddns.me/download/pack/{pack}/sizes/pack_{ver}.size",
-                        f"http://pcmod.ddns.me/updates/pack/{pack}/sizes/pack_{ver}.size"
+                        f"https://pcmod.ddns.me/download/pack/{pack}/sizes/pack_{ver}.size",
+                        f"https://pcmod.ddns.me/updates/pack/{pack}/sizes/pack_{ver}.size"
                     ]
 
                     downloaded = False
@@ -1831,12 +1876,12 @@ class Api:
                     notify_progress({"status": "downloading", "title": f"Downloading Full Pack ({target_pack})...", "percent": 10, "update_in_progress": True})
                     zip_path = os.path.join(DATA_DIR, "update", f"full_pack_{target_pack}.zip")
                     urls = [
-                        f"http://pcmod.ddns.me/packs/{target_pack}.zip",
-                        f"http://pcmod.ddns.me/download/pack/{target_pack}.zip"
+                        f"https://pcmod.ddns.me/packs/{target_pack}.zip",
+                        f"https://pcmod.ddns.me/download/pack/{target_pack}.zip"
                     ]
                     size_urls = [
-                        f"http://pcmod.ddns.me/packs/sizes/{target_pack}.size",
-                        f"http://pcmod.ddns.me/download/pack/sizes/{target_pack}.size"
+                        f"https://pcmod.ddns.me/packs/sizes/{target_pack}.size",
+                        f"https://pcmod.ddns.me/download/pack/sizes/{target_pack}.size"
                     ]
 
                     downloaded = False
@@ -1895,7 +1940,7 @@ class Api:
     def launch_server(self, *args, **kwargs):
         log_init("Executing server launch request...")
         pack = get_pack_name()
-        url = "http://pcmod.ddns.me/servers/status.php"
+        url = "https://pcmod.ddns.me/servers/status.php"
         post_data = urllib.parse.urlencode({'id': 'PC1', 'pack': pack, 'cmd': '2'}).encode('utf-8')
         try:
             req = urllib.request.Request(url, data=post_data, headers={'User-Agent': 'Mozilla/5.0'})
