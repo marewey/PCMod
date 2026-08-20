@@ -1058,7 +1058,9 @@
       } else if (info.status === 'downloading' || info.status === 'extracting' || info.status === 'installing') {
         isUpdateActive = true;
         updateLaunchButtonState(document.getElementById('username').value);
-      } else if (info.status === 'complete' || info.status === 'error' || info.status === 'cancelled') {
+      }
+
+      if (info.status === 'complete' || info.status === 'error' || info.status === 'cancelled' || info.update_in_progress === false) {
         isUpdateActive = false;
         updateLaunchButtonState(document.getElementById('username').value);
         initLauncher();
