@@ -1330,7 +1330,8 @@ def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, t
             m_file = m_info["file"]
             m_name = m_info["name"]
             dl_path = os.path.join(mods_dir, m_file)
-            mod_url = f"https://pcmod.ddns.me/mods/{pack_name}/{m_file}"
+            quoted_file = urllib.parse.quote(m_file)
+            mod_url = f"https://pcmod.ddns.me/mods/{pack_name}/{quoted_file}"
 
             pct = int((idx / missing_count) * 100) if missing_count > 0 else 0
             if progress_callback:
@@ -1342,17 +1343,27 @@ def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, t
                     "update_in_progress": True
                 })
 
-            try:
-                req = urllib.request.Request(mod_url, headers={'User-Agent': 'Mozilla/5.0'})
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-                with urllib.request.urlopen(req, timeout=10.0, context=ctx) as resp:
-                    with open(dl_path, "wb") as mf:
-                        mf.write(resp.read())
-                log_init(f"Downloaded mod: {m_name} ({m_file})")
-            except Exception as e:
-                log_init(f"Failed to download mod {m_name} from {mod_url}: {e}")
+            downloaded = False
+            for attempt in range(1, 4):
+                if UPDATE_CANCEL_REQUESTED:
+                    raise Exception("Update cancelled by user.")
+                try:
+                    req = urllib.request.Request(mod_url, headers={'User-Agent': 'Mozilla/5.0'})
+                    ctx = ssl.create_default_context()
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
+                    with urllib.request.urlopen(req, timeout=15.0, context=ctx) as resp:
+                        with open(dl_path, "wb") as mf:
+                            mf.write(resp.read())
+                    log_init(f"Downloaded mod: {m_name} ({m_file})")
+                    downloaded = True
+                    break
+                except Exception as e:
+                    log_init(f"Attempt {attempt}/3 failed to download mod {m_name} from {mod_url}: {e}")
+                    time.sleep(1.0)
+
+            if not downloaded:
+                log_init(f"FAILED to download mod {m_name} ({m_file}) after 3 attempts.")
 
     log_init(f"Mod verification and sync completed for pack '{pack_name}'.")
 
@@ -2075,7 +2086,16 @@ class Api:
                     notify_progress({"status": "complete", "title": "No Updates Needed", "message": "Your Launcher and Packs are up to date!", "percent": 100, "update_in_progress": False})
 
                 elif action == "refresh_mods":
-                    notify_progress({"status": "downloading", "title": "Refreshing Mods...", "message": "Checking mod integrity...", "percent": 10, "update_in_progress": True})
+                    notify_progress({"status": "downloading", "title": "Refreshing Mods...", "message": "Deleting existing mods...", "percent": 10, "update_in_progress": True})
+                    mods_dir = os.path.join(DATA_DIR, "packs", pack, "mods")
+                    if os.path.exists(mods_dir):
+                        for f in os.listdir(mods_dir):
+                            fpath = os.path.join(mods_dir, f)
+                            if os.path.isfile(fpath):
+                                try:
+                                    os.remove(fpath)
+                                except Exception:
+                                    pass
                     curr_launcher_ver, curr_pack_ver = read_version_indexes(pack)
                     try:
                         verify_and_sync_mods(pack, pack_version=curr_pack_ver, progress_callback=notify_progress, title="Refreshing Mods...")
