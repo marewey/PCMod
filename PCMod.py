@@ -79,8 +79,37 @@ check_cli_entrypoint()
 
 def get_clean_env():
     env = os.environ.copy()
-    env.pop('_MEIPASS2', None)
+    keys_to_remove = [k for k in env if 'MEI' in k or 'PYI' in k]
+    for k in keys_to_remove:
+        env.pop(k, None)
     return env
+
+def run_portablemc_direct(args_list):
+    exec_dir = os.path.dirname(os.path.abspath(sys.argv[0] if getattr(sys, 'frozen', False) else __file__))
+    pmc_paths = [
+        os.path.join(exec_dir, "bin", "pmc"),
+        os.path.join(exec_dir, "_old", "bin", "pmc"),
+        os.path.join(BASE_DIR, "bin", "pmc"),
+        os.path.join(BASE_DIR, "_old", "bin", "pmc")
+    ]
+    for p in pmc_paths:
+        if os.path.exists(p) and p not in sys.path:
+            sys.path.insert(0, p)
+
+    old_argv = sys.argv[:]
+    sys.argv = ["portablemc"] + args_list
+    ret_code = 0
+    try:
+        import portablemc.cli
+        portablemc.cli.main()
+    except SystemExit as e:
+        ret_code = e.code if isinstance(e.code, int) else 0
+    except Exception as e:
+        log_init(f"PortableMC direct execution error: {e}")
+        ret_code = 1
+    finally:
+        sys.argv = old_argv
+    return ret_code
 
 def cleanup_old_files(dirs):
     for d in dirs:
@@ -296,7 +325,10 @@ def bootstrap_missing_files():
                         except Exception:
                             pass
                     zip_ref.extract(member, BASE_DIR)
-            log_init("Core files extracted successfully.")
+            log_init("Core files extracted successfully. Rebooting launcher to apply core update...")
+            log_init("=== Launcher Bootstrap Completed ===")
+            restart_launcher()
+            return
         except Exception as e:
             log_init(f"Error extracting bootstrap zip archive: {e}")
 
@@ -1178,11 +1210,12 @@ def restart_launcher():
     clean_env = get_clean_env()
     if getattr(sys, 'frozen', False):
         clean_args = [a for a in sys.argv[1:] if a != "--cleanup-old"]
-        subprocess.Popen([sys.executable] + clean_args, env=clean_env)
+        target_exe = os.path.join(BASE_DIR, "PCMod.exe") if os.path.exists(os.path.join(BASE_DIR, "PCMod.exe")) else sys.executable
+        subprocess.Popen([target_exe] + clean_args, env=clean_env, cwd=BASE_DIR)
     else:
         python_exe = sys.executable
         script_file = os.path.abspath(__file__)
-        subprocess.Popen([python_exe, script_file] + sys.argv[1:], env=clean_env)
+        subprocess.Popen([python_exe, script_file] + sys.argv[1:], env=clean_env, cwd=BASE_DIR)
     os._exit(0)
 
 class Api:
@@ -1647,35 +1680,41 @@ class Api:
             lock_file = os.path.join(DATA_DIR, "game.lock")
             crashed = False
             try:
+                try:
+                    with open(lock_file, "w", encoding="utf-8") as lf_lock:
+                        lf_lock.write(str(os.getpid()))
+                except Exception:
+                    pass
+
                 if needs_install:
                     log_init(f"Modloader/assets missing for pack '{pack}'. Downloading missing resources...")
                     if self._window:
                         self._window.evaluate_js("onGameLaunchState('downloading');")
-                    dry_cmd = [sys.executable, "-m", "portablemc", "--main-dir", DATA_DIR, "--work-dir", pack_dir, "start", "--dry", m_version]
-                    try:
-                        p_dry = subprocess.Popen(dry_cmd, env=proc_env, cwd=BASE_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-                        for line in iter(p_dry.stdout.readline, ''):
-                            sys.stdout.write(line)
-                            sys.stdout.flush()
-                        p_dry.wait()
-                    except Exception as e:
-                        log_init(f"Dry run resource setup error: {e}")
+                    dry_args = ["--main-dir", DATA_DIR, "--work-dir", pack_dir, "start", "--dry", m_version]
+                    run_portablemc_direct(dry_args)
 
                 if self._window:
                     self._window.evaluate_js("onGameLaunchState('running');")
 
-                log_init(f"Executing PMC command: {' '.join(cmd)}")
+                pmc_args = [
+                    "--main-dir", DATA_DIR,
+                    "--work-dir", os.path.join(DATA_DIR, "packs", pack),
+                    "start", m_version,
+                    "-u", username,
+                    "-i", mcuuid,
+                    f"--jvm-args={jvm_args_str}"
+                ]
+                if autoserver:
+                    port = "25565"
+                    if pack == "2-4-x": port = "25566"
+                    elif pack == "2-3-x": port = "25567"
+                    elif pack == "BTW": port = "25568"
+                    pmc_args.extend(["--server", "plattecraft.ddns.net", "--server-port", port])
+
+                log_init(f"Executing PMC command in-process: portablemc {' '.join(pmc_args)}")
                 launch_log = os.path.join(DATA_DIR, "launch.log")
                 with open(launch_log, "a", encoding="utf-8") as lf:
                     lf.write(f"\n=== PMC Launch {datetime.now()} ===\n")
-
-                proc = subprocess.Popen(cmd, env=proc_env, cwd=BASE_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-
-                try:
-                    with open(lock_file, "w", encoding="utf-8") as lf_lock:
-                        lf_lock.write(str(proc.pid))
-                except Exception:
-                    pass
 
                 # Hide launcher window while game is running
                 if self._window:
@@ -1684,16 +1723,10 @@ class Api:
                     except Exception:
                         pass
 
-                with open(launch_log, "a", encoding="utf-8") as lf:
-                    for line in iter(proc.stdout.readline, ''):
-                        sys.stdout.write(line)
-                        sys.stdout.flush()
-                        lf.write(line)
-                        lf.flush()
-                proc.wait()
-                log_init(f"Game process exited with code {proc.returncode}")
+                ret_code = run_portablemc_direct(pmc_args)
+                log_init(f"Game process exited with code {ret_code}")
 
-                if proc.returncode != 0:
+                if ret_code != 0:
                     crashed = True
                     threading.Thread(target=send_login2_telemetry, args=("crash",), daemon=True).start()
                     try:
