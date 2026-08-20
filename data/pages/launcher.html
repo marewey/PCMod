@@ -961,10 +961,10 @@
       if (container) container.style.display = 'none';
     }
 
-    function showPackDownloaderCards() {
+    function showPackDownloaderCards(forceRefresh) {
       var container = document.getElementById('packCardsContainer');
       if (!container) return;
-      if (container.style.display === 'block') {
+      if (container.style.display === 'block' && !forceRefresh) {
         container.style.display = 'none';
         return;
       }
@@ -1058,14 +1058,15 @@
       } else if (info.status === 'downloading' || info.status === 'extracting' || info.status === 'installing') {
         isUpdateActive = true;
         updateLaunchButtonState(document.getElementById('username').value);
-      } else if (info.status === 'complete' || info.status === 'error' || info.status === 'cancelled') {
+      }
+
+      if (info.status === 'complete' || info.status === 'error' || info.status === 'cancelled' || info.update_in_progress === false) {
         isUpdateActive = false;
         updateLaunchButtonState(document.getElementById('username').value);
         initLauncher();
         var container = document.getElementById('packCardsContainer');
         if (container && container.style.display === 'block') {
-          container.style.display = 'none';
-          showPackDownloaderCards();
+          showPackDownloaderCards(true);
         }
       }
     };
