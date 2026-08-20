@@ -1173,6 +1173,189 @@ def download_with_progress_and_size(url, dst_path, size_url=None, progress_callb
                     })
     return True
 
+def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, title="Validating Mods..."):
+    global UPDATE_CANCEL_REQUESTED
+    log_init(f"Starting mod verification and sync for pack '{pack_name}' (version: {pack_version})...")
+
+    pack_dir = os.path.join(DATA_DIR, "packs", pack_name)
+    mods_dir = os.path.join(pack_dir, "mods")
+    os.makedirs(mods_dir, exist_ok=True)
+    pak_file = os.path.join(pack_dir, f"PCMod-{pack_name}.pak")
+
+    # 1. Fetch latest .pak file from server if possible
+    pak_urls = []
+    if pack_version:
+        pak_urls.append(f"https://pcmod.ddns.me/updates/PCMod-{pack_name}-{pack_version}.pak")
+        pak_urls.append(f"https://pcmod.ddns.me/download/pack/{pack_name}/PCMod-{pack_name}.pak")
+    pak_urls.append(f"https://pcmod.ddns.me/updates/PCMod-{pack_name}.pak")
+
+    for p_url in pak_urls:
+        try:
+            req = urllib.request.Request(p_url, headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=5.0, context=ctx) as resp:
+                content = resp.read()
+                if content:
+                    os.makedirs(os.path.dirname(pak_file), exist_ok=True)
+                    with open(pak_file, "wb") as pf:
+                        pf.write(content)
+                    log_init(f"Downloaded pak file successfully from {p_url}")
+                    break
+        except Exception as e:
+            log_init(f"Warning downloading pak file from {p_url}: {e}")
+
+    if not os.path.exists(pak_file):
+        log_init(f"Warning: pak file {pak_file} not found. Skipping mod verification.")
+        return
+
+    # 2. Parse .pak file for expected mods (tags B, C, U)
+    expected_mods = []
+    try:
+        with open(pak_file, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                parts = line.strip().split(";")
+                if len(parts) >= 2:
+                    tag = parts[0].strip()
+                    if tag in ["B", "C", "U"]:
+                        mod_file = parts[1].strip()
+                        mod_ver = parts[2].strip() if len(parts) > 2 else ""
+                        mod_name = parts[3].strip() if len(parts) > 3 else mod_file
+                        expected_mods.append({
+                            "tag": tag,
+                            "file": mod_file,
+                            "version": mod_ver,
+                            "name": mod_name,
+                            "line": line.strip()
+                        })
+    except Exception as e:
+        log_init(f"Error parsing pak file {pak_file}: {e}")
+        return
+
+    total_expected = len(expected_mods)
+    if total_expected == 0:
+        log_init("No mods specified in pak file.")
+        return
+
+    # 3. Stage valid mods into data/update/staging
+    staging_dir = os.path.join(DATA_DIR, "update", "staging")
+    if os.path.exists(staging_dir):
+        import shutil
+        try:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+        except Exception:
+            pass
+    os.makedirs(staging_dir, exist_ok=True)
+
+    missing_mods = []
+    log_init(f"Validating {total_expected} mods against local mods folder...")
+
+    for idx, m_info in enumerate(expected_mods, 1):
+        if UPDATE_CANCEL_REQUESTED:
+            raise Exception("Update cancelled by user.")
+
+        m_file = m_info["file"]
+        m_name = m_info["name"]
+        src_path = os.path.join(mods_dir, m_file)
+        dst_path = os.path.join(staging_dir, m_file)
+
+        pct = int((idx / total_expected) * 100) if total_expected > 0 else 0
+        if progress_callback:
+            progress_callback({
+                "status": "downloading",
+                "title": title,
+                "message": f"Validating mods... [{idx}/{total_expected}] {pct}%",
+                "percent": pct,
+                "update_in_progress": True
+            })
+
+        if os.path.exists(src_path):
+            try:
+                os.rename(src_path, dst_path)
+            except Exception:
+                import shutil
+                shutil.copy2(src_path, dst_path)
+                try:
+                    os.remove(src_path)
+                except Exception:
+                    pass
+        else:
+            missing_mods.append(m_info)
+
+    # 4. Purge remaining old/unlisted mods in mods_dir
+    log_init("Purging old/unlisted mods...")
+    try:
+        for fname in os.listdir(mods_dir):
+            fpath = os.path.join(mods_dir, fname)
+            if os.path.isfile(fpath):
+                try:
+                    os.remove(fpath)
+                except Exception as e:
+                    log_init(f"Error purging file {fname}: {e}")
+    except Exception as e:
+        log_init(f"Error reading mods directory for purging: {e}")
+
+    # 5. Move valid mods back from staging to mods_dir
+    log_init("Restoring staged valid mods...")
+    try:
+        for fname in os.listdir(staging_dir):
+            s_path = os.path.join(staging_dir, fname)
+            d_path = os.path.join(mods_dir, fname)
+            if os.path.isfile(s_path):
+                try:
+                    os.rename(s_path, d_path)
+                except Exception:
+                    import shutil
+                    shutil.copy2(s_path, d_path)
+    except Exception as e:
+        log_init(f"Error restoring staged mods: {e}")
+
+    import shutil
+    try:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+    except Exception:
+        pass
+
+    # 6. Download missing mods
+    missing_count = len(missing_mods)
+    log_init(f"Verification complete: {total_expected} mods total, {missing_count} missing.")
+
+    if missing_count > 0:
+        log_init(f"Downloading {missing_count} missing mods for pack '{pack_name}'...")
+        for idx, m_info in enumerate(missing_mods, 1):
+            if UPDATE_CANCEL_REQUESTED:
+                raise Exception("Update cancelled by user.")
+
+            m_file = m_info["file"]
+            m_name = m_info["name"]
+            dl_path = os.path.join(mods_dir, m_file)
+            mod_url = f"https://pcmod.ddns.me/mods/{pack_name}/{m_file}"
+
+            pct = int((idx / missing_count) * 100) if missing_count > 0 else 0
+            if progress_callback:
+                progress_callback({
+                    "status": "downloading",
+                    "title": title,
+                    "message": f"Downloading missing mod ({idx}/{missing_count}): {m_name}",
+                    "percent": pct,
+                    "update_in_progress": True
+                })
+
+            try:
+                req = urllib.request.Request(mod_url, headers={'User-Agent': 'Mozilla/5.0'})
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                with urllib.request.urlopen(req, timeout=10.0, context=ctx) as resp:
+                    with open(dl_path, "wb") as mf:
+                        mf.write(resp.read())
+                log_init(f"Downloaded mod: {m_name} ({m_file})")
+            except Exception as e:
+                log_init(f"Failed to download mod {m_name} from {mod_url}: {e}")
+
+    log_init(f"Mod verification and sync completed for pack '{pack_name}'.")
+
 def extract_zip_with_progress(zip_path, extract_dir, progress_callback=None, title="Extracting..."):
     global UPDATE_CANCEL_REQUESTED
     os.makedirs(extract_dir, exist_ok=True)
@@ -1876,6 +2059,7 @@ class Api:
                                         except Exception:
                                             pass
                                 update_version_index(p_name, p_ver)
+                                verify_and_sync_mods(p_name, pack_version=p_ver, progress_callback=notify_progress, title=f"Verifying Mods ({p_name})...")
                             except Exception as e:
                                 if UPDATE_CANCEL_REQUESTED:
                                     notify_progress({"status": "cancelled", "title": "Update Cancelled", "message": "Pack update cancelled.", "percent": 0, "update_in_progress": False})
@@ -1892,47 +2076,15 @@ class Api:
 
                 elif action == "refresh_mods":
                     notify_progress({"status": "downloading", "title": "Refreshing Mods...", "message": "Checking mod integrity...", "percent": 10, "update_in_progress": True})
-                    pak_file = os.path.join(DATA_DIR, "packs", pack, f"PCMod-{pack}.pak")
-                    mods_dir = os.path.join(DATA_DIR, "packs", pack, "mods")
-                    os.makedirs(mods_dir, exist_ok=True)
-
-                    mods_to_download = []
-                    if os.path.exists(pak_file):
-                        with open(pak_file, "r", encoding="utf-8", errors="ignore") as f:
-                            for line in f:
-                                parts = line.strip().split(";")
-                                if len(parts) >= 2 and parts[0].strip() in ["U", "C", "B"]:
-                                    mod_file = parts[1].strip()
-                                    mod_name = parts[3].strip() if len(parts) > 3 else mod_file
-                                    mods_to_download.append((mod_file, mod_name))
-
-                    total_mods = len(mods_to_download)
-                    for idx, (mfile, mname) in enumerate(mods_to_download, 1):
+                    curr_launcher_ver, curr_pack_ver = read_version_indexes(pack)
+                    try:
+                        verify_and_sync_mods(pack, pack_version=curr_pack_ver, progress_callback=notify_progress, title="Refreshing Mods...")
+                        notify_progress({"status": "complete", "title": "Refresh Mods Complete!", "message": "Verified all mods.", "percent": 100, "update_in_progress": False})
+                    except Exception as e:
                         if UPDATE_CANCEL_REQUESTED:
                             notify_progress({"status": "cancelled", "title": "Update Cancelled", "message": "Mod refresh cancelled.", "percent": 0, "update_in_progress": False})
-                            return
-                        mod_path = os.path.join(mods_dir, mfile)
-                        url = f"https://pcmod.ddns.me/mods/{pack}/{mfile}"
-                        pct = int((idx / total_mods) * 100) if total_mods > 0 else 100
-                        notify_progress({
-                            "status": "downloading",
-                            "title": "Refreshing Mods...",
-                            "message": f"Downloading {mname} ({idx}/{total_mods})",
-                            "percent": pct,
-                            "update_in_progress": True
-                        })
-                        try:
-                            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-                            ctx = ssl.create_default_context()
-                            ctx.check_hostname = False
-                            ctx.verify_mode = ssl.CERT_NONE
-                            with urllib.request.urlopen(req, timeout=5.0, context=ctx) as resp:
-                                with open(mod_path, "wb") as mf:
-                                    mf.write(resp.read())
-                        except Exception:
-                            pass
-
-                    notify_progress({"status": "complete", "title": "Refresh Mods Complete!", "message": f"Verified {total_mods} mods.", "percent": 100, "update_in_progress": False})
+                        else:
+                            notify_progress({"status": "error", "title": "Mod Refresh Error", "message": str(e), "percent": 0, "update_in_progress": False})
 
                 elif action == "launcher_update":
                     ver = (target_version or "").strip()
@@ -2043,6 +2195,7 @@ class Api:
                                     except Exception:
                                         pass
                             update_version_index(pack, ver)
+                            verify_and_sync_mods(pack, pack_version=ver, progress_callback=notify_progress, title=f"Verifying Mods ({pack})...")
                             notify_progress({"status": "complete", "title": "Pack Update Complete!", "message": f"{pack} updated to v{ver}", "percent": 100, "update_in_progress": False})
                             threading.Thread(target=send_login2_telemetry, args=("updated",), daemon=True).start()
                         except Exception as e:
@@ -2099,6 +2252,7 @@ class Api:
                                             df.write(sf.read())
                                     except Exception:
                                         pass
+                            verify_and_sync_mods(target_pack, pack_version=None, progress_callback=notify_progress, title=f"Verifying Mods ({target_pack})...")
                             notify_progress({"status": "complete", "title": "Pack Installation Complete!", "message": f"Full Pack '{target_pack}' installed successfully.", "percent": 100, "update_in_progress": False})
                         except Exception as e:
                             if UPDATE_CANCEL_REQUESTED:
