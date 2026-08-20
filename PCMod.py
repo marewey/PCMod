@@ -13,12 +13,152 @@ import ftplib
 import threading
 import socket
 import zipfile
-import webview
 from datetime import datetime
 
 # Dynamic working directory (BASE_DIR) resolution
 OS_NAME = sys.platform
 EXEC_DIR = os.path.dirname(os.path.abspath(sys.argv[0] if getattr(sys, 'frozen', False) else __file__))
+
+def check_cli_entrypoint():
+    # Handle cleanup-old argument if present
+    if "--cleanup-old" in sys.argv:
+        try:
+            idx = sys.argv.index("--cleanup-old")
+            if idx + 1 < len(sys.argv):
+                old_path = sys.argv[idx + 1]
+                def _cleanup():
+                    time.sleep(1.5)
+                    try:
+                        if os.path.exists(old_path):
+                            os.remove(old_path)
+                    except Exception:
+                        pass
+                threading.Thread(target=_cleanup, daemon=True).start()
+        except Exception:
+            pass
+
+    # Check for portablemc invocation
+    argv = sys.argv[:]
+    is_pmc = False
+    pmc_args = []
+
+    if len(argv) > 1:
+        if argv[1] == "-m" and len(argv) > 2 and argv[2] == "portablemc":
+            is_pmc = True
+            pmc_args = ["portablemc"] + argv[3:]
+        elif argv[1] == "portablemc":
+            is_pmc = True
+            pmc_args = ["portablemc"] + argv[2:]
+        elif "-m" in argv and "portablemc" in argv:
+            is_pmc = True
+            idx = argv.index("portablemc")
+            pmc_args = ["portablemc"] + argv[idx+1:]
+
+    if is_pmc:
+        exec_dir = os.path.dirname(os.path.abspath(sys.argv[0] if getattr(sys, 'frozen', False) else __file__))
+        pmc_paths = [
+            os.path.join(exec_dir, "bin", "pmc"),
+            os.path.join(exec_dir, "_old", "bin", "pmc")
+        ]
+        for p in pmc_paths:
+            if os.path.exists(p) and p not in sys.path:
+                sys.path.insert(0, p)
+
+        sys.argv = pmc_args
+        try:
+            import portablemc.cli
+            portablemc.cli.main()
+        except SystemExit as e:
+            sys.exit(e.code if isinstance(e.code, int) else 0)
+        except Exception as e:
+            print(f"Error running PortableMC CLI: {e}")
+            sys.exit(1)
+        sys.exit(0)
+
+check_cli_entrypoint()
+
+def get_clean_env():
+    env = os.environ.copy()
+    keys_to_remove = [k for k in env if 'MEI' in k or 'PYI' in k]
+    for k in keys_to_remove:
+        env.pop(k, None)
+    return env
+
+def run_portablemc_direct(args_list):
+    exec_dir = os.path.dirname(os.path.abspath(sys.argv[0] if getattr(sys, 'frozen', False) else __file__))
+    pmc_paths = [
+        os.path.join(exec_dir, "bin", "pmc"),
+        os.path.join(exec_dir, "_old", "bin", "pmc"),
+        os.path.join(BASE_DIR, "bin", "pmc"),
+        os.path.join(BASE_DIR, "_old", "bin", "pmc")
+    ]
+    for p in pmc_paths:
+        if os.path.exists(p) and p not in sys.path:
+            sys.path.insert(0, p)
+
+    old_argv = sys.argv[:]
+    sys.argv = ["portablemc"] + args_list
+    ret_code = 0
+    try:
+        import portablemc.cli
+        portablemc.cli.main()
+    except SystemExit as e:
+        ret_code = e.code if isinstance(e.code, int) else 0
+    except Exception as e:
+        log_init(f"PortableMC direct execution error: {e}")
+        ret_code = 1
+    finally:
+        sys.argv = old_argv
+    return ret_code
+
+def cleanup_old_files(dirs):
+    for d in dirs:
+        if not d or not os.path.exists(d):
+            continue
+        try:
+            for fname in os.listdir(d):
+                if fname.endswith(".old"):
+                    fpath = os.path.join(d, fname)
+                    try:
+                        os.remove(fpath)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+def relocate_if_needed(target_dir):
+    is_frozen = getattr(sys, 'frozen', False) or sys.argv[0].lower().endswith(".exe")
+    if not is_frozen:
+        return
+
+    current_exe = os.path.abspath(sys.argv[0] if getattr(sys, 'frozen', False) else sys.executable)
+    current_dir = os.path.dirname(current_exe)
+
+    norm_current_dir = os.path.normpath(current_dir).lower()
+    norm_target_dir = os.path.normpath(target_dir).lower()
+
+    if norm_current_dir != norm_target_dir:
+        os.makedirs(target_dir, exist_ok=True)
+        target_exe = os.path.join(target_dir, "PCMod.exe")
+
+        try:
+            import shutil
+            if os.path.exists(target_exe):
+                old_target = target_exe + ".old"
+                try:
+                    if os.path.exists(old_target):
+                        os.remove(old_target)
+                    os.rename(target_exe, old_target)
+                except Exception:
+                    pass
+            shutil.copy2(current_exe, target_exe)
+
+            extra_args = [a for a in sys.argv[1:] if a != "--cleanup-old"]
+            spawn_cmd = [target_exe] + extra_args + ["--cleanup-old", current_exe]
+            subprocess.Popen(spawn_cmd, cwd=target_dir, env=get_clean_env())
+            sys.exit(0)
+        except Exception as e:
+            print(f"Relocation error: {e}")
 
 def resolve_base_directory():
     # If base launcher assets or data folder already exist locally, keep EXEC_DIR as BASE_DIR
@@ -64,6 +204,8 @@ def resolve_base_directory():
     return EXEC_DIR
 
 BASE_DIR = resolve_base_directory()
+relocate_if_needed(BASE_DIR)
+cleanup_old_files([EXEC_DIR, BASE_DIR])
 DATA_DIR = os.path.join(BASE_DIR, "data")
 BIN_DIR = os.path.join(BASE_DIR, "bin")
 OLD_CMD_DIR = os.path.join(BASE_DIR, "_old")
@@ -169,8 +311,24 @@ def bootstrap_missing_files():
         try:
             log_init("Extracting launcher core files to root directory...")
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(BASE_DIR)
-            log_init("Core files extracted successfully.")
+                for member in zip_ref.infolist():
+                    target_path = os.path.join(BASE_DIR, member.filename)
+                    if os.path.exists(target_path) and not member.is_dir():
+                        try:
+                            old_path = target_path + ".old"
+                            if os.path.exists(old_path):
+                                try:
+                                    os.remove(old_path)
+                                except Exception:
+                                    pass
+                            os.rename(target_path, old_path)
+                        except Exception:
+                            pass
+                    zip_ref.extract(member, BASE_DIR)
+            log_init("Core files extracted successfully. Rebooting launcher to apply core update...")
+            log_init("=== Launcher Bootstrap Completed ===")
+            restart_launcher()
+            return
         except Exception as e:
             log_init(f"Error extracting bootstrap zip archive: {e}")
 
@@ -217,7 +375,10 @@ def toggle_desktop_shortcut(enable):
                     'shortcutPath = desktopPath & "\\PCMod Client.lnk"\n'
                     'Set sc = ws.CreateShortcut(shortcutPath)\n'
                     f'sc.TargetPath = "{target}"\n'
-                    f'sc.Arguments = "{script_file}"\n'
+                )
+                if not getattr(sys, 'frozen', False):
+                    vbs_script += f'sc.Arguments = "{script_file}"\n'
+                vbs_script += (
                     f'sc.WorkingDirectory = "{BASE_DIR}"\n'
                     f'sc.IconLocation = "{icon_path}"\n'
                     'sc.Save\n'
@@ -1021,6 +1182,18 @@ def extract_zip_with_progress(zip_path, extract_dir, progress_callback=None, tit
         for i, member in enumerate(members, 1):
             if UPDATE_CANCEL_REQUESTED:
                 raise Exception("Update cancelled by user.")
+            target_path = os.path.join(extract_dir, member.filename)
+            if os.path.exists(target_path) and not member.is_dir():
+                try:
+                    old_path = target_path + ".old"
+                    if os.path.exists(old_path):
+                        try:
+                            os.remove(old_path)
+                        except Exception:
+                            pass
+                    os.rename(target_path, old_path)
+                except Exception:
+                    pass
             zip_ref.extract(member, extract_dir)
             if progress_callback and total_files > 0:
                 percent = int((i / total_files) * 100)
@@ -1034,9 +1207,15 @@ def extract_zip_with_progress(zip_path, extract_dir, progress_callback=None, tit
 
 def restart_launcher():
     log_init("Restarting PCMod Launcher...")
-    python_exe = sys.executable
-    script_file = os.path.abspath(__file__)
-    subprocess.Popen([python_exe, script_file] + sys.argv[1:])
+    clean_env = get_clean_env()
+    if getattr(sys, 'frozen', False):
+        clean_args = [a for a in sys.argv[1:] if a != "--cleanup-old"]
+        target_exe = os.path.join(BASE_DIR, "PCMod.exe") if os.path.exists(os.path.join(BASE_DIR, "PCMod.exe")) else sys.executable
+        subprocess.Popen([target_exe] + clean_args, env=clean_env, cwd=BASE_DIR)
+    else:
+        python_exe = sys.executable
+        script_file = os.path.abspath(__file__)
+        subprocess.Popen([python_exe, script_file] + sys.argv[1:], env=clean_env, cwd=BASE_DIR)
     os._exit(0)
 
 class Api:
@@ -1490,7 +1669,7 @@ class Api:
         elif modloader != "vanilla" and not os.path.exists(os.path.join(pack_dir, "versions", f"{modloader}-{mcversion}-{mlversion}")):
             needs_install = True
 
-        proc_env = os.environ.copy()
+        proc_env = get_clean_env()
         pmc_dir = os.path.join(BIN_DIR, "pmc")
         if "PYTHONPATH" in proc_env:
             proc_env["PYTHONPATH"] = pmc_dir + os.pathsep + proc_env["PYTHONPATH"]
@@ -1501,35 +1680,41 @@ class Api:
             lock_file = os.path.join(DATA_DIR, "game.lock")
             crashed = False
             try:
+                try:
+                    with open(lock_file, "w", encoding="utf-8") as lf_lock:
+                        lf_lock.write(str(os.getpid()))
+                except Exception:
+                    pass
+
                 if needs_install:
                     log_init(f"Modloader/assets missing for pack '{pack}'. Downloading missing resources...")
                     if self._window:
                         self._window.evaluate_js("onGameLaunchState('downloading');")
-                    dry_cmd = [sys.executable, "-m", "portablemc", "--main-dir", DATA_DIR, "--work-dir", pack_dir, "start", "--dry", m_version]
-                    try:
-                        p_dry = subprocess.Popen(dry_cmd, env=proc_env, cwd=BASE_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-                        for line in iter(p_dry.stdout.readline, ''):
-                            sys.stdout.write(line)
-                            sys.stdout.flush()
-                        p_dry.wait()
-                    except Exception as e:
-                        log_init(f"Dry run resource setup error: {e}")
+                    dry_args = ["--main-dir", DATA_DIR, "--work-dir", pack_dir, "start", "--dry", m_version]
+                    run_portablemc_direct(dry_args)
 
                 if self._window:
                     self._window.evaluate_js("onGameLaunchState('running');")
 
-                log_init(f"Executing PMC command: {' '.join(cmd)}")
+                pmc_args = [
+                    "--main-dir", DATA_DIR,
+                    "--work-dir", os.path.join(DATA_DIR, "packs", pack),
+                    "start", m_version,
+                    "-u", username,
+                    "-i", mcuuid,
+                    f"--jvm-args={jvm_args_str}"
+                ]
+                if autoserver:
+                    port = "25565"
+                    if pack == "2-4-x": port = "25566"
+                    elif pack == "2-3-x": port = "25567"
+                    elif pack == "BTW": port = "25568"
+                    pmc_args.extend(["--server", "plattecraft.ddns.net", "--server-port", port])
+
+                log_init(f"Executing PMC command in-process: portablemc {' '.join(pmc_args)}")
                 launch_log = os.path.join(DATA_DIR, "launch.log")
                 with open(launch_log, "a", encoding="utf-8") as lf:
                     lf.write(f"\n=== PMC Launch {datetime.now()} ===\n")
-
-                proc = subprocess.Popen(cmd, env=proc_env, cwd=BASE_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-
-                try:
-                    with open(lock_file, "w", encoding="utf-8") as lf_lock:
-                        lf_lock.write(str(proc.pid))
-                except Exception:
-                    pass
 
                 # Hide launcher window while game is running
                 if self._window:
@@ -1538,16 +1723,10 @@ class Api:
                     except Exception:
                         pass
 
-                with open(launch_log, "a", encoding="utf-8") as lf:
-                    for line in iter(proc.stdout.readline, ''):
-                        sys.stdout.write(line)
-                        sys.stdout.flush()
-                        lf.write(line)
-                        lf.flush()
-                proc.wait()
-                log_init(f"Game process exited with code {proc.returncode}")
+                ret_code = run_portablemc_direct(pmc_args)
+                log_init(f"Game process exited with code {ret_code}")
 
-                if proc.returncode != 0:
+                if ret_code != 0:
                     crashed = True
                     threading.Thread(target=send_login2_telemetry, args=("crash",), daemon=True).start()
                     try:
@@ -1639,11 +1818,22 @@ class Api:
                                 for file in files:
                                     src_file = os.path.join(root, file)
                                     dst_file = os.path.join(dst_dir, file)
+                                    if os.path.exists(dst_file):
+                                        old_file = dst_file + ".old"
+                                        try:
+                                            if os.path.exists(old_file):
+                                                try:
+                                                    os.remove(old_file)
+                                                except Exception:
+                                                    pass
+                                            os.rename(dst_file, old_file)
+                                        except Exception:
+                                            pass
                                     try:
                                         with open(src_file, "rb") as sf, open(dst_file, "wb") as df:
                                             df.write(sf.read())
-                                    except Exception:
-                                        pass
+                                    except Exception as e:
+                                        log_init(f"Warning copying update file {file}: {e}")
                             update_version_index("Launcher", l_up)
                             notify_progress({"status": "complete", "title": "Launcher Update Complete!", "message": "Restarting PCMod...", "percent": 100, "update_in_progress": False})
                             UPDATE_IN_PROGRESS = False
@@ -2023,6 +2213,7 @@ def apply_win32_window_icons():
             pass
 
 def main():
+    import webview
     apply_console_visibility()
     api = Api()
     html_path = os.path.join(DATA_DIR, "pages", "launcher.html")
