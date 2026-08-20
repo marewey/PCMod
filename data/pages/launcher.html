@@ -961,10 +961,10 @@
       if (container) container.style.display = 'none';
     }
 
-    function showPackDownloaderCards() {
+    function showPackDownloaderCards(forceRefresh) {
       var container = document.getElementById('packCardsContainer');
       if (!container) return;
-      if (container.style.display === 'block') {
+      if (container.style.display === 'block' && !forceRefresh) {
         container.style.display = 'none';
         return;
       }
@@ -1064,8 +1064,7 @@
         initLauncher();
         var container = document.getElementById('packCardsContainer');
         if (container && container.style.display === 'block') {
-          container.style.display = 'none';
-          showPackDownloaderCards();
+          showPackDownloaderCards(true);
         }
       }
     };

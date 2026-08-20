@@ -623,23 +623,44 @@ def get_portablemc_version_spec(pack_name):
 
 def update_version_index(key, new_ver):
     vfile = os.path.join(DATA_DIR, "indexes", "version")
+    tmp_vfile = os.path.join(DATA_DIR, "indexes", "version.tmp")
     lines = []
     found = False
+
+    # First check version.tmp or version file for default metadata fields if missing
+    def_loader, def_mcver, def_mlver = "forge", "1.20.1", ""
+    for check_f in [vfile, tmp_vfile]:
+        if os.path.exists(check_f):
+            try:
+                with open(check_f, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        parts = line.strip().split(";")
+                        if len(parts) >= 2 and parts[0].strip() == key:
+                            if len(parts) >= 3 and parts[2].strip(): def_loader = parts[2].strip()
+                            if len(parts) >= 4 and parts[3].strip(): def_mcver = parts[3].strip()
+                            if len(parts) >= 5 and parts[4].strip(): def_mlver = parts[4].strip()
+                            break
+            except Exception:
+                pass
+
     if os.path.exists(vfile):
         try:
             with open(vfile, "r", encoding="utf-8", errors="ignore") as f:
                 for line in f:
                     parts = line.strip().split(";")
                     if len(parts) >= 2 and parts[0].strip() == key:
-                        parts[1] = new_ver
+                        if new_ver:
+                            parts[1] = new_ver
                         lines.append(";".join(parts) + "\n")
                         found = True
                     else:
                         lines.append(line)
         except Exception:
             pass
+
     if not found:
-        lines.append(f"{key};{new_ver};PCMod;1.20.1;\n")
+        ver_val = new_ver if new_ver else "1.0.0"
+        lines.append(f"{key};{ver_val};{def_loader};{def_mcver};{def_mlver}\n")
 
     try:
         with open(vfile, "w", encoding="utf-8") as f:
@@ -2272,6 +2293,8 @@ class Api:
                                             df.write(sf.read())
                                     except Exception:
                                         pass
+                            p_info = read_version_info(target_pack)
+                            update_version_index(target_pack, p_info.get("pack_ver") if p_info.get("pack_ver") != "2.5.3a" else None)
                             verify_and_sync_mods(target_pack, pack_version=None, progress_callback=notify_progress, title=f"Verifying Mods ({target_pack})...")
                             notify_progress({"status": "complete", "title": "Pack Installation Complete!", "message": f"Full Pack '{target_pack}' installed successfully.", "percent": 100, "update_in_progress": False})
                         except Exception as e:
