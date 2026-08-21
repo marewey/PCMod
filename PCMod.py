@@ -1149,20 +1149,7 @@ def check_updates_server():
         "update_available": bool(launcher_update or len(pack_updates) > 0)
     }
 
-def get_remote_file_size(url, size_url=None):
-    if size_url:
-        try:
-            req = urllib.request.Request(size_url, headers={'User-Agent': 'Mozilla/5.0'})
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=2.5, context=ctx) as resp:
-                raw = resp.read().decode('utf-8', errors='ignore').strip()
-                if raw.isdigit():
-                    return int(raw)
-        except Exception:
-            pass
-
+def get_remote_file_size(url):
     try:
         req = urllib.request.Request(url, method='HEAD', headers={'User-Agent': 'Mozilla/5.0'})
         ctx = ssl.create_default_context()
@@ -1177,9 +1164,9 @@ def get_remote_file_size(url, size_url=None):
 
     return 0
 
-def download_with_progress_and_size(url, dst_path, size_url=None, progress_callback=None, title="Downloading..."):
+def download_with_progress_and_size(url, dst_path, progress_callback=None, title="Downloading..."):
     global UPDATE_CANCEL_REQUESTED
-    total_bytes = get_remote_file_size(url, size_url)
+    total_bytes = get_remote_file_size(url)
 
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
     ctx = ssl.create_default_context()
@@ -2132,17 +2119,10 @@ class Api:
                             f"https://pcmod.ddns.me/download/launcher/launcher-{l_up}.zip",
                             f"https://pcmod.ddns.me/updates/launcher/launcher_{l_up}.zip"
                         ]
-                        size_urls = [
-                            f"https://files.pcmod.ddns.me/download/launcher/sizes/launcher_{l_up}.size",
-                            f"https://files.pcmod.ddns.me/download/launcher/sizes/launcher-{l_up}.size",
-                            f"https://pcmod.ddns.me/download/launcher/sizes/launcher_{l_up}.size",
-                            f"https://pcmod.ddns.me/download/launcher/sizes/launcher-{l_up}.size",
-                            f"https://pcmod.ddns.me/updates/launcher/sizes/launcher_{l_up}.size"
-                        ]
                         downloaded = False
-                        for u, su in zip(urls, size_urls):
+                        for u in urls:
                             try:
-                                download_with_progress_and_size(u, zip_path, su, notify_progress, f"Downloading Launcher Update v{l_up}")
+                                download_with_progress_and_size(u, zip_path, notify_progress, f"Downloading Launcher Update v{l_up}")
                                 downloaded = True
                                 break
                             except Exception as e:
@@ -2197,16 +2177,10 @@ class Api:
                                 f"https://pcmod.ddns.me/download/pack/{p_name}/pack_{p_ver}.zip",
                                 f"https://pcmod.ddns.me/updates/pack/{p_name}/pack_{p_ver}.zip"
                             ]
-                            size_urls = [
-                                f"https://files.pcmod.ddns.me/download/pack/{p_name}/sizes/pack_{p_ver}.size",
-                                f"https://files.pcmod.ddns.me/download/pack/sizes/pack_{p_ver}.size",
-                                f"https://pcmod.ddns.me/download/pack/{p_name}/sizes/pack_{p_ver}.size",
-                                f"https://pcmod.ddns.me/updates/pack/{p_name}/sizes/pack_{p_ver}.size"
-                            ]
                             p_downloaded = False
-                            for u, su in zip(urls, size_urls):
+                            for u in urls:
                                 try:
-                                    download_with_progress_and_size(u, zip_path, su, notify_progress, f"Downloading Pack {p_name} v{p_ver}")
+                                    download_with_progress_and_size(u, zip_path, notify_progress, f"Downloading Pack {p_name} v{p_ver}")
                                     p_downloaded = True
                                     break
                                 except Exception as e:
@@ -2290,18 +2264,11 @@ class Api:
                         f"https://pcmod.ddns.me/download/launcher/launcher-{ver}.zip",
                         f"https://pcmod.ddns.me/updates/launcher/launcher_{ver}.zip"
                     ]
-                    size_urls = [
-                        f"https://files.pcmod.ddns.me/download/launcher/sizes/launcher_{ver}.size",
-                        f"https://files.pcmod.ddns.me/download/launcher/sizes/launcher-{ver}.size",
-                        f"https://pcmod.ddns.me/download/launcher/sizes/launcher_{ver}.size",
-                        f"https://pcmod.ddns.me/download/launcher/sizes/launcher-{ver}.size",
-                        f"https://pcmod.ddns.me/updates/launcher/sizes/launcher_{ver}.size"
-                    ]
 
                     downloaded = False
-                    for u, su in zip(urls, size_urls):
+                    for u in urls:
                         try:
-                            download_with_progress_and_size(u, zip_path, su, notify_progress, f"Downloading Launcher v{ver}")
+                            download_with_progress_and_size(u, zip_path, notify_progress, f"Downloading Launcher v{ver}")
                             downloaded = True
                             break
                         except Exception as e:
@@ -2360,20 +2327,11 @@ class Api:
                         f"https://pcmod.ddns.me/download/pack/{pack}/pack-{ver}.zip",
                         f"https://pcmod.ddns.me/updates/pack/{pack}/pack_{ver}.zip"
                     ]
-                    size_urls = [
-                        f"https://files.pcmod.ddns.me/download/pack/{pack}/sizes/pack_{ver}.size",
-                        f"https://files.pcmod.ddns.me/download/pack/{pack}/sizes/pack-{ver}.size",
-                        f"https://files.pcmod.ddns.me/download/pack/sizes/pack_{ver}.size",
-                        f"https://files.pcmod.ddns.me/download/pack/sizes/pack-{ver}.size",
-                        f"https://pcmod.ddns.me/download/pack/{pack}/sizes/pack_{ver}.size",
-                        f"https://pcmod.ddns.me/download/pack/{pack}/sizes/pack-{ver}.size",
-                        f"https://pcmod.ddns.me/updates/pack/{pack}/sizes/pack_{ver}.size"
-                    ]
 
                     downloaded = False
-                    for u, su in zip(urls, size_urls):
+                    for u in urls:
                         try:
-                            download_with_progress_and_size(u, zip_path, su, notify_progress, f"Downloading Pack {pack} v{ver}")
+                            download_with_progress_and_size(u, zip_path, notify_progress, f"Downloading Pack {pack} v{ver}")
                             downloaded = True
                             break
                         except Exception as e:
@@ -2425,17 +2383,11 @@ class Api:
                         f"https://pcmod.ddns.me/packs/{target_pack}.zip",
                         f"https://pcmod.ddns.me/download/pack/{target_pack}.zip"
                     ]
-                    size_urls = [
-                        f"https://files.pcmod.ddns.me/download/pack/sizes/{target_pack}.size",
-                        f"https://files.pcmod.ddns.me/download/pack/{target_pack}/sizes/{target_pack}.size",
-                        f"https://pcmod.ddns.me/packs/sizes/{target_pack}.size",
-                        f"https://pcmod.ddns.me/download/pack/sizes/{target_pack}.size"
-                    ]
 
                     downloaded = False
-                    for u, su in zip(urls, size_urls):
+                    for u in urls:
                         try:
-                            download_with_progress_and_size(u, zip_path, su, notify_progress, f"Downloading Full Pack {target_pack}")
+                            download_with_progress_and_size(u, zip_path, notify_progress, f"Downloading Full Pack {target_pack}")
                             downloaded = True
                             break
                         except Exception as e:
