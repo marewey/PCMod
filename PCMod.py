@@ -1858,18 +1858,28 @@ class Api:
         except Exception:
             pass
 
-        jvm_args_str = f"-Xmx{maxram}M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M"
-
-        # Load extra JVM args from data/indexes/jvm_args if present
+        default_jvm_flags = "-XX:+UnlockExperimentalVMOptions -XX:+UseZGC -XX:+AlwaysPreTouch"
         extra_jvm_args_file = os.path.join(DATA_DIR, "indexes", "jvm_args")
+        os.makedirs(os.path.dirname(extra_jvm_args_file), exist_ok=True)
+
+        if not os.path.exists(extra_jvm_args_file):
+            try:
+                with open(extra_jvm_args_file, "w", encoding="utf-8") as f:
+                    f.write(default_jvm_flags + "\n")
+            except Exception as e:
+                log_init(f"Error creating default jvm_args file: {e}")
+
+        file_jvm_flags = default_jvm_flags
         if os.path.exists(extra_jvm_args_file):
             try:
                 with open(extra_jvm_args_file, "r", encoding="utf-8") as f:
                     content = f.read().strip()
                     if content:
-                        jvm_args_str += " " + content
-            except Exception:
-                pass
+                        file_jvm_flags = content
+            except Exception as e:
+                log_init(f"Error reading jvm_args file: {e}")
+
+        jvm_args_str = f"-Xmx{maxram}M {file_jvm_flags}"
 
         # Resolve portablemc version target spec from version indexes (matching launch.bat %m-version%)
         m_version = get_portablemc_version_spec(pack)
