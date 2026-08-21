@@ -294,7 +294,9 @@ def bootstrap_missing_files():
 
     download_urls = [
         f"https://files.pcmod.ddns.me/download/launcher/launcher_{launcher_ver}.zip",
+        f"https://files.pcmod.ddns.me/download/launcher/launcher-{launcher_ver}.zip",
         f"https://pcmod.ddns.me/download/launcher/launcher_{launcher_ver}.zip",
+        f"https://pcmod.ddns.me/download/launcher/launcher-{launcher_ver}.zip",
         f"https://pcmod.ddns.me/updates/launcher/launcher_{launcher_ver}.zip"
     ]
 
@@ -2125,12 +2127,16 @@ class Api:
                         zip_path = os.path.join(DATA_DIR, "update", f"launcher_{l_up}.zip")
                         urls = [
                             f"https://files.pcmod.ddns.me/download/launcher/launcher_{l_up}.zip",
+                            f"https://files.pcmod.ddns.me/download/launcher/launcher-{l_up}.zip",
                             f"https://pcmod.ddns.me/download/launcher/launcher_{l_up}.zip",
+                            f"https://pcmod.ddns.me/download/launcher/launcher-{l_up}.zip",
                             f"https://pcmod.ddns.me/updates/launcher/launcher_{l_up}.zip"
                         ]
                         size_urls = [
                             f"https://files.pcmod.ddns.me/download/launcher/sizes/launcher_{l_up}.size",
+                            f"https://files.pcmod.ddns.me/download/launcher/sizes/launcher-{l_up}.size",
                             f"https://pcmod.ddns.me/download/launcher/sizes/launcher_{l_up}.size",
+                            f"https://pcmod.ddns.me/download/launcher/sizes/launcher-{l_up}.size",
                             f"https://pcmod.ddns.me/updates/launcher/sizes/launcher_{l_up}.size"
                         ]
                         downloaded = False
@@ -2262,12 +2268,16 @@ class Api:
                     zip_path = os.path.join(DATA_DIR, "update", f"launcher_{ver}.zip")
                     urls = [
                         f"https://files.pcmod.ddns.me/download/launcher/launcher_{ver}.zip",
+                        f"https://files.pcmod.ddns.me/download/launcher/launcher-{ver}.zip",
                         f"https://pcmod.ddns.me/download/launcher/launcher_{ver}.zip",
+                        f"https://pcmod.ddns.me/download/launcher/launcher-{ver}.zip",
                         f"https://pcmod.ddns.me/updates/launcher/launcher_{ver}.zip"
                     ]
                     size_urls = [
                         f"https://files.pcmod.ddns.me/download/launcher/sizes/launcher_{ver}.size",
+                        f"https://files.pcmod.ddns.me/download/launcher/sizes/launcher-{ver}.size",
                         f"https://pcmod.ddns.me/download/launcher/sizes/launcher_{ver}.size",
+                        f"https://pcmod.ddns.me/download/launcher/sizes/launcher-{ver}.size",
                         f"https://pcmod.ddns.me/updates/launcher/sizes/launcher_{ver}.size"
                     ]
 
@@ -2326,14 +2336,20 @@ class Api:
                     zip_path = os.path.join(DATA_DIR, "update", f"pack_{ver}.zip")
                     urls = [
                         f"https://files.pcmod.ddns.me/download/pack/{pack}/pack_{ver}.zip",
+                        f"https://files.pcmod.ddns.me/download/pack/{pack}/pack-{ver}.zip",
                         f"https://files.pcmod.ddns.me/download/pack/pack_{ver}.zip",
+                        f"https://files.pcmod.ddns.me/download/pack/pack-{ver}.zip",
                         f"https://pcmod.ddns.me/download/pack/{pack}/pack_{ver}.zip",
+                        f"https://pcmod.ddns.me/download/pack/{pack}/pack-{ver}.zip",
                         f"https://pcmod.ddns.me/updates/pack/{pack}/pack_{ver}.zip"
                     ]
                     size_urls = [
                         f"https://files.pcmod.ddns.me/download/pack/{pack}/sizes/pack_{ver}.size",
+                        f"https://files.pcmod.ddns.me/download/pack/{pack}/sizes/pack-{ver}.size",
                         f"https://files.pcmod.ddns.me/download/pack/sizes/pack_{ver}.size",
+                        f"https://files.pcmod.ddns.me/download/pack/sizes/pack-{ver}.size",
                         f"https://pcmod.ddns.me/download/pack/{pack}/sizes/pack_{ver}.size",
+                        f"https://pcmod.ddns.me/download/pack/{pack}/sizes/pack-{ver}.size",
                         f"https://pcmod.ddns.me/updates/pack/{pack}/sizes/pack_{ver}.size"
                     ]
 
