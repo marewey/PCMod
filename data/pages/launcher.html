@@ -1189,30 +1189,50 @@
       }
     }
 
+    function selectActivePack(packName) {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_version_select(packName).then(function() {
+          initLauncher();
+          showPackDownloaderCards(true);
+        });
+      }
+    }
+
     function showPackDownloaderCards(forceRefresh) {
       if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.get_available_packs_manifest().then(function(res) {
-          var listDiv = document.getElementById('packCardsList');
-          if (!listDiv || !res || !res.packs) return;
-          listDiv.innerHTML = '';
-          for (var i = 0; i < res.packs.length; i++) {
-            var p = res.packs[i];
-            var card = document.createElement('div');
-            card.style.background = 'rgba(15, 23, 42, 0.9)';
-            card.style.border = '1px solid var(--card-border)';
-            card.style.borderRadius = '8px';
-            card.style.padding = '10px';
-            card.style.display = 'flex';
-            card.style.flexDirection = 'column';
-            card.style.justifyContent = 'space-between';
+        window.pywebview.api.get_settings().then(function(s) {
+          var currentActivePack = (s && s.pack) ? s.pack : '';
 
-            var statusBadge = p.installed ? '<span style="color:#10b981; font-size:11px; font-weight:bold;">[Installed]</span>' : '<span style="color:#eab308; font-size:11px; font-weight:bold;">[Not Installed]</span>';
+          window.pywebview.api.get_available_packs_manifest().then(function(res) {
+            var listDiv = document.getElementById('packCardsList');
+            if (!listDiv || !res || !res.packs) return;
+            listDiv.innerHTML = '';
+            for (var i = 0; i < res.packs.length; i++) {
+              var p = res.packs[i];
+              var card = document.createElement('div');
+              card.style.background = 'rgba(15, 23, 42, 0.9)';
+              card.style.border = (p.name === currentActivePack) ? '1px solid #38bdf8' : '1px solid var(--card-border)';
+              card.style.borderRadius = '8px';
+              card.style.padding = '10px';
+              card.style.display = 'flex';
+              card.style.flexDirection = 'column';
+              card.style.justifyContent = 'space-between';
 
-            card.innerHTML = '<div style="font-weight:bold; color:#f8fafc; font-size:13px; margin-bottom: 2px;">' + p.name + ' ' + statusBadge + '</div>' +
-                             '<div style="font-size:11px; color:var(--text-muted); margin-bottom: 8px;">v' + p.version + ' • ' + p.modloader + '</div>' +
-                             '<button class="btn-secondary" style="padding:6px; font-size:11px; margin-top: auto;" onclick="runUpdateAction(\'download_full_pack\', \'' + p.name + '\')">Install Pack</button>';
-            listDiv.appendChild(card);
-          }
+              var activeBadge = (p.name === currentActivePack) ? '<span style="color:#38bdf8; font-size:11px; font-weight:bold;">[Active]</span> ' : '';
+              var statusBadge = p.installed ? '<span style="color:#10b981; font-size:11px; font-weight:bold;">[Installed]</span>' : '<span style="color:#eab308; font-size:11px; font-weight:bold;">[Not Installed]</span>';
+
+              var selectBtnText = (p.name === currentActivePack) ? 'Active Pack' : 'Select Pack';
+              var selectBtnDisabled = (p.name === currentActivePack) ? 'disabled style="padding:6px; font-size:11px; flex:1; opacity:0.6; cursor:default;"' : 'style="padding:6px; font-size:11px; flex:1;" onclick="selectActivePack(\'' + p.name + '\')"';
+
+              card.innerHTML = '<div style="font-weight:bold; color:#f8fafc; font-size:13px; margin-bottom: 2px;">' + activeBadge + p.name + ' ' + statusBadge + '</div>' +
+                               '<div style="font-size:11px; color:var(--text-muted); margin-bottom: 8px;">v' + p.version + ' • ' + p.modloader + '</div>' +
+                               '<div style="display:flex; gap:6px; margin-top: auto;">' +
+                               '  <button class="btn-secondary" ' + selectBtnDisabled + '>' + selectBtnText + '</button>' +
+                               '  <button class="btn-secondary" style="padding:6px; font-size:11px; flex:1;" onclick="runUpdateAction(\'download_full_pack\', \'' + p.name + '\')">Install Pack</button>' +
+                               '</div>';
+              listDiv.appendChild(card);
+            }
+          });
         });
       }
     }
