@@ -2210,7 +2210,9 @@ class Api:
                         threading.Thread(target=send_login2_telemetry, args=("updated",), daemon=True).start()
                         return
 
-                    notify_progress({"status": "complete", "title": "No Updates Needed", "message": "Your Launcher and Packs are up to date!", "percent": 100, "update_in_progress": False})
+                    curr_l_ver, curr_p_ver = read_version_indexes(pack)
+                    verify_and_sync_mods(pack, pack_version=curr_p_ver, progress_callback=notify_progress, title=f"Verifying Mods ({pack})...")
+                    notify_progress({"status": "complete", "title": "Auto Update Complete!", "message": "Launcher, packs, and mods verified.", "percent": 100, "update_in_progress": False})
 
                 elif action == "refresh_mods":
                     notify_progress({"status": "downloading", "title": "Refreshing Mods...", "message": "Deleting existing mods...", "percent": 10, "update_in_progress": True})
