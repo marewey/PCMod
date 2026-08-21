@@ -2263,7 +2263,24 @@ class Api:
                     ver = (target_version or "").strip()
                     if not ver or ver.lower() == "latest":
                         up_info = check_updates_server()
-                        ver = up_info.get("launcher_update") or up_info.get("current_launcher") or "1.2a"
+                        ver = up_info.get("launcher_update")
+                        if not ver:
+                            # Read remote/cached version directly from data/indexes/version.tmp or version
+                            for vf in [os.path.join(DATA_DIR, "indexes", "version.tmp"), os.path.join(DATA_DIR, "indexes", "version")]:
+                                if os.path.exists(vf):
+                                    try:
+                                        with open(vf, "r", encoding="utf-8", errors="ignore") as f:
+                                            for line in f:
+                                                parts = line.strip().split(";")
+                                                if len(parts) >= 2 and parts[0].strip().lower() == "launcher":
+                                                    ver = parts[1].strip()
+                                                    break
+                                    except Exception:
+                                        pass
+                                if ver:
+                                    break
+                        if not ver:
+                            ver = up_info.get("current_launcher") or "2.0a"
                     notify_progress({"status": "downloading", "title": f"Updating Launcher (v{ver})...", "percent": 10, "update_in_progress": True})
                     zip_path = os.path.join(DATA_DIR, "update", f"launcher_{ver}.zip")
                     urls = [
