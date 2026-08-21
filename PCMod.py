@@ -1233,11 +1233,12 @@ def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, t
     # 1. Fetch latest .pak file from server if possible
     pak_urls = []
     if pack_version:
-        pak_urls.append(f"https://files.pcmod.ddns.me/download/pack/{pack_name}/PCMod-{pack_name}.pak")
+        pak_urls.append(f"https://files.pcmod.ddns.me/download/PCMod-{pack_name}-{pack_version}.pak")
         pak_urls.append(f"https://files.pcmod.ddns.me/download/pack/{pack_name}/PCMod-{pack_name}-{pack_version}.pak")
-        pak_urls.append(f"https://pcmod.ddns.me/download/pack/{pack_name}/PCMod-{pack_name}.pak")
         pak_urls.append(f"https://pcmod.ddns.me/updates/PCMod-{pack_name}-{pack_version}.pak")
+    pak_urls.append(f"https://files.pcmod.ddns.me/download/pack/PCMod-{pack_name}.pak")
     pak_urls.append(f"https://files.pcmod.ddns.me/download/pack/{pack_name}/PCMod-{pack_name}.pak")
+    pak_urls.append(f"https://pcmod.ddns.me/download/pack/{pack_name}/PCMod-{pack_name}.pak")
     pak_urls.append(f"https://pcmod.ddns.me/updates/PCMod-{pack_name}.pak")
 
     for p_url in pak_urls:
