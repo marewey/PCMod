@@ -437,47 +437,143 @@
       color: #f8fafc;
     }
 
-    /* Updater Grid Menu */
-    .updater-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      margin-top: 14px;
+    /* Streamlined Updater Layout */
+    .updater-header-card {
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
 
-    .updater-btn {
-      background: rgba(30, 41, 59, 0.8);
+    .updater-status-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .status-badge.badge-success {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid rgba(16, 185, 129, 0.5);
+      color: #34d399;
+    }
+
+    .status-badge.badge-warning {
+      background: rgba(234, 179, 8, 0.2);
+      border: 1px solid rgba(234, 179, 8, 0.5);
+      color: #fde047;
+    }
+
+    .updater-sections-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .updater-section-box {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .updater-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #38bdf8;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-updater-action {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.05);
       border: 1px solid var(--card-border);
       color: var(--text-main);
-      padding: 16px 12px;
-      border-radius: 10px;
-      font-size: 14px;
+      padding: 12px 10px;
+      border-radius: 8px;
+      font-size: 13px;
       font-weight: 700;
       cursor: pointer;
       transition: all 0.2s;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      text-align: center;
+      gap: 8px;
     }
 
-    .updater-btn:hover {
+    .btn-updater-action:hover {
       background: rgba(59, 130, 246, 0.2);
       border-color: var(--accent-blue);
-      transform: translateY(-2px);
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    .btn-updater-primary {
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-updater-primary:hover {
+      background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+    }
+
+    .pack-downloader-panel {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 12px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .pack-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      overflow-y: auto;
+      padding-right: 4px;
+      flex: 1;
+      margin-top: 8px;
     }
 
     .progress-bar-bg {
       width: 100%;
-      height: 18px;
+      height: 14px;
       background: rgba(0,0,0,0.5);
-      border-radius: 9px;
+      border-radius: 7px;
       overflow: hidden;
       border: 1px solid var(--card-border);
-      margin: 10px 0 6px 0;
     }
 
     .progress-bar-fill {
@@ -485,6 +581,20 @@
       width: 0%;
       background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
       transition: width 0.2s ease-in-out;
+    }
+
+    .log-drawer {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--input-border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #94a3b8;
+      max-height: 48px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
     }
   </style>
 </head>
@@ -636,74 +746,106 @@
 
     <!-- 3. UPDATER VIEW -->
     <div id="updateView" class="view-panel panel" style="display: none; flex-direction: column;">
-      <div class="header-bar">
+      <div class="header-bar" style="margin-bottom: 10px;">
         <button class="btn-back" onclick="showMainView()">← Back to Launcher</button>
-        <div style="font-weight: 700; font-size: 16px; color: #38bdf8;">PCMod GUI Updater</div>
-        <div style="font-size: 12px; color: var(--text-muted);" id="updaterVersionText">Checking versions...</div>
+        <div style="font-weight: 700; font-size: 16px; color: #38bdf8;">PCMod Client Updater</div>
+        <button class="btn-secondary" style="width: auto; padding: 6px 12px;" onclick="cancelOrCloseUpdate()">Cancel / Close</button>
       </div>
 
-      <!-- Updater Status & Progress Card -->
-      <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid var(--card-border); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-        <div style="font-size: 14px; font-weight: 700; color: #38bdf8;" id="updateTitle">Updater Menu</div>
-        <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;" id="updateMessage">Select an update option below.</div>
-
-        <div class="progress-bar-bg">
-          <div class="progress-bar-fill" id="updateProgressFill"></div>
+      <!-- Top Status Card -->
+      <div class="updater-header-card">
+        <div class="updater-status-header">
+          <div>
+            <span style="font-size: 14px; font-weight: 700; color: #38bdf8;" id="updateTitle">Updater Menu</span>
+            <span style="font-size: 12px; color: var(--text-muted); margin-left: 8px;" id="updaterVersionText">Checking versions...</span>
+          </div>
+          <span class="status-badge badge-success" id="updateBadge">
+            <span style="width: 6px; height: 6px; border-radius: 50%; background: currentColor;"></span>
+            <span id="updateBadgeText">UP TO DATE</span>
+          </span>
         </div>
 
-        <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
-          <span id="updateProgressText">0%</span>
+        <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+          <div class="progress-bar-bg" style="flex: 1;">
+            <div class="progress-bar-fill" id="updateProgressFill"></div>
+          </div>
+          <span style="font-size: 12px; font-weight: 700; color: #38bdf8; width: 36px; text-align: right;" id="updateProgressText">0%</span>
+        </div>
+
+        <div class="log-drawer" id="updateMessage">Select an update task below.</div>
+      </div>
+
+      <!-- Sections Grid -->
+      <div class="updater-sections-grid">
+        <!-- Quick Actions Box -->
+        <div class="updater-section-box">
+          <div class="updater-section-title">⚡ Quick Actions</div>
+          <div class="action-row">
+            <button class="btn-updater-action btn-updater-primary" onclick="hidePackCards(); runUpdateAction('auto');">
+              <span style="font-size: 16px;">⚡</span>
+              <span>Auto Update</span>
+            </button>
+            <button class="btn-updater-action" onclick="hidePackCards(); runUpdateAction('refresh_mods');">
+              <span style="font-size: 16px;">🔄</span>
+              <span>Refresh Mods</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Version Management Box -->
+        <div class="updater-section-box">
+          <div class="updater-section-title">🚀 Version Management</div>
+          <div class="action-row">
+            <button class="btn-updater-action" onclick="openVersionSelector('launcher')">
+              <span style="font-size: 16px;">🚀</span>
+              <span>Launcher Version</span>
+            </button>
+            <button class="btn-updater-action" onclick="openVersionSelector('pack')">
+              <span style="font-size: 16px;">🎮</span>
+              <span>Pack Version</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      <!-- Pack Downloader Sub-Panel Container -->
-      <div id="packCardsContainer" style="display: none; margin-top: 10px; flex: 1; overflow-y: auto; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 10px; padding: 10px;">
-        <div style="font-size: 13px; font-weight: 700; color: #38bdf8; margin-bottom: 8px;">Available Packs Manifest</div>
-        <div id="packCardsList" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;"></div>
-      </div>
-
-      <!-- Custom Version Input Fields -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px;">
-        <div style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); border: 1px solid var(--card-border); border-radius: 8px; padding: 6px 10px;">
-          <span style="font-size: 12px; font-weight: 600; color: #38bdf8; white-space: nowrap;">Launcher Ver:</span>
-          <input type="text" class="input-field" id="launcherVersionInput" placeholder="Auto (or e.g. 1.2a)" style="margin-bottom: 0; padding: 4px 8px; font-size: 12px;">
+      <!-- Pack Downloader Panel -->
+      <div class="pack-downloader-panel">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;">
+          <div class="updater-section-title">📦 Pack Downloader (Available Packs)</div>
+          <button class="btn-secondary" style="width: auto; padding: 4px 10px; font-size: 11px;" onclick="showPackDownloaderCards(true)">Refresh List</button>
         </div>
-        <div style="display: flex; align-items: center; gap: 8px; background: rgba(30, 41, 59, 0.7); border: 1px solid var(--card-border); border-radius: 8px; padding: 6px 10px;">
-          <span style="font-size: 12px; font-weight: 600; color: #38bdf8; white-space: nowrap;">Pack Ver:</span>
-          <input type="text" class="input-field" id="packVersionInput" placeholder="Auto (or e.g. 2.5.3a)" style="margin-bottom: 0; padding: 4px 8px; font-size: 12px;">
+        <div class="pack-cards-grid" id="packCardsList">
+          <div style="color: var(--text-muted); font-size: 12px; grid-column: span 3; text-align: center; padding: 20px;">Loading available packs...</div>
         </div>
-      </div>
-
-      <!-- 6 Menu Action Buttons -->
-      <div class="updater-grid" style="margin-top: auto;">
-        <button class="updater-btn" onclick="showPackDownloaderCards()">
-          <span style="font-size: 18px;">📦</span>
-          <span>Pack Downloader</span>
-        </button>
-        <button class="updater-btn" onclick="hidePackCards(); runUpdateAction('refresh_mods');">
-          <span style="font-size: 18px;">🔄</span>
-          <span>Refresh Mods</span>
-        </button>
-        <button class="updater-btn" onclick="hidePackCards(); runUpdateAction('auto');">
-          <span style="font-size: 18px;">⚡</span>
-          <span>Auto Update</span>
-        </button>
-        <button class="updater-btn" onclick="hidePackCards(); runUpdateAction('launcher_update', document.getElementById('launcherVersionInput').value);">
-          <span style="font-size: 18px;">🚀</span>
-          <span>Launcher Update</span>
-        </button>
-        <button class="updater-btn" onclick="hidePackCards(); runUpdateAction('pack_update', document.getElementById('packVersionInput').value);">
-          <span style="font-size: 18px;">🎮</span>
-          <span>Pack Update</span>
-        </button>
-        <button class="updater-btn" onclick="cancelOrCloseUpdate()">
-          <span style="font-size: 18px;">❌</span>
-          <span>Cancel Install</span>
-        </button>
       </div>
     </div>
 
-    <!-- 4. UPDATE NOTIFICATION MODAL -->
+    <!-- 4. VERSION SELECTOR MODAL -->
+    <div id="versionSelectModal" class="modal-overlay" style="display: none;">
+      <div class="modal-card" style="width: 380px;">
+        <div style="font-size: 16px; font-weight: 800; color: #38bdf8; margin-bottom: 12px;" id="versionSelectModalTitle">Select Version</div>
+
+        <div style="text-align: left; margin-bottom: 12px;">
+          <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px;">Choose Version:</label>
+          <select id="versionDropdownSelect" class="input-field" style="margin-bottom: 0;" onchange="onVersionDropdownChange()">
+            <option value="latest">Latest (Auto)</option>
+            <option value="custom">Custom...</option>
+          </select>
+        </div>
+
+        <div id="customVersionInputContainer" style="display: none; text-align: left; margin-bottom: 16px;">
+          <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px;">Enter Custom Version String:</label>
+          <input type="text" id="customVersionTextInput" class="input-field" placeholder="e.g. 2.0a or 2.5.3a" style="margin-bottom: 0;">
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: center;">
+          <button class="btn-login" style="width: 120px; margin-top:0;" onclick="confirmVersionSelection()">Install</button>
+          <button class="btn-secondary" style="width: 100px;" onclick="closeVersionSelectModal()">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. UPDATE NOTIFICATION MODAL -->
     <div id="updateAlertModal" class="modal-overlay" style="display: none;">
       <div class="modal-card">
         <div style="font-size: 18px; font-weight: 800; color: #38bdf8; margin-bottom: 8px;">New Update Available!</div>
@@ -961,15 +1103,93 @@
       if (container) container.style.display = 'none';
     }
 
-    function showPackDownloaderCards(forceRefresh) {
-      var container = document.getElementById('packCardsContainer');
-      if (!container) return;
-      if (container.style.display === 'block' && !forceRefresh) {
-        container.style.display = 'none';
-        return;
-      }
-      container.style.display = 'block';
+    var activeVersionTarget = 'launcher'; // 'launcher' or 'pack'
 
+    function openVersionSelector(target) {
+      activeVersionTarget = target;
+      var modalTitle = document.getElementById('versionSelectModalTitle');
+      var dropdown = document.getElementById('versionDropdownSelect');
+      var customInput = document.getElementById('customVersionTextInput');
+
+      if (target === 'launcher') {
+        modalTitle.innerText = "Select Launcher Version";
+      } else {
+        modalTitle.innerText = "Select Pack Version";
+      }
+
+      // Reset dropdown choices
+      dropdown.innerHTML = "";
+      var optLatest = document.createElement('option');
+      optLatest.value = "latest";
+      optLatest.text = "Latest (Auto)";
+      dropdown.add(optLatest);
+
+      // Add cached/remote version if available
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.check_updates().then(function(info) {
+          if (info) {
+            var targetVer = (target === 'launcher') ? (info.launcher_update || info.current_launcher) : (info.pack_update || info.current_pack);
+            if (targetVer) {
+              var optVer = document.createElement('option');
+              optVer.value = targetVer;
+              optVer.text = "v" + targetVer + (info.launcher_update || info.pack_update ? " (Update Available)" : " (Current)");
+              dropdown.add(optVer);
+            }
+          }
+          var optCustom = document.createElement('option');
+          optCustom.value = "custom";
+          optCustom.text = "Custom...";
+          dropdown.add(optCustom);
+          dropdown.value = "latest";
+          onVersionDropdownChange();
+        });
+      } else {
+        var optCustom = document.createElement('option');
+        optCustom.value = "custom";
+        optCustom.text = "Custom...";
+        dropdown.add(optCustom);
+        dropdown.value = "latest";
+        onVersionDropdownChange();
+      }
+
+      customInput.value = "";
+      document.getElementById('versionSelectModal').style.display = 'flex';
+    }
+
+    function onVersionDropdownChange() {
+      var dropdown = document.getElementById('versionDropdownSelect');
+      var container = document.getElementById('customVersionInputContainer');
+      if (dropdown.value === 'custom') {
+        container.style.display = 'block';
+      } else {
+        container.style.display = 'none';
+      }
+    }
+
+    function closeVersionSelectModal() {
+      document.getElementById('versionSelectModal').style.display = 'none';
+    }
+
+    function confirmVersionSelection() {
+      var dropdown = document.getElementById('versionDropdownSelect');
+      var selectedVal = dropdown.value;
+      if (selectedVal === 'custom') {
+        selectedVal = document.getElementById('customVersionTextInput').value.trim();
+        if (!selectedVal) {
+          alert("Please enter a custom version string.");
+          return;
+        }
+      }
+
+      closeVersionSelectModal();
+      if (activeVersionTarget === 'launcher') {
+        runUpdateAction('launcher_update', selectedVal);
+      } else {
+        runUpdateAction('pack_update', selectedVal);
+      }
+    }
+
+    function showPackDownloaderCards(forceRefresh) {
       if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.get_available_packs_manifest().then(function(res) {
           var listDiv = document.getElementById('packCardsList');
@@ -984,16 +1204,30 @@
             card.style.padding = '10px';
             card.style.display = 'flex';
             card.style.flexDirection = 'column';
-            card.style.justifySpaceBetween = 'space-between';
+            card.style.justifyContent = 'space-between';
 
             var statusBadge = p.installed ? '<span style="color:#10b981; font-size:11px; font-weight:bold;">[Installed]</span>' : '<span style="color:#eab308; font-size:11px; font-weight:bold;">[Not Installed]</span>';
 
-            card.innerHTML = '<div style="font-weight:bold; color:#f8fafc; font-size:13px;">Pack: ' + p.name + ' ' + statusBadge + '</div>' +
-                             '<div style="font-size:11px; color:var(--text-muted); margin: 4px 0 8px 0;">Version: ' + p.version + ' | Loader: ' + p.modloader + '</div>' +
-                             '<button class="btn-secondary" style="padding:6px; font-size:11px;" onclick="runUpdateAction(\'download_full_pack\', \'' + p.name + '\')">Download Pack (' + p.name + ')</button>';
+            card.innerHTML = '<div style="font-weight:bold; color:#f8fafc; font-size:13px; margin-bottom: 2px;">' + p.name + ' ' + statusBadge + '</div>' +
+                             '<div style="font-size:11px; color:var(--text-muted); margin-bottom: 8px;">v' + p.version + ' • ' + p.modloader + '</div>' +
+                             '<button class="btn-secondary" style="padding:6px; font-size:11px; margin-top: auto;" onclick="runUpdateAction(\'download_full_pack\', \'' + p.name + '\')">Install Pack</button>';
             listDiv.appendChild(card);
           }
         });
+      }
+    }
+
+    function updateBadgeState(hasUpdate, updateText) {
+      var badge = document.getElementById('updateBadge');
+      var badgeText = document.getElementById('updateBadgeText');
+      if (!badge || !badgeText) return;
+
+      if (hasUpdate) {
+        badge.className = "status-badge badge-warning";
+        badgeText.innerText = updateText || "UPDATE AVAILABLE";
+      } else {
+        badge.className = "status-badge badge-success";
+        badgeText.innerText = "UP TO DATE";
       }
     }
 
@@ -1002,13 +1236,26 @@
       document.getElementById('modlistView').style.display = 'none';
       document.getElementById('updateView').style.display = 'flex';
 
+      showPackDownloaderCards();
+
       if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.check_updates().then(function(info) {
           if (!info) return;
           var text = "Launcher: v" + info.current_launcher + " / Pack " + info.pack + ": v" + info.current_pack;
-          if (info.launcher_update) text += " [New Launcher v" + info.launcher_update + " available!]";
-          if (info.pack_update) text += " [New Pack v" + info.pack_update + " available!]";
+          var hasUp = false;
+          var badgeLabel = "";
+          if (info.launcher_update) {
+            text += " [New Launcher v" + info.launcher_update + " available!]";
+            hasUp = true;
+            badgeLabel = "LAUNCHER UPDATE";
+          }
+          if (info.pack_update) {
+            text += " [New Pack v" + info.pack_update + " available!]";
+            hasUp = true;
+            badgeLabel = badgeLabel ? "UPDATES AVAILABLE" : "PACK UPDATE";
+          }
           document.getElementById('updaterVersionText').innerText = text;
+          updateBadgeState(hasUp, badgeLabel);
         });
       }
     }
