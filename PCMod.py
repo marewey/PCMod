@@ -258,40 +258,46 @@ def bootstrap_missing_files():
     os.makedirs(os.path.join(DATA_DIR, "pages"), exist_ok=True)
 
     tmp_ver_file = os.path.join(DATA_DIR, "indexes", "version.tmp")
-    version_url = "https://pcmod.ddns.me/version"
+    version_urls = [
+        "https://files.pcmod.ddns.me/version",
+        "https://pcmod.ddns.me/version"
+    ]
     launcher_ver = "1.2a"
 
-    try:
-        log_init(f"Fetching version manifest from {version_url}...")
-        req = urllib.request.Request(version_url, headers={'User-Agent': 'Mozilla/5.0'})
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        with urllib.request.urlopen(req, timeout=5.0, context=ctx) as resp:
-            raw_text = resp.read().decode('utf-8', errors='ignore')
-            lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
-            with open(tmp_ver_file, "w", encoding="utf-8") as f:
-                f.write("\n".join(lines) + "\n")
-
-            ver_file = os.path.join(DATA_DIR, "indexes", "version")
-            if not os.path.exists(ver_file):
-                with open(ver_file, "w", encoding="utf-8") as f:
+    for version_url in version_urls:
+        try:
+            log_init(f"Fetching version manifest from {version_url}...")
+            req = urllib.request.Request(version_url, headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=5.0, context=ctx) as resp:
+                raw_text = resp.read().decode('utf-8', errors='ignore')
+                lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
+                with open(tmp_ver_file, "w", encoding="utf-8") as f:
                     f.write("\n".join(lines) + "\n")
 
-            for line in lines:
-                parts = line.split(";")
-                if len(parts) >= 2 and parts[0].strip() == "Launcher":
-                    launcher_ver = parts[1].strip()
-                    break
-        log_init(f"Resolved Launcher version for bootstrap: {launcher_ver}")
-    except Exception as e:
-        log_init(f"Bootstrap version fetch warning ({e}). Using default version {launcher_ver}")
+                ver_file = os.path.join(DATA_DIR, "indexes", "version")
+                if not os.path.exists(ver_file):
+                    with open(ver_file, "w", encoding="utf-8") as f:
+                        f.write("\n".join(lines) + "\n")
+
+                for line in lines:
+                    parts = line.split(";")
+                    if len(parts) >= 2 and parts[0].strip() == "Launcher":
+                        launcher_ver = parts[1].strip()
+                        break
+            log_init(f"Resolved Launcher version for bootstrap: {launcher_ver}")
+            break
+        except Exception as e:
+            log_init(f"Bootstrap version fetch warning from {version_url} ({e}).")
 
     download_urls = [
-        f"https://pcmod.ddns.me/download/launcher/launcher-{launcher_ver}.zip",
-        f"https://pcmod.ddns.me/download/launcher/launcher-{launcher_ver}.zip",
+        f"https://files.pcmod.ddns.me/download/launcher/launcher_{launcher_ver}.zip",
+        f"https://pcmod.ddns.me/download/launcher/launcher_{launcher_ver}.zip",
         f"https://pcmod.ddns.me/updates/launcher/launcher_{launcher_ver}.zip"
     ]
+
 
     zip_path = os.path.join(DATA_DIR, "update", f"bootstrap_launcher_{launcher_ver}.zip")
     download_success = False
@@ -1073,25 +1079,30 @@ def check_updates_server():
     pack = get_pack_name()
     l_ver, p_ver = read_version_indexes(pack)
 
-    url = "https://pcmod.ddns.me/version"
+    version_urls = [
+        "https://files.pcmod.ddns.me/version",
+        "https://pcmod.ddns.me/version"
+    ]
     tmp_file = os.path.join(DATA_DIR, "indexes", "version.tmp")
 
     remote_versions = {}
 
-    try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        with urllib.request.urlopen(req, timeout=3.0, context=ctx) as resp:
-            raw_text = resp.read().decode('utf-8', errors='ignore')
-            if raw_text:
-                lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
-                clean_content = "\n".join(lines) + "\n"
-                with open(tmp_file, "w", encoding="utf-8") as f:
-                    f.write(clean_content)
-    except Exception as e:
-        log_init(f"Update check network warning: {e}")
+    for url in version_urls:
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=3.0, context=ctx) as resp:
+                raw_text = resp.read().decode('utf-8', errors='ignore')
+                if raw_text:
+                    lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+                    clean_content = "\n".join(lines) + "\n"
+                    with open(tmp_file, "w", encoding="utf-8") as f:
+                        f.write(clean_content)
+                    break
+        except Exception as e:
+            log_init(f"Update check network warning from {url}: {e}")
 
     if os.path.exists(tmp_file):
         try:
@@ -1222,8 +1233,11 @@ def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, t
     # 1. Fetch latest .pak file from server if possible
     pak_urls = []
     if pack_version:
-        pak_urls.append(f"https://pcmod.ddns.me/updates/PCMod-{pack_name}-{pack_version}.pak")
+        pak_urls.append(f"https://files.pcmod.ddns.me/download/pack/{pack_name}/PCMod-{pack_name}.pak")
+        pak_urls.append(f"https://files.pcmod.ddns.me/download/pack/{pack_name}/PCMod-{pack_name}-{pack_version}.pak")
         pak_urls.append(f"https://pcmod.ddns.me/download/pack/{pack_name}/PCMod-{pack_name}.pak")
+        pak_urls.append(f"https://pcmod.ddns.me/updates/PCMod-{pack_name}-{pack_version}.pak")
+    pak_urls.append(f"https://files.pcmod.ddns.me/download/pack/{pack_name}/PCMod-{pack_name}.pak")
     pak_urls.append(f"https://pcmod.ddns.me/updates/PCMod-{pack_name}.pak")
 
     for p_url in pak_urls:
@@ -1368,7 +1382,11 @@ def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, t
             m_name = m_info["name"]
             dl_path = os.path.join(mods_dir, m_file)
             quoted_file = urllib.parse.quote(m_file)
-            mod_url = f"https://pcmod.ddns.me/mods/{pack_name}/{quoted_file}"
+            mod_urls = [
+                f"https://files.pcmod.ddns.me/download/mods/{pack_name}/{quoted_file}",
+                f"https://files.pcmod.ddns.me/download/mods/{quoted_file}",
+                f"https://pcmod.ddns.me/mods/{pack_name}/{quoted_file}"
+            ]
 
             pct = int((idx / missing_count) * 100) if missing_count > 0 else 0
             if progress_callback:
@@ -1381,23 +1399,26 @@ def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, t
                 })
 
             downloaded = False
-            for attempt in range(1, 4):
-                if UPDATE_CANCEL_REQUESTED:
-                    raise Exception("Update cancelled by user.")
-                try:
-                    req = urllib.request.Request(mod_url, headers={'User-Agent': 'Mozilla/5.0'})
-                    ctx = ssl.create_default_context()
-                    ctx.check_hostname = False
-                    ctx.verify_mode = ssl.CERT_NONE
-                    with urllib.request.urlopen(req, timeout=15.0, context=ctx) as resp:
-                        with open(dl_path, "wb") as mf:
-                            mf.write(resp.read())
-                    log_init(f"Downloaded mod: {m_name} ({m_file})")
-                    downloaded = True
+            for mod_url in mod_urls:
+                if downloaded:
                     break
-                except Exception as e:
-                    log_init(f"Attempt {attempt}/3 failed to download mod {m_name} from {mod_url}: {e}")
-                    time.sleep(1.0)
+                for attempt in range(1, 3):
+                    if UPDATE_CANCEL_REQUESTED:
+                        raise Exception("Update cancelled by user.")
+                    try:
+                        req = urllib.request.Request(mod_url, headers={'User-Agent': 'Mozilla/5.0'})
+                        ctx = ssl.create_default_context()
+                        ctx.check_hostname = False
+                        ctx.verify_mode = ssl.CERT_NONE
+                        with urllib.request.urlopen(req, timeout=15.0, context=ctx) as resp:
+                            with open(dl_path, "wb") as mf:
+                                mf.write(resp.read())
+                        log_init(f"Downloaded mod: {m_name} ({m_file}) from {mod_url}")
+                        downloaded = True
+                        break
+                    except Exception as e:
+                        log_init(f"Attempt {attempt}/2 failed to download mod {m_name} from {mod_url}: {e}")
+                        time.sleep(0.5)
 
             if not downloaded:
                 log_init(f"FAILED to download mod {m_name} ({m_file}) after 3 attempts.")
@@ -1851,12 +1872,25 @@ class Api:
             except Exception:
                 pass
 
-        try:
-            skin_url = f"https://pcmod.ddns.me/skins/{username}.png"
-            skin_dst = os.path.join(DATA_DIR, "cached_skin.png")
-            urllib.request.urlretrieve(skin_url, skin_dst)
-        except Exception:
-            pass
+        skin_urls = [
+            f"https://files.pcmod.ddns.me/skins/{username}",
+            f"https://files.pcmod.ddns.me/skins/{username}.png",
+            f"https://pcmod.ddns.me/skins/{username}",
+            f"https://pcmod.ddns.me/skins/{username}.png"
+        ]
+        skin_dst = os.path.join(DATA_DIR, "cached_skin.png")
+        for skin_url in skin_urls:
+            try:
+                req = urllib.request.Request(skin_url, headers={'User-Agent': 'Mozilla/5.0'})
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                with urllib.request.urlopen(req, timeout=3.0, context=ctx) as resp:
+                    with open(skin_dst, "wb") as sf:
+                        sf.write(resp.read())
+                break
+            except Exception:
+                pass
 
         default_jvm_flags = "-XX:+UnlockExperimentalVMOptions -XX:+UseZGC -XX:+AlwaysPreTouch"
         extra_jvm_args_file = os.path.join(DATA_DIR, "indexes", "jvm_args")
@@ -2044,50 +2078,60 @@ class Api:
                     if l_up:
                         notify_progress({"status": "downloading", "title": f"Downloading Launcher Update v{l_up}...", "percent": 10, "update_in_progress": True})
                         zip_path = os.path.join(DATA_DIR, "update", f"launcher_{l_up}.zip")
-                        url = f"https://pcmod.ddns.me/updates/launcher/launcher_{l_up}.zip"
-                        size_url = f"https://pcmod.ddns.me/updates/launcher/sizes/launcher_{l_up}.size"
-                        try:
-                            download_with_progress_and_size(url, zip_path, size_url, notify_progress, f"Downloading Launcher Update v{l_up}")
-                            notify_progress({"status": "extracting", "title": "Extracting Launcher Update...", "percent": 70, "update_in_progress": True})
-                            ext_dir = os.path.join(DATA_DIR, "update", f"launcher_{l_up}")
-                            extract_zip_with_progress(zip_path, ext_dir, notify_progress, "Extracting Launcher Update")
-                            notify_progress({"status": "installing", "title": "Installing Launcher Update...", "percent": 90, "update_in_progress": True})
-                            for root, dirs, files in os.walk(ext_dir):
-                                rel_path = os.path.relpath(root, ext_dir)
-                                dst_dir = BASE_DIR if rel_path == "." else os.path.join(BASE_DIR, rel_path)
-                                os.makedirs(dst_dir, exist_ok=True)
-                                for file in files:
-                                    src_file = os.path.join(root, file)
-                                    dst_file = os.path.join(dst_dir, file)
-                                    if os.path.exists(dst_file):
-                                        old_file = dst_file + ".old"
-                                        try:
-                                            if os.path.exists(old_file):
-                                                try:
-                                                    os.remove(old_file)
-                                                except Exception:
-                                                    pass
-                                            os.rename(dst_file, old_file)
-                                        except Exception:
-                                            pass
+                        urls = [
+                            f"https://files.pcmod.ddns.me/download/launcher/launcher_{l_up}.zip",
+                            f"https://pcmod.ddns.me/download/launcher/launcher_{l_up}.zip",
+                            f"https://pcmod.ddns.me/updates/launcher/launcher_{l_up}.zip"
+                        ]
+                        size_urls = [
+                            f"https://files.pcmod.ddns.me/download/launcher/sizes/launcher_{l_up}.size",
+                            f"https://pcmod.ddns.me/download/launcher/sizes/launcher_{l_up}.size",
+                            f"https://pcmod.ddns.me/updates/launcher/sizes/launcher_{l_up}.size"
+                        ]
+                        downloaded = False
+                        for u, su in zip(urls, size_urls):
+                            try:
+                                download_with_progress_and_size(u, zip_path, su, notify_progress, f"Downloading Launcher Update v{l_up}")
+                                downloaded = True
+                                break
+                            except Exception as e:
+                                log_init(f"Launcher auto-update download attempt failed from {u}: {e}")
+                        if not downloaded:
+                            raise Exception("Failed to download launcher update zip from all mirrors.")
+                        notify_progress({"status": "extracting", "title": "Extracting Launcher Update...", "percent": 70, "update_in_progress": True})
+                        ext_dir = os.path.join(DATA_DIR, "update", f"launcher_{l_up}")
+                        extract_zip_with_progress(zip_path, ext_dir, notify_progress, "Extracting Launcher Update")
+                        notify_progress({"status": "installing", "title": "Installing Launcher Update...", "percent": 90, "update_in_progress": True})
+                        for root, dirs, files in os.walk(ext_dir):
+                            rel_path = os.path.relpath(root, ext_dir)
+                            dst_dir = BASE_DIR if rel_path == "." else os.path.join(BASE_DIR, rel_path)
+                            os.makedirs(dst_dir, exist_ok=True)
+                            for file in files:
+                                src_file = os.path.join(root, file)
+                                dst_file = os.path.join(dst_dir, file)
+                                if os.path.exists(dst_file):
+                                    old_file = dst_file + ".old"
                                     try:
-                                        with open(src_file, "rb") as sf, open(dst_file, "wb") as df:
-                                            df.write(sf.read())
-                                    except Exception as e:
-                                        log_init(f"Warning copying update file {file}: {e}")
-                            update_version_index("Launcher", l_up)
-                            notify_progress({"status": "complete", "title": "Launcher Update Complete!", "message": "Restarting PCMod...", "percent": 100, "update_in_progress": False})
-                            UPDATE_IN_PROGRESS = False
-                            threading.Thread(target=send_login2_telemetry, args=("updated",), daemon=True).start()
-                            time.sleep(1.5)
-                            restart_launcher()
-                            return
-                        except Exception as e:
-                            if UPDATE_CANCEL_REQUESTED:
-                                notify_progress({"status": "cancelled", "title": "Update Cancelled", "message": "Launcher update cancelled.", "percent": 0, "update_in_progress": False})
-                            else:
-                                notify_progress({"status": "error", "title": "Launcher Update Error", "message": str(e), "percent": 0, "update_in_progress": False})
-                            return
+                                        if os.path.exists(old_file):
+                                            try:
+                                                os.remove(old_file)
+                                            except Exception:
+                                                pass
+                                        os.rename(dst_file, old_file)
+                                    except Exception:
+                                        pass
+                                try:
+                                    with open(src_file, "rb") as sf, open(dst_file, "wb") as df:
+                                        df.write(sf.read())
+                                except Exception as e:
+                                    log_init(f"Warning copying update file {file}: {e}")
+                        update_version_index("Launcher", l_up)
+                        notify_progress({"status": "complete", "title": "Launcher Update Complete!", "message": "Restarting PCMod...", "percent": 100, "update_in_progress": False})
+                        UPDATE_IN_PROGRESS = False
+                        threading.Thread(target=send_login2_telemetry, args=("updated",), daemon=True).start()
+                        time.sleep(1.5)
+                        restart_launcher()
+                        return
 
                     if p_updates:
                         total_packs = len(p_updates)
@@ -2096,35 +2140,46 @@ class Api:
                             p_ver = p_item["new_version"]
                             notify_progress({"status": "downloading", "title": f"Updating Pack {p_name} ({idx}/{total_packs}) v{p_ver}...", "percent": 10, "update_in_progress": True})
                             zip_path = os.path.join(DATA_DIR, "update", f"pack_{p_ver}.zip")
-                            url = f"https://pcmod.ddns.me/updates/pack/{p_name}/pack_{p_ver}.zip"
-                            size_url = f"https://pcmod.ddns.me/updates/pack/{p_name}/sizes/pack_{p_ver}.size"
-                            try:
-                                download_with_progress_and_size(url, zip_path, size_url, notify_progress, f"Downloading Pack {p_name} v{p_ver}")
-                                ext_dir = os.path.join(DATA_DIR, "update", f"pack_{p_ver}")
-                                extract_zip_with_progress(zip_path, ext_dir, notify_progress, f"Extracting Pack {p_name} v{p_ver}")
-                                dst_pack_dir = os.path.join(DATA_DIR, "packs", p_name)
-                                os.makedirs(dst_pack_dir, exist_ok=True)
-                                for root, dirs, files in os.walk(ext_dir):
-                                    rel_path = os.path.relpath(root, ext_dir)
-                                    dst_dir = dst_pack_dir if rel_path == "." else os.path.join(dst_pack_dir, rel_path)
-                                    os.makedirs(dst_dir, exist_ok=True)
-                                    for file in files:
-                                        src_file = os.path.join(root, file)
-                                        dst_file = os.path.join(dst_dir, file)
-                                        try:
-                                            with open(src_file, "rb") as sf, open(dst_file, "wb") as df:
-                                                df.write(sf.read())
-                                        except Exception:
-                                            pass
-                                update_version_index(p_name, p_ver)
-                                verify_and_sync_mods(p_name, pack_version=p_ver, progress_callback=notify_progress, title=f"Verifying Mods ({p_name})...")
-                            except Exception as e:
-                                if UPDATE_CANCEL_REQUESTED:
-                                    notify_progress({"status": "cancelled", "title": "Update Cancelled", "message": "Pack update cancelled.", "percent": 0, "update_in_progress": False})
-                                    return
-                                else:
-                                    notify_progress({"status": "error", "title": "Pack Update Error", "message": str(e), "percent": 0, "update_in_progress": False})
-                                    return
+                            urls = [
+                                f"https://files.pcmod.ddns.me/download/pack/{p_name}/pack_{p_ver}.zip",
+                                f"https://files.pcmod.ddns.me/download/pack/pack_{p_ver}.zip",
+                                f"https://pcmod.ddns.me/download/pack/{p_name}/pack_{p_ver}.zip",
+                                f"https://pcmod.ddns.me/updates/pack/{p_name}/pack_{p_ver}.zip"
+                            ]
+                            size_urls = [
+                                f"https://files.pcmod.ddns.me/download/pack/{p_name}/sizes/pack_{p_ver}.size",
+                                f"https://files.pcmod.ddns.me/download/pack/sizes/pack_{p_ver}.size",
+                                f"https://pcmod.ddns.me/download/pack/{p_name}/sizes/pack_{p_ver}.size",
+                                f"https://pcmod.ddns.me/updates/pack/{p_name}/sizes/pack_{p_ver}.size"
+                            ]
+                            p_downloaded = False
+                            for u, su in zip(urls, size_urls):
+                                try:
+                                    download_with_progress_and_size(u, zip_path, su, notify_progress, f"Downloading Pack {p_name} v{p_ver}")
+                                    p_downloaded = True
+                                    break
+                                except Exception as e:
+                                    log_init(f"Pack auto-update download attempt failed from {u}: {e}")
+                            if not p_downloaded:
+                                raise Exception(f"Failed to download pack update for {p_name} from all mirrors.")
+                            ext_dir = os.path.join(DATA_DIR, "update", f"pack_{p_ver}")
+                            extract_zip_with_progress(zip_path, ext_dir, notify_progress, f"Extracting Pack {p_name} v{p_ver}")
+                            dst_pack_dir = os.path.join(DATA_DIR, "packs", p_name)
+                            os.makedirs(dst_pack_dir, exist_ok=True)
+                            for root, dirs, files in os.walk(ext_dir):
+                                rel_path = os.path.relpath(root, ext_dir)
+                                dst_dir = dst_pack_dir if rel_path == "." else os.path.join(dst_pack_dir, rel_path)
+                                os.makedirs(dst_dir, exist_ok=True)
+                                for file in files:
+                                    src_file = os.path.join(root, file)
+                                    dst_file = os.path.join(dst_dir, file)
+                                    try:
+                                        with open(src_file, "rb") as sf, open(dst_file, "wb") as df:
+                                            df.write(sf.read())
+                                    except Exception:
+                                        pass
+                            update_version_index(p_name, p_ver)
+                            verify_and_sync_mods(p_name, pack_version=p_ver, progress_callback=notify_progress, title=f"Verifying Mods ({p_name})...")
 
                         notify_progress({"status": "complete", "title": "Pack Updates Complete!", "message": f"Updated {total_packs} packs.", "percent": 100, "update_in_progress": False})
                         threading.Thread(target=send_login2_telemetry, args=("updated",), daemon=True).start()
@@ -2161,11 +2216,13 @@ class Api:
                     notify_progress({"status": "downloading", "title": f"Updating Launcher (v{ver})...", "percent": 10, "update_in_progress": True})
                     zip_path = os.path.join(DATA_DIR, "update", f"launcher_{ver}.zip")
                     urls = [
-                        f"https://pcmod.ddns.me/download/launcher/launcher-{ver}.zip",
+                        f"https://files.pcmod.ddns.me/download/launcher/launcher_{ver}.zip",
+                        f"https://pcmod.ddns.me/download/launcher/launcher_{ver}.zip",
                         f"https://pcmod.ddns.me/updates/launcher/launcher_{ver}.zip"
                     ]
                     size_urls = [
-                        f"https://pcmod.ddns.me/download/launcher/sizes/launcher-{ver}.size",
+                        f"https://files.pcmod.ddns.me/download/launcher/sizes/launcher_{ver}.size",
+                        f"https://pcmod.ddns.me/download/launcher/sizes/launcher_{ver}.size",
                         f"https://pcmod.ddns.me/updates/launcher/sizes/launcher_{ver}.size"
                     ]
 
@@ -2223,10 +2280,14 @@ class Api:
                     notify_progress({"status": "downloading", "title": f"Updating Pack {pack} (v{ver})...", "percent": 10, "update_in_progress": True})
                     zip_path = os.path.join(DATA_DIR, "update", f"pack_{ver}.zip")
                     urls = [
+                        f"https://files.pcmod.ddns.me/download/pack/{pack}/pack_{ver}.zip",
+                        f"https://files.pcmod.ddns.me/download/pack/pack_{ver}.zip",
                         f"https://pcmod.ddns.me/download/pack/{pack}/pack_{ver}.zip",
                         f"https://pcmod.ddns.me/updates/pack/{pack}/pack_{ver}.zip"
                     ]
                     size_urls = [
+                        f"https://files.pcmod.ddns.me/download/pack/{pack}/sizes/pack_{ver}.size",
+                        f"https://files.pcmod.ddns.me/download/pack/sizes/pack_{ver}.size",
                         f"https://pcmod.ddns.me/download/pack/{pack}/sizes/pack_{ver}.size",
                         f"https://pcmod.ddns.me/updates/pack/{pack}/sizes/pack_{ver}.size"
                     ]
@@ -2281,10 +2342,14 @@ class Api:
                     notify_progress({"status": "downloading", "title": f"Downloading Full Pack ({target_pack})...", "percent": 10, "update_in_progress": True})
                     zip_path = os.path.join(DATA_DIR, "update", f"full_pack_{target_pack}.zip")
                     urls = [
+                        f"https://files.pcmod.ddns.me/download/pack/{target_pack}.zip",
+                        f"https://files.pcmod.ddns.me/download/pack/{target_pack}/{target_pack}.zip",
                         f"https://pcmod.ddns.me/packs/{target_pack}.zip",
                         f"https://pcmod.ddns.me/download/pack/{target_pack}.zip"
                     ]
                     size_urls = [
+                        f"https://files.pcmod.ddns.me/download/pack/sizes/{target_pack}.size",
+                        f"https://files.pcmod.ddns.me/download/pack/{target_pack}/sizes/{target_pack}.size",
                         f"https://pcmod.ddns.me/packs/sizes/{target_pack}.size",
                         f"https://pcmod.ddns.me/download/pack/sizes/{target_pack}.size"
                     ]
