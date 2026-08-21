@@ -19,6 +19,8 @@ from datetime import datetime
 OS_NAME = sys.platform
 EXEC_DIR = os.path.dirname(os.path.abspath(sys.argv[0] if getattr(sys, 'frozen', False) else __file__))
 
+import shutil
+
 def check_cli_entrypoint():
     # Handle cleanup-old argument if present
     if "--cleanup-old" in sys.argv:
@@ -30,7 +32,10 @@ def check_cli_entrypoint():
                     time.sleep(1.5)
                     try:
                         if os.path.exists(old_path):
-                            os.remove(old_path)
+                            if os.path.isdir(old_path):
+                                shutil.rmtree(old_path, ignore_errors=True)
+                            else:
+                                os.remove(old_path)
                     except Exception:
                         pass
                 threading.Thread(target=_cleanup, daemon=True).start()
@@ -325,6 +330,17 @@ def bootstrap_missing_files():
                         except Exception:
                             pass
                     zip_ref.extract(member, BASE_DIR)
+
+            # Clean up legacy folders if present
+            for legacy_folder in ["cmd", "bin"]:
+                legacy_path = os.path.join(BASE_DIR, legacy_folder)
+                if os.path.exists(legacy_path):
+                    try:
+                        log_init(f"Cleaning legacy '{legacy_folder}' directory during bootstrap...")
+                        shutil.rmtree(legacy_path, ignore_errors=True)
+                    except Exception as e:
+                        log_init(f"Warning cleaning legacy directory '{legacy_folder}': {e}")
+
             log_init("Core files extracted successfully. Rebooting launcher to apply core update...")
             log_init("=== Launcher Bootstrap Completed ===")
             restart_launcher()
