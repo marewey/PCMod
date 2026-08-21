@@ -1233,11 +1233,11 @@ def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, t
     # 1. Fetch latest .pak file from server if possible
     pak_urls = []
     if pack_version:
-        pak_urls.append(f"https://files.pcmod.ddns.me/download/PCMod-{pack_name}-{pack_version}.pak")
+        pak_urls.append(f"https://files.pcmod.ddns.me/download/pack/PCMod-{pack_name}-{pack_version}.pak")
         pak_urls.append(f"https://files.pcmod.ddns.me/download/pack/{pack_name}/PCMod-{pack_name}-{pack_version}.pak")
         pak_urls.append(f"https://pcmod.ddns.me/updates/PCMod-{pack_name}-{pack_version}.pak")
-    pak_urls.append(f"https://files.pcmod.ddns.me/download/pack/PCMod-{pack_name}.pak")
     pak_urls.append(f"https://files.pcmod.ddns.me/download/pack/{pack_name}/PCMod-{pack_name}.pak")
+    pak_urls.append(f"https://files.pcmod.ddns.me/download/pack/PCMod-{pack_name}.pak")
     pak_urls.append(f"https://pcmod.ddns.me/download/pack/{pack_name}/PCMod-{pack_name}.pak")
     pak_urls.append(f"https://pcmod.ddns.me/updates/PCMod-{pack_name}.pak")
 
@@ -1873,25 +1873,69 @@ class Api:
             except Exception:
                 pass
 
-        skin_urls = [
-            f"https://files.pcmod.ddns.me/skins/{username}",
-            f"https://files.pcmod.ddns.me/skins/{username}.png",
-            f"https://pcmod.ddns.me/skins/{username}",
-            f"https://pcmod.ddns.me/skins/{username}.png"
+        # Fetch and cache skindex
+        skindex_file = os.path.join(DATA_DIR, "indexes", "skindex")
+        skindex_urls = [
+            "https://files.pcmod.ddns.me/skins/skin.index",
+            "https://files.pcmod.ddns.me/skins/index"
         ]
-        skin_dst = os.path.join(DATA_DIR, "cached_skin.png")
-        for skin_url in skin_urls:
+        for sk_url in skindex_urls:
             try:
-                req = urllib.request.Request(skin_url, headers={'User-Agent': 'Mozilla/5.0'})
+                req = urllib.request.Request(sk_url, headers={'User-Agent': 'Mozilla/5.0'})
                 ctx = ssl.create_default_context()
                 ctx.check_hostname = False
                 ctx.verify_mode = ssl.CERT_NONE
                 with urllib.request.urlopen(req, timeout=3.0, context=ctx) as resp:
-                    with open(skin_dst, "wb") as sf:
-                        sf.write(resp.read())
-                break
+                    content = resp.read()
+                    if content:
+                        with open(skindex_file, "wb") as skf:
+                            skf.write(content)
+                        break
             except Exception:
                 pass
+
+        # Parse skindex to fetch skins for all indexed usernames
+        all_usernames = set()
+        if username:
+            all_usernames.add(username)
+
+        if os.path.exists(skindex_file):
+            try:
+                with open(skindex_file, "r", encoding="utf-8", errors="ignore") as skf:
+                    for line in skf:
+                        u_line = line.strip()
+                        if u_line and not u_line.startswith("#") and not u_line.startswith("<"):
+                            all_usernames.add(u_line)
+            except Exception:
+                pass
+
+        skins_dir = os.path.join(DATA_DIR, "packs", pack, "cachedImages", "skins")
+        os.makedirs(skins_dir, exist_ok=True)
+        skin_root_dst = os.path.join(DATA_DIR, "cached_skin.png")
+
+        for u_skin in all_usernames:
+            u_skin_dst = os.path.join(skins_dir, f"{u_skin}.png")
+            u_urls = [
+                f"https://files.pcmod.ddns.me/skins/{u_skin}",
+                f"https://pcmod.ddns.me/skins/{u_skin}"
+            ]
+            for s_url in u_urls:
+                try:
+                    req = urllib.request.Request(s_url, headers={'User-Agent': 'Mozilla/5.0'})
+                    ctx = ssl.create_default_context()
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
+                    with urllib.request.urlopen(req, timeout=2.5, context=ctx) as resp:
+                        s_data = resp.read()
+                        if s_data:
+                            with open(u_skin_dst, "wb") as sf:
+                                sf.write(s_data)
+                            if u_skin == username:
+                                with open(skin_root_dst, "wb") as sf:
+                                    sf.write(s_data)
+                            break
+                except Exception:
+                    pass
 
         default_jvm_flags = "-XX:+UnlockExperimentalVMOptions -XX:+UseZGC -XX:+AlwaysPreTouch"
         extra_jvm_args_file = os.path.join(DATA_DIR, "indexes", "jvm_args")
