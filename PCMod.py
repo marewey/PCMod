@@ -581,32 +581,30 @@ def read_version_info(pack_name):
     mcversion = "1.20.1"
     mlversion = "47.4.10"
 
-    version_files = [
-        os.path.join(DATA_DIR, "indexes", "version"),
-        os.path.join(DATA_DIR, "indexes", "version.tmp")
-    ]
+    vfile = os.path.join(DATA_DIR, "indexes", "version")
+    if not os.path.exists(vfile):
+        vfile = os.path.join(DATA_DIR, "indexes", "version.tmp")
 
-    for vfile in version_files:
-        if os.path.exists(vfile):
-            try:
-                with open(vfile, "r", encoding="utf-8", errors="ignore") as f:
-                    for line in f:
-                        parts = line.strip().split(";")
-                        if len(parts) >= 2:
-                            key = parts[0].strip()
-                            ver = parts[1].strip()
-                            if key == "Launcher":
-                                launcher_ver = ver
-                            elif key == pack_name:
-                                pack_ver = ver
-                                if len(parts) >= 3 and parts[2].strip():
-                                    modloader = parts[2].strip()
-                                if len(parts) >= 4 and parts[3].strip():
-                                    mcversion = parts[3].strip()
-                                if len(parts) >= 5 and parts[4].strip():
-                                    mlversion = parts[4].strip()
-            except Exception:
-                pass
+    if os.path.exists(vfile):
+        try:
+            with open(vfile, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    parts = line.strip().split(";")
+                    if len(parts) >= 2:
+                        key = parts[0].strip()
+                        ver = parts[1].strip()
+                        if key == "Launcher":
+                            launcher_ver = ver
+                        elif key == pack_name:
+                            pack_ver = ver
+                            if len(parts) >= 3 and parts[2].strip():
+                                modloader = parts[2].strip()
+                            if len(parts) >= 4 and parts[3].strip():
+                                mcversion = parts[3].strip()
+                            if len(parts) >= 5 and parts[4].strip():
+                                mlversion = parts[4].strip()
+        except Exception:
+            pass
 
     return {
         "launcher_ver": launcher_ver,
