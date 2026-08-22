@@ -89,30 +89,7 @@ def get_clean_env():
         env.pop(k, None)
     return env
 
-class TeeStream:
-    def __init__(self, original_stream, log_filepath):
-        self.original_stream = original_stream
-        self.log_filepath = log_filepath
-
-    def write(self, buf):
-        try:
-            self.original_stream.write(buf)
-            self.original_stream.flush()
-        except Exception:
-            pass
-        try:
-            with open(self.log_filepath, "a", encoding="utf-8", errors="ignore") as f:
-                f.write(buf)
-        except Exception:
-            pass
-
-    def flush(self):
-        try:
-            self.original_stream.flush()
-        except Exception:
-            pass
-
-def run_portablemc_direct(args_list, tee_to_launch_log=True):
+def run_portablemc_direct(args_list):
     exec_dir = os.path.dirname(os.path.abspath(sys.argv[0] if getattr(sys, 'frozen', False) else __file__))
     pmc_paths = [
         os.path.join(exec_dir, "bin", "pmc"),
@@ -128,17 +105,6 @@ def run_portablemc_direct(args_list, tee_to_launch_log=True):
     sys.argv = ["portablemc"] + args_list
     ret_code = 0
 
-    old_stdout = sys.stdout
-    old_stderr = sys.stderr
-
-    if tee_to_launch_log:
-        launch_log = os.path.join(DATA_DIR, "launch.log")
-        try:
-            sys.stdout = TeeStream(old_stdout, launch_log)
-            sys.stderr = TeeStream(old_stderr, launch_log)
-        except Exception:
-            pass
-
     try:
         import portablemc.cli
         portablemc.cli.main()
@@ -149,8 +115,6 @@ def run_portablemc_direct(args_list, tee_to_launch_log=True):
         ret_code = 1
     finally:
         sys.argv = old_argv
-        sys.stdout = old_stdout
-        sys.stderr = old_stderr
     return ret_code
 
 def cleanup_old_files(dirs):
@@ -2256,8 +2220,19 @@ class Api:
 
                 log_init(f"Executing PMC command in-process: portablemc {' '.join(pmc_args)}")
                 launch_log = os.path.join(DATA_DIR, "launch.log")
-                with open(launch_log, "a", encoding="utf-8") as lf:
-                    lf.write(f"\n=== PMC Launch {datetime.now()} ===\n")
+                try:
+                    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    log_entry = (
+                        f"[{ts}] Launch Event: LAUNCHED\n"
+                        f"  User: {username}\n"
+                        f"  Pack: {pack}\n"
+                        f"  MC Version: {m_version}\n"
+                        f"  JVM Args: {jvm_args_str}\n"
+                    )
+                    with open(launch_log, "a", encoding="utf-8") as lf:
+                        lf.write(log_entry)
+                except Exception as e:
+                    log_init(f"Error writing to launch.log: {e}")
 
                 # Hide launcher window while game is running
                 if self._window:
@@ -2268,6 +2243,19 @@ class Api:
 
                 ret_code = run_portablemc_direct(pmc_args)
                 log_init(f"Game process exited with code {ret_code}")
+
+                try:
+                    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    exit_entry = (
+                        f"[{ts}] Launch Event: CLOSED\n"
+                        f"  User: {username}\n"
+                        f"  Pack: {pack}\n"
+                        f"  Exit Code: {ret_code}\n\n"
+                    )
+                    with open(launch_log, "a", encoding="utf-8") as lf:
+                        lf.write(exit_entry)
+                except Exception as e:
+                    log_init(f"Error writing exit event to launch.log: {e}")
 
                 if ret_code != 0:
                     crashed = True
