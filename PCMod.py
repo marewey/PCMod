@@ -159,7 +159,7 @@ def cleanup_old_files(dirs):
             continue
         try:
             for fname in os.listdir(d):
-                if fname.endswith(".old"):
+                if ".old" in fname:
                     fpath = os.path.join(d, fname)
                     try:
                         os.remove(fpath)
@@ -167,6 +167,27 @@ def cleanup_old_files(dirs):
                         pass
         except Exception:
             pass
+
+def safe_install_file(src_file, dst_file):
+    os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+    if os.path.exists(dst_file):
+        try:
+            old_file = dst_file + ".old"
+            if os.path.exists(old_file):
+                try:
+                    os.remove(old_file)
+                except Exception:
+                    old_file = f"{dst_file}.old_{int(time.time())}"
+            os.rename(dst_file, old_file)
+        except Exception as e:
+            log_init(f"Warning renaming {dst_file} to old: {e}")
+    try:
+        shutil.copy2(src_file, dst_file)
+        log_init(f"Successfully installed updated file: {dst_file}")
+        return True
+    except Exception as e:
+        log_init(f"Error copying update file {src_file} -> {dst_file}: {e}")
+        return False
 
 def clean_update_dir():
     update_dir = os.path.join(DATA_DIR, "update")
@@ -267,7 +288,6 @@ BASE_DIR = resolve_base_directory()
 relocate_if_needed(BASE_DIR)
 cleanup_old_files([EXEC_DIR, BASE_DIR])
 DATA_DIR = os.path.join(BASE_DIR, "data")
-clean_update_dir()
 BIN_DIR = os.path.join(BASE_DIR, "bin")
 OLD_CMD_DIR = os.path.join(BASE_DIR, "_old")
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -284,6 +304,8 @@ def log_init(msg):
             f.write(entry + "\n")
     except Exception:
         pass
+
+clean_update_dir()
 
 log_init("=== PCMod Client Starting ===")
 
@@ -2345,22 +2367,7 @@ class Api:
                             for file in files:
                                 src_file = os.path.join(root, file)
                                 dst_file = os.path.join(dst_dir, file)
-                                if os.path.exists(dst_file):
-                                    old_file = dst_file + ".old"
-                                    try:
-                                        if os.path.exists(old_file):
-                                            try:
-                                                os.remove(old_file)
-                                            except Exception:
-                                                pass
-                                        os.rename(dst_file, old_file)
-                                    except Exception:
-                                        pass
-                                try:
-                                    with open(src_file, "rb") as sf, open(dst_file, "wb") as df:
-                                        df.write(sf.read())
-                                except Exception as e:
-                                    log_init(f"Warning copying update file {file}: {e}")
+                                safe_install_file(src_file, dst_file)
                         update_version_index("Launcher", l_up)
                         notify_progress({"status": "complete", "title": "Launcher Update Complete!", "message": "Restarting PCMod...", "percent": 100, "update_in_progress": False})
                         UPDATE_IN_PROGRESS = False
@@ -2403,11 +2410,7 @@ class Api:
                                 for file in files:
                                     src_file = os.path.join(root, file)
                                     dst_file = os.path.join(dst_dir, file)
-                                    try:
-                                        with open(src_file, "rb") as sf, open(dst_file, "wb") as df:
-                                            df.write(sf.read())
-                                    except Exception:
-                                        pass
+                                    safe_install_file(src_file, dst_file)
                             update_version_index(p_name, p_ver)
                             verify_and_sync_mods(p_name, pack_version=p_ver, progress_callback=notify_progress, title=f"Verifying Mods ({p_name})...")
 
