@@ -1707,22 +1707,21 @@ class Api:
             except Exception as e:
                 launch_log_text = f"Error reading launch log: {e}"
 
+        if not launch_log_text:
+            launch_log_text = "No launch log available."
+
+        game_log_text = ""
         pack_latest_log = os.path.join(DATA_DIR, "packs", pack, "logs", "latest.log")
         if os.path.exists(pack_latest_log):
             try:
                 with open(pack_latest_log, "r", encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()
-                    log_content = "".join(lines[-400:])
-                    if launch_log_text:
-                        launch_log_text += f"\n\n=== Minecraft logs/latest.log ({pack}) ===\n" + log_content
-                    else:
-                        launch_log_text = f"=== Minecraft logs/latest.log ({pack}) ===\n" + log_content
+                    game_log_text = "".join(lines[-400:])
             except Exception as e:
-                if not launch_log_text:
-                    launch_log_text = f"Error reading pack latest log: {e}"
+                game_log_text = f"Error reading game log: {e}"
 
-        if not launch_log_text:
-            launch_log_text = "No launch log available."
+        if not game_log_text:
+            game_log_text = "No game log (logs/latest.log) available for this pack."
 
         crash_report_text = "No crash reports found in crash-reports folder."
         crash_dir = os.path.join(DATA_DIR, "packs", pack, "crash-reports")
@@ -1741,6 +1740,7 @@ class Api:
 
         return {
             "launch_log": launch_log_text,
+            "game_log": game_log_text,
             "crash_report": crash_report_text
         }
 
