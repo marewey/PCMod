@@ -104,6 +104,7 @@ def run_portablemc_direct(args_list):
     old_argv = sys.argv[:]
     sys.argv = ["portablemc"] + args_list
     ret_code = 0
+
     try:
         import portablemc.cli
         portablemc.cli.main()
@@ -122,7 +123,7 @@ def cleanup_old_files(dirs):
             continue
         try:
             for fname in os.listdir(d):
-                if fname.endswith(".old"):
+                if ".old" in fname:
                     fpath = os.path.join(d, fname)
                     try:
                         os.remove(fpath)
@@ -130,6 +131,53 @@ def cleanup_old_files(dirs):
                         pass
         except Exception:
             pass
+
+def safe_install_file(src_file, dst_file):
+    os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+    ext = os.path.splitext(dst_file)[1].lower()
+    if os.path.exists(dst_file) and ext in [".exe", ".py"]:
+        try:
+            old_file = dst_file + ".old"
+            if os.path.exists(old_file):
+                try:
+                    os.remove(old_file)
+                except Exception:
+                    old_file = f"{dst_file}.old_{int(time.time())}"
+            os.rename(dst_file, old_file)
+        except Exception as e:
+            log_init(f"Warning renaming {dst_file} to old: {e}")
+    try:
+        shutil.copy2(src_file, dst_file)
+        log_init(f"Successfully installed updated file: {dst_file}")
+        return True
+    except Exception as e:
+        log_init(f"Error copying update file {src_file} -> {dst_file}: {e}")
+        return False
+
+def clean_update_dir():
+    try:
+        st = read_settings()
+        if st.get("cleanup_updates", "1") == "0":
+            log_init("Skipping update directory cleanup as cleanup_updates setting is disabled (0).")
+            return
+    except Exception:
+        pass
+    update_dir = os.path.join(DATA_DIR, "update")
+    if not os.path.exists(update_dir):
+        return
+    try:
+        for item in os.listdir(update_dir):
+            item_path = os.path.join(update_dir, item)
+            try:
+                if os.path.isdir(item_path):
+                    shutil.rmtree(item_path, ignore_errors=True)
+                else:
+                    os.remove(item_path)
+            except Exception as e:
+                log_init(f"Warning cleaning update item {item}: {e}")
+        log_init("Cleaned data/update directory contents.")
+    except Exception as e:
+        log_init(f"Error cleaning update directory: {e}")
 
 def relocate_if_needed(target_dir):
     is_frozen = getattr(sys, 'frozen', False) or sys.argv[0].lower().endswith(".exe")
@@ -218,6 +266,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(os.path.join(DATA_DIR, "indexes"), exist_ok=True)
 
 INIT_LOG = os.path.join(DATA_DIR, "init.log")
+global_api_instance = None
 
 def log_init(msg):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -326,7 +375,8 @@ def bootstrap_missing_files():
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 for member in zip_ref.infolist():
                     target_path = os.path.join(BASE_DIR, member.filename)
-                    if os.path.exists(target_path) and not member.is_dir():
+                    ext = os.path.splitext(target_path)[1].lower()
+                    if os.path.exists(target_path) and not member.is_dir() and ext in [".exe", ".py"]:
                         try:
                             old_path = target_path + ".old"
                             if os.path.exists(old_path):
@@ -439,8 +489,9 @@ def get_default_settings():
         "log-logins": "1",
         "lite": "0",
         "showconsole": "0",
+        "cleanup_updates": "1",
         "pack": "2-5-x",
-        "memory": "4096",
+        "memory": "6144",
         "username": ""
     }
 
@@ -485,6 +536,7 @@ def write_settings(settings):
         pass
 
 init_settings = read_settings(log_event=True)
+clean_update_dir()
 
 def apply_console_visibility():
     if OS_NAME == "win32":
@@ -640,7 +692,7 @@ def get_portablemc_version_spec(pack_name):
         return mc
     elif ml == "fabric":
         return f"fabric:{mc}:{mver}" if mver else f"fabric:{mc}"
-    elif ml == "#-btw":
+    elif ml in ["custom", "#-btw"]:
         return mver
     else: # default forge or other loaders
         return f"{ml}:{mc}-{mver}" if mver else f"{ml}:{mc}"
@@ -732,6 +784,116 @@ USER_INFO = {
     "auth_token": "",
     "valid": False
 }
+
+IS_ONLINE = True
+OFFLINE_THREAD_ACTIVE = False
+QUEUED_NETWORK_ACTIONS = []
+QUEUED_ACTIONS_LOCK = threading.Lock()
+
+def enter_offline_mode():
+    global IS_ONLINE, OFFLINE_THREAD_ACTIVE
+    IS_ONLINE = False
+    if not OFFLINE_THREAD_ACTIVE:
+        OFFLINE_THREAD_ACTIVE = True
+        t = threading.Thread(target=offline_reconnect_loop, daemon=True)
+        t.start()
+
+def queue_network_action(action_type, payload):
+    with QUEUED_ACTIONS_LOCK:
+        QUEUED_NETWORK_ACTIONS.append((action_type, payload))
+
+def offline_reconnect_loop():
+    global IS_ONLINE, OFFLINE_THREAD_ACTIVE
+    log_init("[Offline Mode] Auto-reconnect polling started (checking every 30s)...")
+    while not IS_ONLINE:
+        time.sleep(30)
+        try:
+            req = urllib.request.Request("https://files.pcmod.ddns.me/version", headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
+                if resp.status == 200:
+                    log_init("[Online Mode] Network connection restored!")
+                    IS_ONLINE = True
+                    break
+        except Exception:
+            pass
+
+    OFFLINE_THREAD_ACTIVE = False
+    process_queued_reconnect_actions()
+
+def process_queued_reconnect_actions():
+    global QUEUED_NETWORK_ACTIONS
+    log_init("[Online Mode] Processing queued reconnect actions...")
+
+    s = read_settings()
+    u = USER_INFO.get("username") or s.get("username", "").strip()
+    token = USER_INFO.get("auth_token") or (read_auth_token(u) if u else "")
+
+    if u and token:
+        formatted_token = token if token.startswith("\\") else f"\\{token}"
+        auth_url = "https://pcmod.ddns.me/commands/authp.php"
+        post_data = urllib.parse.urlencode({
+            'x': formatted_token,
+            'u': u,
+            'z': 'auth'
+        }).encode('utf-8')
+
+        log_init(f"[Online Re-validation] Sending auth check to {auth_url} for user '{u}'")
+        server_rejected = False
+        try:
+            req = urllib.request.Request(auth_url, data=post_data, headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
+                body = resp.read().decode('utf-8', errors='ignore').strip()
+                log_init(f"[Online Re-validation] Server response: {body}")
+                if "401.auth" in body or "incorrect" in body.lower():
+                    server_rejected = True
+        except Exception as e:
+            log_init(f"[Online Re-validation] Exception: {e}")
+
+        if server_rejected:
+            log_init(f"[Online Re-validation] AUTH FAILED for user '{u}'. Invalidating credentials.")
+            game_info = get_running_game_info()
+            if game_info.get("running"):
+                log_init(f"Game is running for unauthorized user '{u}'. Terminating game process!")
+                force_unlock_game()
+                if global_api_instance and global_api_instance._window:
+                    try:
+                        global_api_instance._window.evaluate_js("alert('You are not authorized to use this account. Please log in again.');")
+                    except Exception:
+                        pass
+
+            auth_file = os.path.join(DATA_DIR, "indexes", "auth")
+            if os.path.exists(auth_file):
+                try:
+                    os.remove(auth_file)
+                except Exception:
+                    pass
+            USER_INFO["username"] = ""
+            USER_INFO["auth_token"] = ""
+            USER_INFO["valid"] = False
+            s["username"] = ""
+            write_settings(s)
+
+            if global_api_instance and global_api_instance._window:
+                try:
+                    global_api_instance._window.evaluate_js("initLauncher();")
+                except Exception:
+                    pass
+            return
+
+    # Process queued telemetry and actions
+    with QUEUED_ACTIONS_LOCK:
+        actions_to_run = list(QUEUED_NETWORK_ACTIONS)
+        QUEUED_NETWORK_ACTIONS.clear()
+
+    for act_type, payload in actions_to_run:
+        if act_type == "telemetry":
+            send_login2_telemetry(payload)
 
 def rot13_5(text):
     res = []
@@ -877,7 +1039,7 @@ def load_user_info():
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
-        with urllib.request.urlopen(req, timeout=2.5, context=ctx) as resp:
+        with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
             body = resp.read().decode('utf-8', errors='ignore').strip()
             log_init(f"Boot Auth server response: {body}")
 
@@ -1095,7 +1257,7 @@ def check_updates_server():
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=3.0, context=ctx) as resp:
+            with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
                 raw_text = resp.read().decode('utf-8', errors='ignore')
                 if raw_text:
                     lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
@@ -1166,6 +1328,7 @@ def get_remote_file_size(url):
 
 def download_with_progress_and_size(url, dst_path, progress_callback=None, title="Downloading..."):
     global UPDATE_CANCEL_REQUESTED
+    log_init(f"Downloading: {title}...")
     total_bytes = get_remote_file_size(url)
 
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -1208,6 +1371,7 @@ def download_with_progress_and_size(url, dst_path, progress_callback=None, title
                         "total_str": f"{tot_mb} MB" if total_bytes > 0 else "Unknown",
                         "update_in_progress": True
                     })
+    log_init(f"Download Completed: {title}")
     return True
 
 def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, title="Validating Mods..."):
@@ -1417,6 +1581,7 @@ def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, t
 
 def extract_zip_with_progress(zip_path, extract_dir, progress_callback=None, title="Extracting..."):
     global UPDATE_CANCEL_REQUESTED
+    log_init(f"Extracting ZIP: {title}...")
     os.makedirs(extract_dir, exist_ok=True)
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         members = zip_ref.infolist()
@@ -1425,7 +1590,8 @@ def extract_zip_with_progress(zip_path, extract_dir, progress_callback=None, tit
             if UPDATE_CANCEL_REQUESTED:
                 raise Exception("Update cancelled by user.")
             target_path = os.path.join(extract_dir, member.filename)
-            if os.path.exists(target_path) and not member.is_dir():
+            ext = os.path.splitext(target_path)[1].lower()
+            if os.path.exists(target_path) and not member.is_dir() and ext in [".exe", ".py"]:
                 try:
                     old_path = target_path + ".old"
                     if os.path.exists(old_path):
@@ -1446,6 +1612,7 @@ def extract_zip_with_progress(zip_path, extract_dir, progress_callback=None, tit
                     "percent": percent,
                     "update_in_progress": True
                 })
+    log_init(f"Extraction Completed: {title}")
 
 def restart_launcher():
     log_init("Restarting PCMod Launcher...")
@@ -1462,7 +1629,9 @@ def restart_launcher():
 
 class Api:
     def __init__(self):
+        global global_api_instance
         self._window = None
+        global_api_instance = self
 
     def set_window(self, window):
         self._window = window
@@ -1537,14 +1706,30 @@ class Api:
     def get_latest_crash_logs(self, *args, **kwargs):
         pack = get_pack_name()
         launch_log_path = os.path.join(DATA_DIR, "launch.log")
-        launch_log_text = "No launch log available."
+        launch_log_text = ""
         if os.path.exists(launch_log_path):
             try:
                 with open(launch_log_path, "r", encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()
-                    launch_log_text = "".join(lines[-300:])
+                    launch_log_text = "".join(lines[-400:])
             except Exception as e:
                 launch_log_text = f"Error reading launch log: {e}"
+
+        if not launch_log_text:
+            launch_log_text = "No launch log available."
+
+        game_log_text = ""
+        pack_latest_log = os.path.join(DATA_DIR, "packs", pack, "logs", "latest.log")
+        if os.path.exists(pack_latest_log):
+            try:
+                with open(pack_latest_log, "r", encoding="utf-8", errors="ignore") as f:
+                    lines = f.readlines()
+                    game_log_text = "".join(lines[-400:])
+            except Exception as e:
+                game_log_text = f"Error reading game log: {e}"
+
+        if not game_log_text:
+            game_log_text = "No game log (logs/latest.log) available for this pack."
 
         crash_report_text = "No crash reports found in crash-reports folder."
         crash_dir = os.path.join(DATA_DIR, "packs", pack, "crash-reports")
@@ -1563,6 +1748,7 @@ class Api:
 
         return {
             "launch_log": launch_log_text,
+            "game_log": game_log_text,
             "crash_report": crash_report_text
         }
 
@@ -1686,7 +1872,7 @@ class Api:
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=1.5, context=ctx) as resp:
+            with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
                 content = resp.read().decode('utf-8', errors='ignore')
                 if content and len(content) > 10:
                     try:
@@ -1710,7 +1896,7 @@ class Api:
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=1.5, context=ctx) as response:
+            with urllib.request.urlopen(req, timeout=8.0, context=ctx) as response:
                 text = response.read().decode('utf-8', errors='ignore').strip()
                 players = [line.strip() for line in text.splitlines() if line.strip() and not line.startswith("<")]
                 if players:
@@ -1768,7 +1954,7 @@ class Api:
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=2.5, context=ctx) as resp:
+            with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
                 body = resp.read().decode('utf-8', errors='ignore').strip()
                 log_init(f"Auth server response: {body}")
 
@@ -1806,6 +1992,7 @@ class Api:
                     return {"success": True, "message": "Logged In"}
         except Exception as e:
             log_init(f"Auth Network Exception ({e})")
+        enter_offline_mode()
 
         # Offline Mode logic: Allow offline login ONLY if auth file exists!
         auth_file = os.path.join(DATA_DIR, "indexes", "auth")
@@ -1901,6 +2088,11 @@ class Api:
         skins_dir = os.path.join(DATA_DIR, "packs", pack, "cachedImages", "skins")
         os.makedirs(skins_dir, exist_ok=True)
         skin_root_dst = os.path.join(DATA_DIR, "cached_skin.png")
+        if os.path.exists(skin_root_dst):
+            try:
+                os.remove(skin_root_dst)
+            except Exception:
+                pass
 
         for u_skin in all_usernames:
             u_skin_dst = os.path.join(skins_dir, f"{u_skin}.png")
@@ -1914,46 +2106,65 @@ class Api:
                     ctx = ssl.create_default_context()
                     ctx.check_hostname = False
                     ctx.verify_mode = ssl.CERT_NONE
-                    with urllib.request.urlopen(req, timeout=2.5, context=ctx) as resp:
+                    with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
                         s_data = resp.read()
                         if s_data:
                             with open(u_skin_dst, "wb") as sf:
                                 sf.write(s_data)
-                            if u_skin == username:
-                                with open(skin_root_dst, "wb") as sf:
-                                    sf.write(s_data)
                             break
                 except Exception:
                     pass
 
-        default_jvm_flags = "-XX:+UnlockExperimentalVMOptions -XX:+UseZGC -XX:+AlwaysPreTouch"
-        extra_jvm_args_file = os.path.join(DATA_DIR, "indexes", "jvm_args")
-        os.makedirs(os.path.dirname(extra_jvm_args_file), exist_ok=True)
+        vinfo = read_version_info(pack)
+        mcver = vinfo.get("mcversion", "1.20.1")
 
-        if not os.path.exists(extra_jvm_args_file):
+        def is_version_at_least(ver_str, target_ver=(1, 20, 1)):
             try:
-                with open(extra_jvm_args_file, "w", encoding="utf-8") as f:
+                parts = [int(x) for x in re.findall(r'\d+', ver_str)]
+                while len(parts) < 3:
+                    parts.append(0)
+                return tuple(parts[:3]) >= target_ver
+            except Exception:
+                return True
+
+        if is_version_at_least(mcver, (1, 20, 1)):
+            default_jvm_flags = "-XX:+UnlockExperimentalVMOptions -XX:+UseZGC -XX:+AlwaysPreTouch"
+        else:
+            default_jvm_flags = "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M"
+
+        pack_dir = os.path.join(DATA_DIR, "packs", pack)
+        os.makedirs(pack_dir, exist_ok=True)
+        pack_jvm_args_file = os.path.join(pack_dir, "jvm_args")
+
+        if not os.path.exists(pack_jvm_args_file):
+            try:
+                with open(pack_jvm_args_file, "w", encoding="utf-8") as f:
                     f.write(default_jvm_flags + "\n")
             except Exception as e:
-                log_init(f"Error creating default jvm_args file: {e}")
+                log_init(f"Error creating pack jvm_args file for {pack}: {e}")
 
         file_jvm_flags = default_jvm_flags
-        if os.path.exists(extra_jvm_args_file):
+        if os.path.exists(pack_jvm_args_file):
             try:
-                with open(extra_jvm_args_file, "r", encoding="utf-8") as f:
+                with open(pack_jvm_args_file, "r", encoding="utf-8") as f:
                     content = f.read().strip()
                     if content:
                         file_jvm_flags = content
             except Exception as e:
-                log_init(f"Error reading jvm_args file: {e}")
+                log_init(f"Error reading pack jvm_args file for {pack}: {e}")
 
         jvm_args_str = f"-Xmx{maxram}M {file_jvm_flags}"
 
         # Resolve portablemc version target spec from version indexes (matching launch.bat %m-version%)
         m_version = get_portablemc_version_spec(pack)
+        vinfo_pack = read_version_info(pack)
+
+        pack_dir = os.path.join(DATA_DIR, "packs", pack)
+        is_custom = any("CUSTOM" in str(v).upper() for v in [vinfo_pack.get("modloader", ""), vinfo_pack.get("mcversion", ""), vinfo_pack.get("mlversion", ""), pack])
+        main_dir = pack_dir if is_custom else DATA_DIR
 
         # Execution using PYTHONPATH=bin/pmc and python -m portablemc to prevent http.py import shadowing!
-        cmd = [sys.executable, "-m", "portablemc", "--main-dir", DATA_DIR, "--work-dir", os.path.join(DATA_DIR, "packs", pack), "start", m_version, "-u", username, "-i", mcuuid, f"--jvm-args={jvm_args_str}"]
+        cmd = [sys.executable, "-m", "portablemc", "--main-dir", main_dir, "--work-dir", pack_dir, "start", m_version, "-u", username, "-i", mcuuid, f"--jvm-args={jvm_args_str}"]
 
         if autoserver:
             port = "25565"
@@ -1999,15 +2210,15 @@ class Api:
                     log_init(f"Modloader/assets missing for pack '{pack}'. Downloading missing resources...")
                     if self._window:
                         self._window.evaluate_js("onGameLaunchState('downloading');")
-                    dry_args = ["--main-dir", DATA_DIR, "--work-dir", pack_dir, "start", "--dry", m_version]
+                    dry_args = ["--main-dir", main_dir, "--work-dir", pack_dir, "start", "--dry", m_version]
                     run_portablemc_direct(dry_args)
 
                 if self._window:
                     self._window.evaluate_js("onGameLaunchState('running');")
 
                 pmc_args = [
-                    "--main-dir", DATA_DIR,
-                    "--work-dir", os.path.join(DATA_DIR, "packs", pack),
+                    "--main-dir", main_dir,
+                    "--work-dir", pack_dir,
                     "start", m_version,
                     "-u", username,
                     "-i", mcuuid,
@@ -2022,8 +2233,19 @@ class Api:
 
                 log_init(f"Executing PMC command in-process: portablemc {' '.join(pmc_args)}")
                 launch_log = os.path.join(DATA_DIR, "launch.log")
-                with open(launch_log, "a", encoding="utf-8") as lf:
-                    lf.write(f"\n=== PMC Launch {datetime.now()} ===\n")
+                try:
+                    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    log_entry = (
+                        f"[{ts}] Launch Event: LAUNCHED\n"
+                        f"  User: {username}\n"
+                        f"  Pack: {pack}\n"
+                        f"  MC Version: {m_version}\n"
+                        f"  JVM Args: {jvm_args_str}\n"
+                    )
+                    with open(launch_log, "a", encoding="utf-8") as lf:
+                        lf.write(log_entry)
+                except Exception as e:
+                    log_init(f"Error writing to launch.log: {e}")
 
                 # Hide launcher window while game is running
                 if self._window:
@@ -2034,6 +2256,19 @@ class Api:
 
                 ret_code = run_portablemc_direct(pmc_args)
                 log_init(f"Game process exited with code {ret_code}")
+
+                try:
+                    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    exit_entry = (
+                        f"[{ts}] Launch Event: CLOSED\n"
+                        f"  User: {username}\n"
+                        f"  Pack: {pack}\n"
+                        f"  Exit Code: {ret_code}\n\n"
+                    )
+                    with open(launch_log, "a", encoding="utf-8") as lf:
+                        lf.write(exit_entry)
+                except Exception as e:
+                    log_init(f"Error writing exit event to launch.log: {e}")
 
                 if ret_code != 0:
                     crashed = True
@@ -2093,6 +2328,13 @@ class Api:
         UPDATE_CANCEL_REQUESTED = False
 
         def notify_progress(info):
+            status = info.get("status", "")
+            if status not in ["downloading", "extracting"]:
+                title = info.get("title", "")
+                msg = info.get("message", "")
+                pct = info.get("percent", "")
+                log_str = f"Update Progress [{pct}%]: {title}" + (f" - {msg}" if msg else "")
+                log_init(log_str)
             if self._window:
                 safe_json = json.dumps(info)
                 self._window.evaluate_js(f"if(window.onUpdateProgress) window.onUpdateProgress({safe_json});")
@@ -2140,22 +2382,7 @@ class Api:
                             for file in files:
                                 src_file = os.path.join(root, file)
                                 dst_file = os.path.join(dst_dir, file)
-                                if os.path.exists(dst_file):
-                                    old_file = dst_file + ".old"
-                                    try:
-                                        if os.path.exists(old_file):
-                                            try:
-                                                os.remove(old_file)
-                                            except Exception:
-                                                pass
-                                        os.rename(dst_file, old_file)
-                                    except Exception:
-                                        pass
-                                try:
-                                    with open(src_file, "rb") as sf, open(dst_file, "wb") as df:
-                                        df.write(sf.read())
-                                except Exception as e:
-                                    log_init(f"Warning copying update file {file}: {e}")
+                                safe_install_file(src_file, dst_file)
                         update_version_index("Launcher", l_up)
                         notify_progress({"status": "complete", "title": "Launcher Update Complete!", "message": "Restarting PCMod...", "percent": 100, "update_in_progress": False})
                         UPDATE_IN_PROGRESS = False
@@ -2198,11 +2425,7 @@ class Api:
                                 for file in files:
                                     src_file = os.path.join(root, file)
                                     dst_file = os.path.join(dst_dir, file)
-                                    try:
-                                        with open(src_file, "rb") as sf, open(dst_file, "wb") as df:
-                                            df.write(sf.read())
-                                    except Exception:
-                                        pass
+                                    safe_install_file(src_file, dst_file)
                             update_version_index(p_name, p_ver)
                             verify_and_sync_mods(p_name, pack_version=p_ver, progress_callback=notify_progress, title=f"Verifying Mods ({p_name})...")
 
@@ -2287,17 +2510,13 @@ class Api:
                             for root, dirs, files in os.walk(ext_dir):
                                 rel_path = os.path.relpath(root, ext_dir)
                                 dst_dir = BASE_DIR if rel_path == "." else os.path.join(BASE_DIR, rel_path)
-                                os.makedirs(dst_dir, exist_ok=True)
                                 for file in files:
                                     src_file = os.path.join(root, file)
                                     dst_file = os.path.join(dst_dir, file)
-                                    try:
-                                        with open(src_file, "rb") as sf, open(dst_file, "wb") as df:
-                                            df.write(sf.read())
-                                    except Exception:
-                                        pass
+                                    safe_install_file(src_file, dst_file)
+
                             update_version_index("Launcher", ver)
-                            notify_progress({"status": "complete", "title": "Launcher Update Complete!", "message": "Restarting PCMod...", "percent": 100, "update_in_progress": False})
+                            notify_progress({"status": "complete", "title": "Launcher Update Complete!", "message": f"Successfully updated Launcher to v{ver}. Restarting...", "percent": 100, "update_in_progress": False})
                             threading.Thread(target=send_login2_telemetry, args=("updated",), daemon=True).start()
                             time.sleep(1.5)
                             restart_launcher()
@@ -2432,6 +2651,7 @@ class Api:
                             notify_progress({"status": "error", "title": "Pack Install Error", "message": f"Failed to download full pack {target_pack}.", "percent": 0, "update_in_progress": False})
             finally:
                 UPDATE_IN_PROGRESS = False
+                clean_update_dir()
 
         threading.Thread(target=worker, daemon=True).start()
         return True
