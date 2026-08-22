@@ -312,8 +312,6 @@ def log_init(msg):
     except Exception:
         pass
 
-clean_update_dir()
-
 log_init("=== PCMod Client Starting ===")
 
 # Explicit AppUserModelID set FIRST before any windows or processes initialize
@@ -571,6 +569,7 @@ def write_settings(settings):
         pass
 
 init_settings = read_settings(log_event=True)
+clean_update_dir()
 
 def apply_console_visibility():
     if OS_NAME == "win32":
@@ -2328,6 +2327,11 @@ class Api:
         UPDATE_CANCEL_REQUESTED = False
 
         def notify_progress(info):
+            title = info.get("title", "")
+            msg = info.get("message", "")
+            pct = info.get("percent", "")
+            log_str = f"Update Progress [{pct}%]: {title}" + (f" - {msg}" if msg else "")
+            log_init(log_str)
             if self._window:
                 safe_json = json.dumps(info)
                 self._window.evaluate_js(f"if(window.onUpdateProgress) window.onUpdateProgress({safe_json});")
@@ -2499,28 +2503,14 @@ class Api:
                         try:
                             ext_dir = os.path.join(DATA_DIR, "update", f"launcher_{ver}")
                             extract_zip_with_progress(zip_path, ext_dir, notify_progress, f"Extracting Launcher v{ver}")
-                            notify_progress({"status": "installing", "title": "Installing Launcher Update...", "message": "Installing files...", "percent": 90, "update_in_progress": True})
-
-                            all_files_to_copy = []
+                            notify_progress({"status": "installing", "title": "Installing Launcher Update...", "percent": 90, "update_in_progress": True})
                             for root, dirs, files in os.walk(ext_dir):
-                                for file in files:
-                                    all_files_to_copy.append((root, file))
-
-                            tot = len(all_files_to_copy)
-                            for idx, (root, file) in enumerate(all_files_to_copy, 1):
                                 rel_path = os.path.relpath(root, ext_dir)
                                 dst_dir = BASE_DIR if rel_path == "." else os.path.join(BASE_DIR, rel_path)
-                                src_file = os.path.join(root, file)
-                                dst_file = os.path.join(dst_dir, file)
-                                safe_install_file(src_file, dst_file)
-                                pct = 90 + int((idx / tot) * 10) if tot > 0 else 90
-                                notify_progress({
-                                    "status": "installing",
-                                    "title": "Installing Launcher Update...",
-                                    "message": f"Installed: {file} ({idx}/{tot})",
-                                    "percent": pct,
-                                    "update_in_progress": True
-                                })
+                                for file in files:
+                                    src_file = os.path.join(root, file)
+                                    dst_file = os.path.join(dst_dir, file)
+                                    safe_install_file(src_file, dst_file)
 
                             update_version_index("Launcher", ver)
                             notify_progress({"status": "complete", "title": "Launcher Update Complete!", "message": f"Successfully updated Launcher to v{ver}. Restarting...", "percent": 100, "update_in_progress": False})
