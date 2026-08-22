@@ -89,7 +89,30 @@ def get_clean_env():
         env.pop(k, None)
     return env
 
-def run_portablemc_direct(args_list):
+class TeeStream:
+    def __init__(self, original_stream, log_filepath):
+        self.original_stream = original_stream
+        self.log_filepath = log_filepath
+
+    def write(self, buf):
+        try:
+            self.original_stream.write(buf)
+            self.original_stream.flush()
+        except Exception:
+            pass
+        try:
+            with open(self.log_filepath, "a", encoding="utf-8", errors="ignore") as f:
+                f.write(buf)
+        except Exception:
+            pass
+
+    def flush(self):
+        try:
+            self.original_stream.flush()
+        except Exception:
+            pass
+
+def run_portablemc_direct(args_list, tee_to_launch_log=True):
     exec_dir = os.path.dirname(os.path.abspath(sys.argv[0] if getattr(sys, 'frozen', False) else __file__))
     pmc_paths = [
         os.path.join(exec_dir, "bin", "pmc"),
@@ -104,6 +127,18 @@ def run_portablemc_direct(args_list):
     old_argv = sys.argv[:]
     sys.argv = ["portablemc"] + args_list
     ret_code = 0
+
+    old_stdout = sys.stdout
+    old_stderr = sys.stderr
+
+    if tee_to_launch_log:
+        launch_log = os.path.join(DATA_DIR, "launch.log")
+        try:
+            sys.stdout = TeeStream(old_stdout, launch_log)
+            sys.stderr = TeeStream(old_stderr, launch_log)
+        except Exception:
+            pass
+
     try:
         import portablemc.cli
         portablemc.cli.main()
@@ -114,6 +149,8 @@ def run_portablemc_direct(args_list):
         ret_code = 1
     finally:
         sys.argv = old_argv
+        sys.stdout = old_stdout
+        sys.stderr = old_stderr
     return ret_code
 
 def cleanup_old_files(dirs):
@@ -130,6 +167,24 @@ def cleanup_old_files(dirs):
                         pass
         except Exception:
             pass
+
+def clean_update_dir():
+    update_dir = os.path.join(DATA_DIR, "update")
+    if not os.path.exists(update_dir):
+        return
+    try:
+        for item in os.listdir(update_dir):
+            item_path = os.path.join(update_dir, item)
+            try:
+                if os.path.isdir(item_path):
+                    shutil.rmtree(item_path, ignore_errors=True)
+                else:
+                    os.remove(item_path)
+            except Exception as e:
+                log_init(f"Warning cleaning update item {item}: {e}")
+        log_init("Cleaned data/update directory contents.")
+    except Exception as e:
+        log_init(f"Error cleaning update directory: {e}")
 
 def relocate_if_needed(target_dir):
     is_frozen = getattr(sys, 'frozen', False) or sys.argv[0].lower().endswith(".exe")
@@ -212,6 +267,7 @@ BASE_DIR = resolve_base_directory()
 relocate_if_needed(BASE_DIR)
 cleanup_old_files([EXEC_DIR, BASE_DIR])
 DATA_DIR = os.path.join(BASE_DIR, "data")
+clean_update_dir()
 BIN_DIR = os.path.join(BASE_DIR, "bin")
 OLD_CMD_DIR = os.path.join(BASE_DIR, "_old")
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -440,7 +496,7 @@ def get_default_settings():
         "lite": "0",
         "showconsole": "0",
         "pack": "2-5-x",
-        "memory": "4096",
+        "memory": "6144",
         "username": ""
     }
 
@@ -733,6 +789,116 @@ USER_INFO = {
     "valid": False
 }
 
+IS_ONLINE = True
+OFFLINE_THREAD_ACTIVE = False
+QUEUED_NETWORK_ACTIONS = []
+QUEUED_ACTIONS_LOCK = threading.Lock()
+
+def enter_offline_mode():
+    global IS_ONLINE, OFFLINE_THREAD_ACTIVE
+    IS_ONLINE = False
+    if not OFFLINE_THREAD_ACTIVE:
+        OFFLINE_THREAD_ACTIVE = True
+        t = threading.Thread(target=offline_reconnect_loop, daemon=True)
+        t.start()
+
+def queue_network_action(action_type, payload):
+    with QUEUED_ACTIONS_LOCK:
+        QUEUED_NETWORK_ACTIONS.append((action_type, payload))
+
+def offline_reconnect_loop():
+    global IS_ONLINE, OFFLINE_THREAD_ACTIVE
+    log_init("[Offline Mode] Auto-reconnect polling started (checking every 30s)...")
+    while not IS_ONLINE:
+        time.sleep(30)
+        try:
+            req = urllib.request.Request("https://files.pcmod.ddns.me/version", headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
+                if resp.status == 200:
+                    log_init("[Online Mode] Network connection restored!")
+                    IS_ONLINE = True
+                    break
+        except Exception:
+            pass
+
+    OFFLINE_THREAD_ACTIVE = False
+    process_queued_reconnect_actions()
+
+def process_queued_reconnect_actions():
+    global QUEUED_NETWORK_ACTIONS
+    log_init("[Online Mode] Processing queued reconnect actions...")
+
+    s = read_settings()
+    u = USER_INFO.get("username") or s.get("username", "").strip()
+    token = USER_INFO.get("auth_token") or (read_auth_token(u) if u else "")
+
+    if u and token:
+        formatted_token = token if token.startswith("\\") else f"\\{token}"
+        auth_url = "https://pcmod.ddns.me/commands/authp.php"
+        post_data = urllib.parse.urlencode({
+            'x': formatted_token,
+            'u': u,
+            'z': 'auth'
+        }).encode('utf-8')
+
+        log_init(f"[Online Re-validation] Sending auth check to {auth_url} for user '{u}'")
+        server_rejected = False
+        try:
+            req = urllib.request.Request(auth_url, data=post_data, headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
+                body = resp.read().decode('utf-8', errors='ignore').strip()
+                log_init(f"[Online Re-validation] Server response: {body}")
+                if "401.auth" in body or "incorrect" in body.lower():
+                    server_rejected = True
+        except Exception as e:
+            log_init(f"[Online Re-validation] Exception: {e}")
+
+        if server_rejected:
+            log_init(f"[Online Re-validation] AUTH FAILED for user '{u}'. Invalidating credentials.")
+            game_info = get_running_game_info()
+            if game_info.get("running"):
+                log_init(f"Game is running for unauthorized user '{u}'. Terminating game process!")
+                force_unlock_game()
+                if global_api_instance and global_api_instance._window:
+                    try:
+                        global_api_instance._window.evaluate_js("alert('You are not authorized to use this account. Please log in again.');")
+                    except Exception:
+                        pass
+
+            auth_file = os.path.join(DATA_DIR, "indexes", "auth")
+            if os.path.exists(auth_file):
+                try:
+                    os.remove(auth_file)
+                except Exception:
+                    pass
+            USER_INFO["username"] = ""
+            USER_INFO["auth_token"] = ""
+            USER_INFO["valid"] = False
+            s["username"] = ""
+            write_settings(s)
+
+            if global_api_instance and global_api_instance._window:
+                try:
+                    global_api_instance._window.evaluate_js("initLauncher();")
+                except Exception:
+                    pass
+            return
+
+    # Process queued telemetry and actions
+    with QUEUED_ACTIONS_LOCK:
+        actions_to_run = list(QUEUED_NETWORK_ACTIONS)
+        QUEUED_NETWORK_ACTIONS.clear()
+
+    for act_type, payload in actions_to_run:
+        if act_type == "telemetry":
+            send_login2_telemetry(payload)
+
 def rot13_5(text):
     res = []
     for ch in text:
@@ -877,7 +1043,7 @@ def load_user_info():
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
-        with urllib.request.urlopen(req, timeout=2.5, context=ctx) as resp:
+        with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
             body = resp.read().decode('utf-8', errors='ignore').strip()
             log_init(f"Boot Auth server response: {body}")
 
@@ -1095,7 +1261,7 @@ def check_updates_server():
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=3.0, context=ctx) as resp:
+            with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
                 raw_text = resp.read().decode('utf-8', errors='ignore')
                 if raw_text:
                     lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
@@ -1462,7 +1628,9 @@ def restart_launcher():
 
 class Api:
     def __init__(self):
+        global global_api_instance
         self._window = None
+        global_api_instance = self
 
     def set_window(self, window):
         self._window = window
@@ -1537,14 +1705,31 @@ class Api:
     def get_latest_crash_logs(self, *args, **kwargs):
         pack = get_pack_name()
         launch_log_path = os.path.join(DATA_DIR, "launch.log")
-        launch_log_text = "No launch log available."
+        launch_log_text = ""
         if os.path.exists(launch_log_path):
             try:
                 with open(launch_log_path, "r", encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()
-                    launch_log_text = "".join(lines[-300:])
+                    launch_log_text = "".join(lines[-400:])
             except Exception as e:
                 launch_log_text = f"Error reading launch log: {e}"
+
+        pack_latest_log = os.path.join(DATA_DIR, "packs", pack, "logs", "latest.log")
+        if os.path.exists(pack_latest_log):
+            try:
+                with open(pack_latest_log, "r", encoding="utf-8", errors="ignore") as f:
+                    lines = f.readlines()
+                    log_content = "".join(lines[-400:])
+                    if launch_log_text:
+                        launch_log_text += f"\n\n=== Minecraft logs/latest.log ({pack}) ===\n" + log_content
+                    else:
+                        launch_log_text = f"=== Minecraft logs/latest.log ({pack}) ===\n" + log_content
+            except Exception as e:
+                if not launch_log_text:
+                    launch_log_text = f"Error reading pack latest log: {e}"
+
+        if not launch_log_text:
+            launch_log_text = "No launch log available."
 
         crash_report_text = "No crash reports found in crash-reports folder."
         crash_dir = os.path.join(DATA_DIR, "packs", pack, "crash-reports")
@@ -1686,7 +1871,7 @@ class Api:
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=1.5, context=ctx) as resp:
+            with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
                 content = resp.read().decode('utf-8', errors='ignore')
                 if content and len(content) > 10:
                     try:
@@ -1710,7 +1895,7 @@ class Api:
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=1.5, context=ctx) as response:
+            with urllib.request.urlopen(req, timeout=8.0, context=ctx) as response:
                 text = response.read().decode('utf-8', errors='ignore').strip()
                 players = [line.strip() for line in text.splitlines() if line.strip() and not line.startswith("<")]
                 if players:
@@ -1768,7 +1953,7 @@ class Api:
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=2.5, context=ctx) as resp:
+            with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
                 body = resp.read().decode('utf-8', errors='ignore').strip()
                 log_init(f"Auth server response: {body}")
 
@@ -1806,6 +1991,7 @@ class Api:
                     return {"success": True, "message": "Logged In"}
         except Exception as e:
             log_init(f"Auth Network Exception ({e})")
+        enter_offline_mode()
 
         # Offline Mode logic: Allow offline login ONLY if auth file exists!
         auth_file = os.path.join(DATA_DIR, "indexes", "auth")
@@ -1901,6 +2087,11 @@ class Api:
         skins_dir = os.path.join(DATA_DIR, "packs", pack, "cachedImages", "skins")
         os.makedirs(skins_dir, exist_ok=True)
         skin_root_dst = os.path.join(DATA_DIR, "cached_skin.png")
+        if os.path.exists(skin_root_dst):
+            try:
+                os.remove(skin_root_dst)
+            except Exception:
+                pass
 
         for u_skin in all_usernames:
             u_skin_dst = os.path.join(skins_dir, f"{u_skin}.png")
@@ -1914,38 +2105,52 @@ class Api:
                     ctx = ssl.create_default_context()
                     ctx.check_hostname = False
                     ctx.verify_mode = ssl.CERT_NONE
-                    with urllib.request.urlopen(req, timeout=2.5, context=ctx) as resp:
+                    with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
                         s_data = resp.read()
                         if s_data:
                             with open(u_skin_dst, "wb") as sf:
                                 sf.write(s_data)
-                            if u_skin == username:
-                                with open(skin_root_dst, "wb") as sf:
-                                    sf.write(s_data)
                             break
                 except Exception:
                     pass
 
-        default_jvm_flags = "-XX:+UnlockExperimentalVMOptions -XX:+UseZGC -XX:+AlwaysPreTouch"
-        extra_jvm_args_file = os.path.join(DATA_DIR, "indexes", "jvm_args")
-        os.makedirs(os.path.dirname(extra_jvm_args_file), exist_ok=True)
+        vinfo = read_version_info(pack)
+        mcver = vinfo.get("mcversion", "1.20.1")
 
-        if not os.path.exists(extra_jvm_args_file):
+        def is_version_at_least(ver_str, target_ver=(1, 20, 1)):
             try:
-                with open(extra_jvm_args_file, "w", encoding="utf-8") as f:
+                parts = [int(x) for x in re.findall(r'\d+', ver_str)]
+                while len(parts) < 3:
+                    parts.append(0)
+                return tuple(parts[:3]) >= target_ver
+            except Exception:
+                return True
+
+        if is_version_at_least(mcver, (1, 20, 1)):
+            default_jvm_flags = "-XX:+UnlockExperimentalVMOptions -XX:+UseZGC -XX:+AlwaysPreTouch"
+        else:
+            default_jvm_flags = "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M"
+
+        pack_dir = os.path.join(DATA_DIR, "packs", pack)
+        os.makedirs(pack_dir, exist_ok=True)
+        pack_jvm_args_file = os.path.join(pack_dir, "jvm_args")
+
+        if not os.path.exists(pack_jvm_args_file):
+            try:
+                with open(pack_jvm_args_file, "w", encoding="utf-8") as f:
                     f.write(default_jvm_flags + "\n")
             except Exception as e:
-                log_init(f"Error creating default jvm_args file: {e}")
+                log_init(f"Error creating pack jvm_args file for {pack}: {e}")
 
         file_jvm_flags = default_jvm_flags
-        if os.path.exists(extra_jvm_args_file):
+        if os.path.exists(pack_jvm_args_file):
             try:
-                with open(extra_jvm_args_file, "r", encoding="utf-8") as f:
+                with open(pack_jvm_args_file, "r", encoding="utf-8") as f:
                     content = f.read().strip()
                     if content:
                         file_jvm_flags = content
             except Exception as e:
-                log_init(f"Error reading jvm_args file: {e}")
+                log_init(f"Error reading pack jvm_args file for {pack}: {e}")
 
         jvm_args_str = f"-Xmx{maxram}M {file_jvm_flags}"
 
@@ -2432,6 +2637,7 @@ class Api:
                             notify_progress({"status": "error", "title": "Pack Install Error", "message": f"Failed to download full pack {target_pack}.", "percent": 0, "update_in_progress": False})
             finally:
                 UPDATE_IN_PROGRESS = False
+                clean_update_dir()
 
         threading.Thread(target=worker, daemon=True).start()
         return True
