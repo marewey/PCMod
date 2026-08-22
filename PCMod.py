@@ -134,7 +134,8 @@ def cleanup_old_files(dirs):
 
 def safe_install_file(src_file, dst_file):
     os.makedirs(os.path.dirname(dst_file), exist_ok=True)
-    if os.path.exists(dst_file):
+    ext = os.path.splitext(dst_file)[1].lower()
+    if os.path.exists(dst_file) and ext in [".exe", ".py"]:
         try:
             old_file = dst_file + ".old"
             if os.path.exists(old_file):
@@ -374,7 +375,8 @@ def bootstrap_missing_files():
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 for member in zip_ref.infolist():
                     target_path = os.path.join(BASE_DIR, member.filename)
-                    if os.path.exists(target_path) and not member.is_dir():
+                    ext = os.path.splitext(target_path)[1].lower()
+                    if os.path.exists(target_path) and not member.is_dir() and ext in [".exe", ".py"]:
                         try:
                             old_path = target_path + ".old"
                             if os.path.exists(old_path):
@@ -1585,7 +1587,8 @@ def extract_zip_with_progress(zip_path, extract_dir, progress_callback=None, tit
             if UPDATE_CANCEL_REQUESTED:
                 raise Exception("Update cancelled by user.")
             target_path = os.path.join(extract_dir, member.filename)
-            if os.path.exists(target_path) and not member.is_dir():
+            ext = os.path.splitext(target_path)[1].lower()
+            if os.path.exists(target_path) and not member.is_dir() and ext in [".exe", ".py"]:
                 try:
                     old_path = target_path + ".old"
                     if os.path.exists(old_path):
