@@ -1328,6 +1328,7 @@ def get_remote_file_size(url):
 
 def download_with_progress_and_size(url, dst_path, progress_callback=None, title="Downloading..."):
     global UPDATE_CANCEL_REQUESTED
+    log_init(f"Downloading: {title}...")
     total_bytes = get_remote_file_size(url)
 
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -1370,6 +1371,7 @@ def download_with_progress_and_size(url, dst_path, progress_callback=None, title
                         "total_str": f"{tot_mb} MB" if total_bytes > 0 else "Unknown",
                         "update_in_progress": True
                     })
+    log_init(f"Download Completed: {title}")
     return True
 
 def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, title="Validating Mods..."):
@@ -1579,6 +1581,7 @@ def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, t
 
 def extract_zip_with_progress(zip_path, extract_dir, progress_callback=None, title="Extracting..."):
     global UPDATE_CANCEL_REQUESTED
+    log_init(f"Extracting ZIP: {title}...")
     os.makedirs(extract_dir, exist_ok=True)
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         members = zip_ref.infolist()
@@ -1609,6 +1612,7 @@ def extract_zip_with_progress(zip_path, extract_dir, progress_callback=None, tit
                     "percent": percent,
                     "update_in_progress": True
                 })
+    log_init(f"Extraction Completed: {title}")
 
 def restart_launcher():
     log_init("Restarting PCMod Launcher...")
