@@ -190,6 +190,13 @@ def safe_install_file(src_file, dst_file):
         return False
 
 def clean_update_dir():
+    try:
+        st = read_settings()
+        if st.get("cleanup_updates", "1") == "0":
+            log_init("Skipping update directory cleanup as cleanup_updates setting is disabled (0).")
+            return
+    except Exception:
+        pass
     update_dir = os.path.join(DATA_DIR, "update")
     if not os.path.exists(update_dir):
         return
@@ -517,6 +524,7 @@ def get_default_settings():
         "log-logins": "1",
         "lite": "0",
         "showconsole": "0",
+        "cleanup_updates": "1",
         "pack": "2-5-x",
         "memory": "6144",
         "username": ""
@@ -2491,21 +2499,31 @@ class Api:
                         try:
                             ext_dir = os.path.join(DATA_DIR, "update", f"launcher_{ver}")
                             extract_zip_with_progress(zip_path, ext_dir, notify_progress, f"Extracting Launcher v{ver}")
-                            notify_progress({"status": "installing", "title": "Installing Launcher Update...", "percent": 90, "update_in_progress": True})
+                            notify_progress({"status": "installing", "title": "Installing Launcher Update...", "message": "Installing files...", "percent": 90, "update_in_progress": True})
+
+                            all_files_to_copy = []
                             for root, dirs, files in os.walk(ext_dir):
+                                for file in files:
+                                    all_files_to_copy.append((root, file))
+
+                            tot = len(all_files_to_copy)
+                            for idx, (root, file) in enumerate(all_files_to_copy, 1):
                                 rel_path = os.path.relpath(root, ext_dir)
                                 dst_dir = BASE_DIR if rel_path == "." else os.path.join(BASE_DIR, rel_path)
-                                os.makedirs(dst_dir, exist_ok=True)
-                                for file in files:
-                                    src_file = os.path.join(root, file)
-                                    dst_file = os.path.join(dst_dir, file)
-                                    try:
-                                        with open(src_file, "rb") as sf, open(dst_file, "wb") as df:
-                                            df.write(sf.read())
-                                    except Exception:
-                                        pass
+                                src_file = os.path.join(root, file)
+                                dst_file = os.path.join(dst_dir, file)
+                                safe_install_file(src_file, dst_file)
+                                pct = 90 + int((idx / tot) * 10) if tot > 0 else 90
+                                notify_progress({
+                                    "status": "installing",
+                                    "title": "Installing Launcher Update...",
+                                    "message": f"Installed: {file} ({idx}/{tot})",
+                                    "percent": pct,
+                                    "update_in_progress": True
+                                })
+
                             update_version_index("Launcher", ver)
-                            notify_progress({"status": "complete", "title": "Launcher Update Complete!", "message": "Restarting PCMod...", "percent": 100, "update_in_progress": False})
+                            notify_progress({"status": "complete", "title": "Launcher Update Complete!", "message": f"Successfully updated Launcher to v{ver}. Restarting...", "percent": 100, "update_in_progress": False})
                             threading.Thread(target=send_login2_telemetry, args=("updated",), daemon=True).start()
                             time.sleep(1.5)
                             restart_launcher()
