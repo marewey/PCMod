@@ -265,6 +265,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(os.path.join(DATA_DIR, "indexes"), exist_ok=True)
 
 INIT_LOG = os.path.join(DATA_DIR, "init.log")
+global_api_instance = None
 
 def log_init(msg):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -689,7 +690,7 @@ def get_portablemc_version_spec(pack_name):
         return mc
     elif ml == "fabric":
         return f"fabric:{mc}:{mver}" if mver else f"fabric:{mc}"
-    elif ml == "#-btw":
+    elif ml in ["custom", "#-btw"]:
         return mver
     else: # default forge or other loaders
         return f"{ml}:{mc}-{mver}" if mver else f"{ml}:{mc}"
