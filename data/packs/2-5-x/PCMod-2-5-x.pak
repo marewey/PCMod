@@ -13,7 +13,7 @@ B;architectury-9.2.14-forge.jar;2.5.2e;architectury;#
 U;AttributeFix-Forge-1.20.1-21.0.5.jar;2.5.1b;AttributeFix;#
 U;AutoLeveling-1.20-1.19b.jar;2.5.0;AutoLeveling;#
 B;baguettelib-1.20.1-Forge-1.1.6.jar;2.5.0;baguettelib;#
-B;balm-forge-1.20.1-7.3.38-all.jar;2.5.0;balm;#
+B;balm-forge-1.20.1-7.3.42.jar;2.5.3b;balm;#
 U;bedspreads-forge-6.3.0+1.20.1.jar;2.5.0;bedspreads;#
 U;bellsandwhistles-0.4.5-1.20.x-Create6.0+.jar;2.5.0;bellsandwhistlesCreate;#
 U;Better Cave Dweller-1.20.1.jar;2.5.0;BetterCaveDweller;geckolib
@@ -25,7 +25,7 @@ U;BiomesOPlenty-1.20.1-18.0.0.592.jar;2.5.0;BiomesOPlenty;TerraBlender
 B;Bookshelf-Forge-1.20.1-20.2.15.jar;2.5.1b;Bookshelf;#
 U;Bountiful-6.0.4+1.20.1-forge.jar;2.5.0;Bountiful;#
 U;BuildingWands-mc1.20.1-2.6.9-release.jar;2.5.1f;BuildingWandsrelease;#
-U;bulletarmorenchant-1.0-1.20.1.jar;2.5.0;bulletarmorenchant;#
+U;bulletarmorenchant-2.0-1.20.1.jar;2.5.3b;bulletarmorenchant;#
 S;buyclaimchunks-1.0.jar;2.5.0;buyclaimchunks;#
 B;caelus-forge-3.2.0+1.20.1.jar;2.5.0;caelus;#
 C;CameraOverhaul-v2.1.1-forge+mc[1.20-1.20.5].jar;2.5.3;CameraOverhaul;#
@@ -43,10 +43,10 @@ U;clientsort-forge-2.2.2+1.20.1.jar;2.5.3;clientsort;#
 U;clockwork-0.5.6.jar;2.5.3;clockwork;#
 B;cloth-config-11.1.136-forge.jar;2.5.0;clothconfig;#
 U;Clumps-forge-1.20.1-12.0.0.4.jar;2.5.0;Clumps;#
-B;CodeChickenLib-1.20.1-4.4.0.516-universal.jar;2.5.0;CodeChickenLib;#
+B;CodeChickenLib-1.20.1-4.4.0.528-universal.jar;2.5.3b;CodeChickenLib;#
 B;collective-1.20.1-8.39.jar;2.5.3;collective;#
 C;Controlling-forge-1.20.1-12.0.2.jar;2.5.0;Controlling;#
-U;copycats-3.0.7+mc.1.20.1-forge.jar;2.5.1c;copycats;#
+U;copycats-3.0.8+mc.1.20.1-forge.jar;2.5.3b;copycats;#
 U;corail_woodcutter-1.20.1-3.0.6.jar;2.5.0;corailwoodcutter;#
 U;corn_delight-1.2.11-1.20.1.jar;2.5.3;corndelight;#
 B;coroutil-forge-1.20.1-1.3.7.jar;2.5.0;coroutil;#
@@ -54,8 +54,8 @@ U;corpsecurioscompat-1.20.1-Forge-3.1.3.jar;2.5.0;corpsecurioscompat;curios+bagu
 U;corpse-forge-1.20.1-1.0.23.jar;2.5.0;corpse;#
 U;CraftTweaker-forge-1.20.1-14.0.60.jar;2.5.2f;CraftTweaker;#
 U;create_connected-1.2.3-mc1.20.1-all.jar;2.5.3;createconnected;#
-U;create_enchantment_industry-1.4.0-for-create-6.0.8.jar;2.5.3a;createenchantmentindustryforcreate;#
-U;create_hypertube-0.4.0-FORGE.jar;2.5.3a;createhypertube;#
+U;create_enchantment_industry-1.4.1-for-create-6.0.8.jar;2.5.3b;createenchantmentindustryforcreate;#
+U;create_hypertube-0.6.0-FORGE.jar;2.5.3b;createhypertube;#
 U;create_interactive-1.2.1_1.20.1-forge.jar;2.5.0;createinteractive;#
 U;create_power_loader-2.0.3-mc1.20.1.jar;2.5.0;createpowerloader;#
 U;create_radar-0.4.6+mc1.20.1.jar;2.5.3;createradar;#
@@ -70,15 +70,15 @@ U;createenchantablemachinery-3.6.0+mc1.20.1-forge.jar;2.5.2f;createenchantablema
 U;createpropulsion-0.3.0.jar;2.5.0;createpropulsion;#
 B;CreativeCore_FORGE_v2.12.39_mc1.20.1.jar;2.5.3;CreativeCore;#
 U;ctaw-3.0.5.jar;2.5.0f;createtheairwars;#
-B;cupboard-1.20.1-3.7.jar;2.5.3;cupboard;#
+B;cupboard-1.20.1-4.0.jar;2.5.3b;cupboard;#
 B;curios-forge-5.14.1+1.20.1.jar;2.5.0;curios;#
 U;customizableelytra-forge-2.1.2+1.20.jar;2.5.0;customizableelytra;#
 U;deathbackup-1.20.1-3.6.jar;2.5.3;deathbackup;#
 U;diminvswapper-1.0.1.jar;2.5.2b;diminvswapper;#
 U;displaydelight-1.7.0.jar;2.5.3;displaydelight;#
-U;DistantHorizons-3.1.2-b-1.20.1-fabric-forge.jar;2.5.3;DistantHorizons;#
+U;DistantHorizons-3.2.0-b-1.20.1-fabric-forge.jar;2.5.3b;DistantHorizons;#
 U;do_a_barrel_roll-forge-3.5.6+1.20.1.jar;2.5.0;doabarrelroll;#
-U;DragNs_Livestock_Overhaul-1.20.1-3.8.jar;2.5.3;DragNsLivestockOverhaul;#
+U;DragNs_Livestock_Overhaul-1.20.1-3.9.1.jar;2.5.3b;DragNsLivestockOverhaul;#
 S;dragonfight-1.20.1-4.7.jar;2.5.0;dragonfight;#
 U;drivebywire_recipes-1.1.0.jar;2.5.0;drivebywirerecipes;drivebywire
 U;drivebywire-1.20.1-0.1.1.jar;2.5.2a;drivebywire;#
@@ -99,9 +99,9 @@ U;eureka-1201-1.6.3.jar;2.5.3;eureka;#
 S;Explorify v1.6.5.mod.jar;2.5.3;Explorifymod;#
 U;Explosion-Overhaul-0.2.0.0-a Forge 1.20.1 x64.jar;2.5.0;ExplosionOverhaulaForgex;#
 U;exposure-1.20.1-1.7.16-forge.jar;2.5.0;exposure;#
-U;ExtraLib-3.0.11-1.20.1-Forge.jar;2.5.3;ExtraLib;#
+U;ExtraLib-3.0.12-1.20.1-Forge.jar;2.5.3b;ExtraLib;#
 U;ExtraQuests-1.7.0-1.20.1-Forge.jar;2.5.3;ExtraQuests;#
-U;FarmersDelight-1.20.1-1.3.2.jar;2.5.3;FarmersDelight;#
+U;FarmersDelight-1.20.1-1.3.3.jar;2.5.3b;FarmersDelight;#
 S;FastLeafDecay-32.jar;2.5.0;FastLeafDecay;#
 U;FastSuite-1.20.1-5.1.2.jar;2.5.0;FastSuite;#
 U;ferritecore-6.0.1-forge.jar;2.5.0;ferritecore;#
@@ -128,23 +128,23 @@ U;grapplevs-1.20.1-1.0.1-VS_2.4_compat.jar;2.5.0;grapplevscompat;#
 U;guardvillagers-1.20.1-1.6.18.jar;2.5.3;guardvillagers;#
 U;guccivuitton-1.20.1-0.2.2.jar;2.5.1d;guccivuitton;#
 B;guideme-20.1.15.jar;2.5.3;guideme;#
-U;hardcorerevival-forge-1.20.1-12.0.12.jar;2.5.3;hardcorerevival;#
+U;hardcorerevival-forge-1.20.1-20.1.18.jar;2.5.3b;hardcorerevival;#
 U;homesteads-2.0.1-for-forge-1.20.1.jar;2.5.3;homesteadsfor;#
 U;hourglass-1.20-1.2.1.1.jar;2.5.0;hourglass;#
 U;Immersive Vehicles-1.20.1-24.0.0.jar;2.5.3;ImmersiveVehicles;#
 U;immersive_paintings-0.6.13+1.20.1-forge.jar;2.5.3;immersivepaintings;#
 S;improved-village-placement-1.1.2.jar;2.5.0;improvedvillageplacement;#
 B;insanelib-1.23.4.6.jar;2.5.3;insanelib;#
-B;irons_lib-1.20.1-1.1.0.jar;2.5.3;ironslib;#
-U;irons_spellbooks-1.20.1-3.16.1.jar;2.5.3;ironsspellbooks;#
+B;irons_lib-1.20.1-2.1.0.jar;2.5.3b;ironslib;#
+U;irons_spellbooks-1.20.1-3.16.3.jar;2.5.3b;ironsspellbooks;#
 S;iswydt-1.0.5-1.20.1-FORGE.jar;2.5.0;iswydt;#
 U;Item Scrapper Pack - Armor Tools.jar;2.5.3;ItemScrapperPackArmorTools;#
 U;Item Scrapper Pack - TACZ.jar;2.5.3;ItemScrapperPackTACZ;#
-U;item_scrapper-1.3.0.jar;2.5.2e;itemscrapper;#
+U;item_scrapper-1.4.0.jar;2.5.3b;itemscrapper;#
 U;Jade-1.20.1-Forge-11.13.2.jar;2.5.0;Jade;#
-U;Jade-VS-forge-1.20.1-1.3.0.jar;2.5.2a;Jade;#
+U;Jade-1.20.1-Forge-11.13.3.jar;2.5.3b;Jade;#
 U;jei-1.20.1-forge-15.20.0.112.jar;2.5.0;jei;#
-U;JustEnoughMekanismMultiblocks-1.20.1-4.18.jar;2.5.3;JustEnoughMekanismMultiblocks;#
+U;JustEnoughMekanismMultiblocks-1.20.1-4.20.jar;2.5.3b;JustEnoughMekanismMultiblocks;#
 U;JustEnoughProfessions-forge-1.20.1-3.0.1.jar;2.5.0;JustEnoughProfessions;jei
 U;JustEnoughResources-1.20.1-1.4.0.247.jar;2.5.0;JustEnoughResources;jei
 B;Kambrik-6.1.1+1.20.1-forge.jar;2.5.0;Kambrik;#
@@ -162,12 +162,12 @@ S;Log-Begone-Forge-1.20.1-1.0.8.jar;2.5.0d;LogBegone;#
 S;logprot-1.20.1-3.5.jar;2.5.0;logprot;#
 U;lootintegrations_ctov-1.4.jar;2.5.0;lootintegrationsctov;#
 U;lootintegrations_dungeoncrawl-1.2.jar;2.5.3;lootintegrationsdungeoncrawl;#
-U;lootintegrations_vanilla-1.6.jar;2.5.3;lootintegrationsvanilla;#
+U;lootintegrations_vanilla-1.7.jar;2.5.3b;lootintegrationsvanilla;#
 U;lootintegrations_yungs-1.6.jar;2.5.3;lootintegrationsyungs;#
 U;lootintegrations-1.20.1-4.7.jar;2.5.0;lootintegrations;#
 U;lootjs-forge-1.20.1-2.13.1.jar;2.5.0c;lootjs;#
 U;lootr-forge-1.20-0.7.35.94.jar;2.5.0;lootr;#
-U;lrtactical-1.20.1-0.3.0.jar;2.5.0;lrtactical;tacz
+U;lrtactical-1.20.1-0.4.3.jar;2.5.3b;lrtactical;#
 U;madgique_tickrate_changer-1.20.1-1.0.0-forge.jar;2.5.2e;madgiquetickratechanger;#
 B;Mantle-1.20.1-1.11.104.jar;2.5.0a;Mantle;#
 U;marks_death_mod-1.2-forge-1.20.1.jar;2.5.0;marksdeathmod;#
@@ -198,6 +198,7 @@ S;Multiworld-Forge-1.20.1.jar;2.5.0;Multiworld;#
 U;MutantMonsters-v8.0.8-1.20.1-Forge.jar;2.5.0;MutantMonsters;PuzzlesLib
 B;mysterious_mountain_lib-1.6.34-1.20.1.jar;2.5.1c;mysteriousmountainlib;#
 U;naturalist-5.0pre2+forge-1.20.1.jar;2.5.0;naturalistpre;#
+U;neoforge-tardis_refined-mc1.20.1-v2.1.7.jar;2.5.3b;neotardisrefined;#
 U;Neruina-2.1.2-forge+1.20.1.jar;2.5.0;Neruina;#
 S;nohostilesaroundcampfire-1.20.1-7.5.jar;2.5.3;nohostilesaroundcampfire;#
 U;notenoughcrashes-4.4.9+1.20.1-forge.jar;2.5.0;notenoughcrashes;#
@@ -207,7 +208,7 @@ U;Origins_Force_Human.jar;2.5.0;OriginsForceHuman;#
 U;origins-forge-1.20.1-1.10.0.9-all.jar;2.5.0;origins;caelus
 U;Paps_Fantasy_Origins_Forge-1_6-1_20_0.jar;2.5.0;PapsFantasyOrigins;#
 U;parry-2.5.0.jar;2.5.0;parry;#
-U;particular-1.20.1-Forge-1.5.5.jar;2.5.3;particular;#
+U;particular-1.20.1-Forge-1.5.7.jar;2.5.3b;particular;#
 U;PassableFoliage-1.20.1-forge-8.2.1.jar;2.5.0;PassableFoliage;Kiwi
 B;Patchouli-1.20.1-85-FORGE.jar;2.5.2d;Patchouli;#
 U;Pehkui-3.8.2+1.20.1-forge.jar;2.5.0;Pehkui;#
@@ -241,13 +242,13 @@ C;sodiumdynamiclights-forge-1.0.10-1.20.1.jar;2.5.0;sodiumdynamiclights;#
 C;sodiumextras-forge-1.0.7-1.20.1.jar;2.5.0;sodiumextras;#
 C;sodiumoptionsapi-forge-1.0.10-1.20.1.jar;2.5.0;sodiumoptionsapi;#
 C;sodiumoptionsmodcompat-forge-1.0.0-1.20.1.jar;2.5.0;sodiumoptionsmodcompat;#
-U;sophisticatedbackpacks-1.20.1-3.24.58.1934.jar;2.5.3;sophisticatedbackpacks;#
-B;sophisticatedcore-1.20.1-1.3.59.2086.jar;2.5.3a;sophisticatedcore;#
+U;sophisticatedbackpacks-1.20.1-3.24.67.2109.jar;2.5.3b;sophisticatedbackpacks;#
+B;sophisticatedcore-1.20.1-1.3.83.2295.jar;2.5.3b;sophisticatedcore;#
 C;sound-physics-remastered-forge-1.20.1-1.5.1.jar;2.5.0;soundphysicsremastered;#
 U;Sounds-2.2.1+1.20.1+forge.jar;2.5.0;Sounds;MRU
 S;spark-1.10.53-forge.jar;2.5.0;spark;#
 S;sparsestructures-forge-1.20.1-3.0.jar;2.5.0b;sparsestructures;#
-U;spawn-3.3.jar;2.5.3;spawn;#
+U;spawn-4.0.7-1.20.1.jar;2.5.3b;spawn;#
 S;starterkit-1.20.1-8.1.jar;2.5.3;starterkit;#
 U;Steam_Rails-1.7.2+forge-mc1.20.1.jar;2.5.2f;SteamRails;#
 U;still-life-0.1.1.jar;2.5.0;stilllife;#
@@ -273,14 +274,14 @@ U;UNU Military Pack [MTS] 1.20.1-22.18.0-6.0.3.jar;2.5.3;UNUMilitaryPackMTS;#
 U;UNU Parts Pack [MTS] 1.20.1-22.18.0-6.7.3.jar;2.5.3;UNUPartsPackMTS;#
 U;valkib-1.1.0.jar;2.5.0f;valkib;#
 B;valkyrienskies-120-2.4.11.jar;2.5.3;valkyrienskies;#
-U;visualhealth-forge-1.20.1-2.0.2.jar;2.5.3;visualhealth;#
-U;voicechat-forge-1.20.1-2.6.20.jar;2.5.3;voicechat;#
+U;visualhealth-forge-1.20.1-2.0.3.jar;2.5.3b;visualhealth;#
+U;voicechat-forge-1.20.1-2.6.22.jar;2.5.3b;voicechat;#
 U;Voiceless Survival-forge-1.20.1-2.0.2.jar;2.5.3;VoicelessSurvival;#
 U;walljump-1.20.1-1.3.8-forge.jar;2.5.3;walljump;#
 U;watut-forge-1.20.1-1.2.3.jar;2.5.0;watut;coroutil
 U;weather2-1.20.1-2.8.3.jar;2.5.0;weather;#
 U;weather2modcompat-1.1.0.jar;2.5.0;weathermodcompat;weather
-S;wits-1.1.0+1.20.1-forge.jar;2.5.0;wits;#
+S;wits-1.1.1+1.20.1-forge.jar;2.5.3b;wits;#
 S;worldedit-mod-7.2.15.jar;2.5.0;worldeditmod;#
 U;xlpackets-forge-1.20.1-1.0.5.jar;2.5.2d;xlpackets;#
 S;XP From Harvest Reworked-1.20.x-1.2.4.jar;2.5.0;XPFromHarvestReworked;#
