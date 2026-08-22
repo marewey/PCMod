@@ -2321,11 +2321,13 @@ class Api:
         UPDATE_CANCEL_REQUESTED = False
 
         def notify_progress(info):
-            title = info.get("title", "")
-            msg = info.get("message", "")
-            pct = info.get("percent", "")
-            log_str = f"Update Progress [{pct}%]: {title}" + (f" - {msg}" if msg else "")
-            log_init(log_str)
+            status = info.get("status", "")
+            if status not in ["downloading", "extracting"]:
+                title = info.get("title", "")
+                msg = info.get("message", "")
+                pct = info.get("percent", "")
+                log_str = f"Update Progress [{pct}%]: {title}" + (f" - {msg}" if msg else "")
+                log_init(log_str)
             if self._window:
                 safe_json = json.dumps(info)
                 self._window.evaluate_js(f"if(window.onUpdateProgress) window.onUpdateProgress({safe_json});")
