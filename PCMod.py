@@ -2149,9 +2149,14 @@ class Api:
 
         # Resolve portablemc version target spec from version indexes (matching launch.bat %m-version%)
         m_version = get_portablemc_version_spec(pack)
+        vinfo_pack = read_version_info(pack)
+
+        pack_dir = os.path.join(DATA_DIR, "packs", pack)
+        is_custom = any("CUSTOM" in str(v).upper() for v in [vinfo_pack.get("modloader", ""), vinfo_pack.get("mcversion", ""), vinfo_pack.get("mlversion", ""), pack])
+        main_dir = pack_dir if is_custom else DATA_DIR
 
         # Execution using PYTHONPATH=bin/pmc and python -m portablemc to prevent http.py import shadowing!
-        cmd = [sys.executable, "-m", "portablemc", "--main-dir", DATA_DIR, "--work-dir", os.path.join(DATA_DIR, "packs", pack), "start", m_version, "-u", username, "-i", mcuuid, f"--jvm-args={jvm_args_str}"]
+        cmd = [sys.executable, "-m", "portablemc", "--main-dir", main_dir, "--work-dir", pack_dir, "start", m_version, "-u", username, "-i", mcuuid, f"--jvm-args={jvm_args_str}"]
 
         if autoserver:
             port = "25565"
@@ -2197,15 +2202,15 @@ class Api:
                     log_init(f"Modloader/assets missing for pack '{pack}'. Downloading missing resources...")
                     if self._window:
                         self._window.evaluate_js("onGameLaunchState('downloading');")
-                    dry_args = ["--main-dir", DATA_DIR, "--work-dir", pack_dir, "start", "--dry", m_version]
+                    dry_args = ["--main-dir", main_dir, "--work-dir", pack_dir, "start", "--dry", m_version]
                     run_portablemc_direct(dry_args)
 
                 if self._window:
                     self._window.evaluate_js("onGameLaunchState('running');")
 
                 pmc_args = [
-                    "--main-dir", DATA_DIR,
-                    "--work-dir", os.path.join(DATA_DIR, "packs", pack),
+                    "--main-dir", main_dir,
+                    "--work-dir", pack_dir,
                     "start", m_version,
                     "-u", username,
                     "-i", mcuuid,
