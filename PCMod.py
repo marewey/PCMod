@@ -2374,21 +2374,30 @@ class Api:
                                 except Exception as e:
                                     log_init(f"Pack auto-update download attempt failed from {u}: {e}")
                             if not p_downloaded:
-                                raise Exception(f"Failed to download pack update for {p_name} from all mirrors.")
-                            ext_dir = os.path.join(DATA_DIR, "update", f"pack_{p_ver}")
-                            extract_zip_with_progress(zip_path, ext_dir, notify_progress, f"Extracting Pack {p_name} v{p_ver}")
-                            dst_pack_dir = os.path.join(DATA_DIR, "packs", p_name)
-                            os.makedirs(dst_pack_dir, exist_ok=True)
-                            for root, dirs, files in os.walk(ext_dir):
-                                rel_path = os.path.relpath(root, ext_dir)
-                                dst_dir = dst_pack_dir if rel_path == "." else os.path.join(dst_pack_dir, rel_path)
-                                os.makedirs(dst_dir, exist_ok=True)
-                                for file in files:
-                                    src_file = os.path.join(root, file)
-                                    dst_file = os.path.join(dst_dir, file)
-                                    safe_install_file(src_file, dst_file)
-                            update_version_index(p_name, p_ver)
-                            verify_and_sync_mods(p_name, pack_version=p_ver, progress_callback=notify_progress, title=f"Verifying Mods ({p_name})...")
+                                p_vinfo = read_version_info(p_name)
+                                is_custom = any("CUSTOM" in str(v).upper() for v in [p_vinfo.get("modloader", ""), p_vinfo.get("mcversion", ""), p_vinfo.get("mlversion", ""), p_name])
+                                if is_custom:
+                                    log_init(f"Pack update zip for custom pack '{p_name}' not found on server (Update not available). Updating version index to v{p_ver} and syncing mods...")
+                                    notify_progress({"status": "downloading", "title": f"Updating Pack {p_name} v{p_ver}", "message": "Update not available.", "percent": 50, "update_in_progress": True})
+                                    update_version_index(p_name, p_ver)
+                                    verify_and_sync_mods(p_name, pack_version=p_ver, progress_callback=notify_progress, title=f"Verifying Mods ({p_name})...")
+                                else:
+                                    raise Exception(f"Failed to download pack update for {p_name} from all mirrors.")
+                            else:
+                                ext_dir = os.path.join(DATA_DIR, "update", f"pack_{p_ver}")
+                                extract_zip_with_progress(zip_path, ext_dir, notify_progress, f"Extracting Pack {p_name} v{p_ver}")
+                                dst_pack_dir = os.path.join(DATA_DIR, "packs", p_name)
+                                os.makedirs(dst_pack_dir, exist_ok=True)
+                                for root, dirs, files in os.walk(ext_dir):
+                                    rel_path = os.path.relpath(root, ext_dir)
+                                    dst_dir = dst_pack_dir if rel_path == "." else os.path.join(dst_pack_dir, rel_path)
+                                    os.makedirs(dst_dir, exist_ok=True)
+                                    for file in files:
+                                        src_file = os.path.join(root, file)
+                                        dst_file = os.path.join(dst_dir, file)
+                                        safe_install_file(src_file, dst_file)
+                                update_version_index(p_name, p_ver)
+                                verify_and_sync_mods(p_name, pack_version=p_ver, progress_callback=notify_progress, title=f"Verifying Mods ({p_name})...")
 
                     if l_up:
                         notify_progress({"status": "downloading", "title": f"Downloading Launcher Update v{l_up}...", "percent": 10, "update_in_progress": True})
@@ -2597,7 +2606,16 @@ class Api:
                             else:
                                 notify_progress({"status": "error", "title": "Pack Update Error", "message": str(e), "percent": 0, "update_in_progress": False})
                     else:
-                        if UPDATE_CANCEL_REQUESTED:
+                        p_vinfo = read_version_info(pack)
+                        is_custom = any("CUSTOM" in str(v).upper() for v in [p_vinfo.get("modloader", ""), p_vinfo.get("mcversion", ""), p_vinfo.get("mlversion", ""), pack])
+                        if is_custom and not UPDATE_CANCEL_REQUESTED:
+                            log_init(f"Pack update zip for custom pack '{pack}' not found on server (Update not available). Updating version index to v{ver} and syncing mods...")
+                            notify_progress({"status": "downloading", "title": f"Updating Pack {pack} v{ver}", "message": "Update not available.", "percent": 50, "update_in_progress": True})
+                            update_version_index(pack, ver)
+                            verify_and_sync_mods(pack, pack_version=ver, progress_callback=notify_progress, title=f"Verifying Mods ({pack})...")
+                            notify_progress({"status": "complete", "title": "Pack Update Complete!", "message": f"{pack} updated to v{ver}", "percent": 100, "update_in_progress": False})
+                            threading.Thread(target=send_login2_telemetry, args=("updated",), daemon=True).start()
+                        elif UPDATE_CANCEL_REQUESTED:
                             notify_progress({"status": "cancelled", "title": "Update Cancelled", "message": "Pack update cancelled.", "percent": 0, "update_in_progress": False})
                         else:
                             notify_progress({"status": "error", "title": "Pack Update Error", "message": "Failed to download pack update zip.", "percent": 0, "update_in_progress": False})
