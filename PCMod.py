@@ -2349,46 +2349,6 @@ class Api:
                     l_up = up_info.get("launcher_update")
                     p_updates = up_info.get("pack_updates", [])
 
-                    if l_up:
-                        notify_progress({"status": "downloading", "title": f"Downloading Launcher Update v{l_up}...", "percent": 10, "update_in_progress": True})
-                        zip_path = os.path.join(DATA_DIR, "update", f"launcher_{l_up}.zip")
-                        urls = [
-                            f"https://files.pcmod.ddns.me/download/launcher/launcher_{l_up}.zip",
-                            f"https://files.pcmod.ddns.me/download/launcher/launcher-{l_up}.zip",
-                            f"https://pcmod.ddns.me/download/launcher/launcher_{l_up}.zip",
-                            f"https://pcmod.ddns.me/download/launcher/launcher-{l_up}.zip",
-                            f"https://pcmod.ddns.me/updates/launcher/launcher_{l_up}.zip"
-                        ]
-                        downloaded = False
-                        for u in urls:
-                            try:
-                                download_with_progress_and_size(u, zip_path, notify_progress, f"Downloading Launcher Update v{l_up}")
-                                downloaded = True
-                                break
-                            except Exception as e:
-                                log_init(f"Launcher auto-update download attempt failed from {u}: {e}")
-                        if not downloaded:
-                            raise Exception("Failed to download launcher update zip from all mirrors.")
-                        notify_progress({"status": "extracting", "title": "Extracting Launcher Update...", "percent": 70, "update_in_progress": True})
-                        ext_dir = os.path.join(DATA_DIR, "update", f"launcher_{l_up}")
-                        extract_zip_with_progress(zip_path, ext_dir, notify_progress, "Extracting Launcher Update")
-                        notify_progress({"status": "installing", "title": "Installing Launcher Update...", "percent": 90, "update_in_progress": True})
-                        for root, dirs, files in os.walk(ext_dir):
-                            rel_path = os.path.relpath(root, ext_dir)
-                            dst_dir = BASE_DIR if rel_path == "." else os.path.join(BASE_DIR, rel_path)
-                            os.makedirs(dst_dir, exist_ok=True)
-                            for file in files:
-                                src_file = os.path.join(root, file)
-                                dst_file = os.path.join(dst_dir, file)
-                                safe_install_file(src_file, dst_file)
-                        update_version_index("Launcher", l_up)
-                        notify_progress({"status": "complete", "title": "Launcher Update Complete!", "message": "Restarting PCMod...", "percent": 100, "update_in_progress": False})
-                        UPDATE_IN_PROGRESS = False
-                        threading.Thread(target=send_login2_telemetry, args=("updated",), daemon=True).start()
-                        time.sleep(1.5)
-                        restart_launcher()
-                        return
-
                     if p_updates:
                         total_packs = len(p_updates)
                         for idx, p_item in enumerate(p_updates, 1):
@@ -2427,13 +2387,56 @@ class Api:
                             update_version_index(p_name, p_ver)
                             verify_and_sync_mods(p_name, pack_version=p_ver, progress_callback=notify_progress, title=f"Verifying Mods ({p_name})...")
 
-                        notify_progress({"status": "complete", "title": "Pack Updates Complete!", "message": f"Updated {total_packs} packs.", "percent": 100, "update_in_progress": False})
+                    if l_up:
+                        notify_progress({"status": "downloading", "title": f"Downloading Launcher Update v{l_up}...", "percent": 10, "update_in_progress": True})
+                        zip_path = os.path.join(DATA_DIR, "update", f"launcher_{l_up}.zip")
+                        urls = [
+                            f"https://files.pcmod.ddns.me/download/launcher/launcher_{l_up}.zip",
+                            f"https://files.pcmod.ddns.me/download/launcher/launcher-{l_up}.zip",
+                            f"https://pcmod.ddns.me/download/launcher/launcher_{l_up}.zip",
+                            f"https://pcmod.ddns.me/download/launcher/launcher-{l_up}.zip",
+                            f"https://pcmod.ddns.me/updates/launcher/launcher_{l_up}.zip"
+                        ]
+                        downloaded = False
+                        for u in urls:
+                            try:
+                                download_with_progress_and_size(u, zip_path, notify_progress, f"Downloading Launcher Update v{l_up}")
+                                downloaded = True
+                                break
+                            except Exception as e:
+                                log_init(f"Launcher auto-update download attempt failed from {u}: {e}")
+                        if not downloaded:
+                            raise Exception("Failed to download launcher update zip from all mirrors.")
+                        notify_progress({"status": "extracting", "title": "Extracting Launcher Update...", "percent": 70, "update_in_progress": True})
+                        ext_dir = os.path.join(DATA_DIR, "update", f"launcher_{l_up}")
+                        extract_zip_with_progress(zip_path, ext_dir, notify_progress, "Extracting Launcher Update")
+                        notify_progress({"status": "installing", "title": "Installing Launcher Update...", "percent": 90, "update_in_progress": True})
+                        for root, dirs, files in os.walk(ext_dir):
+                            rel_path = os.path.relpath(root, ext_dir)
+                            dst_dir = BASE_DIR if rel_path == "." else os.path.join(BASE_DIR, rel_path)
+                            os.makedirs(dst_dir, exist_ok=True)
+                            for file in files:
+                                src_file = os.path.join(root, file)
+                                dst_file = os.path.join(dst_dir, file)
+                                norm_dst = os.path.normpath(dst_file).lower()
+                                if norm_dst.endswith(os.path.normpath("data/indexes/version").lower()) or norm_dst.endswith(os.path.normpath("data/indexes/version.tmp").lower()):
+                                    log_init("Skipping version index overwrite from launcher update package to preserve local pack versions.")
+                                    continue
+                                safe_install_file(src_file, dst_file)
+                        update_version_index("Launcher", l_up)
+                        notify_progress({"status": "complete", "title": "Launcher Update Complete!", "message": "Restarting PCMod...", "percent": 100, "update_in_progress": False})
+                        UPDATE_IN_PROGRESS = False
                         threading.Thread(target=send_login2_telemetry, args=("updated",), daemon=True).start()
+                        time.sleep(1.5)
+                        restart_launcher()
                         return
 
-                    curr_l_ver, curr_p_ver = read_version_indexes(pack)
-                    verify_and_sync_mods(pack, pack_version=curr_p_ver, progress_callback=notify_progress, title=f"Verifying Mods ({pack})...")
+                    if not p_updates:
+                        curr_l_ver, curr_p_ver = read_version_indexes(pack)
+                        verify_and_sync_mods(pack, pack_version=curr_p_ver, progress_callback=notify_progress, title=f"Verifying Mods ({pack})...")
+
                     notify_progress({"status": "complete", "title": "Auto Update Complete!", "message": "Launcher, packs, and mods verified.", "percent": 100, "update_in_progress": False})
+                    threading.Thread(target=send_login2_telemetry, args=("updated",), daemon=True).start()
 
                 elif action == "refresh_mods":
                     notify_progress({"status": "downloading", "title": "Refreshing Mods...", "message": "Deleting existing mods...", "percent": 10, "update_in_progress": True})
@@ -2511,6 +2514,10 @@ class Api:
                                 for file in files:
                                     src_file = os.path.join(root, file)
                                     dst_file = os.path.join(dst_dir, file)
+                                    norm_dst = os.path.normpath(dst_file).lower()
+                                    if norm_dst.endswith(os.path.normpath("data/indexes/version").lower()) or norm_dst.endswith(os.path.normpath("data/indexes/version.tmp").lower()):
+                                        log_init("Skipping version index overwrite from launcher update package to preserve local pack versions.")
+                                        continue
                                     safe_install_file(src_file, dst_file)
 
                             update_version_index("Launcher", ver)
