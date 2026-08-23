@@ -1288,6 +1288,9 @@ def check_updates_server():
 
     for item in installed_versions:
         p_name = item["name"]
+        p_vinfo = read_version_info(p_name)
+        if p_vinfo.get("modloader", "").lower() == "vanilla":
+            continue
         _, current_p_ver = read_version_indexes(p_name)
         remote_p_ver = remote_versions.get(p_name, "")
         if remote_p_ver and remote_p_ver != current_p_ver:
