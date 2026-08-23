@@ -2790,32 +2790,13 @@ def main():
         js_api=api,
         width=1160,
         height=690,
-        resizable=False
+        resizable=False,
+        icon=icon_path if os.path.exists(icon_path) else None
     )
     api.set_window(window)
 
     def on_loaded():
         apply_win32_window_icons()
-        if OS_NAME == "win32":
-            try:
-                import System
-                import System.Drawing
-                import System.Windows.Forms
-
-                forms = System.Windows.Forms.Application.OpenForms
-                for f in forms:
-                    icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
-                    if os.path.exists(icon_path):
-                        def set_form_icon():
-                            try:
-                                f.Icon = System.Drawing.Icon(icon_path)
-                                f.ShowIcon = True
-                            except Exception:
-                                pass
-
-                        f.BeginInvoke(System.Action(set_form_icon))
-            except Exception:
-                pass
 
     def on_closing():
         threading.Thread(target=send_login2_telemetry, args=("out",), daemon=True).start()
