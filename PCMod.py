@@ -575,7 +575,7 @@ def get_pack_name():
     return "2-5-x"
 
 def read_version_info(pack_name):
-    launcher_ver = "1.2a"
+    launcher_ver = "2.0c"
     pack_ver = "2.5.3a"
     modloader = "forge"
     mcversion = "1.20.1"
@@ -593,9 +593,9 @@ def read_version_info(pack_name):
                     if len(parts) >= 2:
                         key = parts[0].strip()
                         ver = parts[1].strip()
-                        if key == "Launcher":
+                        if key.lower() == "launcher":
                             launcher_ver = ver
-                        elif key == pack_name:
+                        elif key.lower() == pack_name.lower():
                             pack_ver = ver
                             if len(parts) >= 3 and parts[2].strip():
                                 modloader = parts[2].strip()
@@ -709,7 +709,7 @@ def update_version_index(key, new_ver):
                 with open(check_f, "r", encoding="utf-8", errors="ignore") as f:
                     for line in f:
                         parts = line.strip().split(";")
-                        if len(parts) >= 2 and parts[0].strip() == key:
+                        if len(parts) >= 2 and parts[0].strip().lower() == key.lower():
                             if len(parts) >= 3 and parts[2].strip(): def_loader = parts[2].strip()
                             if len(parts) >= 4 and parts[3].strip(): def_mcver = parts[3].strip()
                             if len(parts) >= 5 and parts[4].strip(): def_mlver = parts[4].strip()
@@ -722,7 +722,8 @@ def update_version_index(key, new_ver):
             with open(vfile, "r", encoding="utf-8", errors="ignore") as f:
                 for line in f:
                     parts = line.strip().split(";")
-                    if len(parts) >= 2 and parts[0].strip() == key:
+                    if len(parts) >= 2 and parts[0].strip().lower() == key.lower():
+                        parts[0] = key
                         if new_ver:
                             parts[1] = new_ver
                         lines.append(";".join(parts) + "\n")
