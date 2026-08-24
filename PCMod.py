@@ -26,8 +26,10 @@ def check_cli_entrypoint():
     if "--cleanup-old" in sys.argv:
         try:
             idx = sys.argv.index("--cleanup-old")
-            if idx + 1 < len(sys.argv):
-                old_path = sys.argv[idx + 1]
+            old_path = sys.argv[idx + 1] if idx + 1 < len(sys.argv) else None
+            # Remove --cleanup-old and its target path argument from sys.argv so child restarts do not inherit orphaned args
+            if old_path:
+                sys.argv = [a for i, a in enumerate(sys.argv) if i != idx and i != idx + 1]
                 def _cleanup():
                     time.sleep(1.5)
                     try:
@@ -39,6 +41,8 @@ def check_cli_entrypoint():
                     except Exception:
                         pass
                 threading.Thread(target=_cleanup, daemon=True).start()
+            else:
+                sys.argv = [a for i, a in enumerate(sys.argv) if i != idx]
         except Exception:
             pass
 
@@ -206,8 +210,18 @@ def relocate_if_needed(target_dir):
                     pass
             shutil.copy2(current_exe, target_exe)
 
-            extra_args = [a for a in sys.argv[1:] if a != "--cleanup-old"]
-            spawn_cmd = [target_exe] + extra_args + ["--cleanup-old", current_exe]
+            clean_args = []
+            skip_next = False
+            for arg in sys.argv[1:]:
+                if skip_next:
+                    skip_next = False
+                    continue
+                if arg == "--cleanup-old":
+                    skip_next = True
+                    continue
+                clean_args.append(arg)
+
+            spawn_cmd = [target_exe] + clean_args + ["--cleanup-old", current_exe]
             subprocess.Popen(spawn_cmd, cwd=target_dir, env=get_clean_env())
             sys.exit(0)
         except Exception as e:
@@ -1620,7 +1634,16 @@ def restart_launcher():
     log_init("Restarting PCMod Launcher...")
     clean_env = get_clean_env()
     if getattr(sys, 'frozen', False):
-        clean_args = [a for a in sys.argv[1:] if a != "--cleanup-old"]
+        clean_args = []
+        skip_next = False
+        for arg in sys.argv[1:]:
+            if skip_next:
+                skip_next = False
+                continue
+            if arg == "--cleanup-old":
+                skip_next = True
+                continue
+            clean_args.append(arg)
         target_exe = os.path.join(BASE_DIR, "PCMod.exe") if os.path.exists(os.path.join(BASE_DIR, "PCMod.exe")) else sys.executable
         subprocess.Popen([target_exe] + clean_args, env=clean_env, cwd=BASE_DIR)
     else:
@@ -2791,8 +2814,7 @@ def main():
         js_api=api,
         width=1160,
         height=690,
-        resizable=False,
-        icon=icon_path if os.path.exists(icon_path) else None
+        resizable=False
     )
     api.set_window(window)
 
