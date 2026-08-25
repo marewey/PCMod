@@ -737,6 +737,7 @@
       </div>
       <div style="display: flex; gap: 10px; margin-bottom: 10px;">
         <button class="btn-secondary" id="tabCrashBtn" onclick="switchCrashTab('crash_report')" style="width: 160px; background: rgba(59, 130, 246, 0.3);">Crash Report</button>
+        <button class="btn-secondary" id="tabGameLogBtn" onclick="switchCrashTab('game_log')" style="width: 160px;">Game Log</button>
         <button class="btn-secondary" id="tabLaunchBtn" onclick="switchCrashTab('launch_log')" style="width: 160px;">Launch Log</button>
       </div>
       <div class="table-container" style="padding: 12px; font-family: monospace; white-space: pre-wrap; word-break: break-all; color: #f8fafc;" id="crashTextContent">
@@ -1020,7 +1021,7 @@
       initLauncher();
     }
 
-    var crashLogsCache = { launch_log: '', crash_report: '' };
+    var crashLogsCache = { launch_log: '', game_log: '', crash_report: '' };
 
     function onGameCrashed() {
       onGameLaunchState('idle');
@@ -1044,15 +1045,21 @@
 
     function switchCrashTab(tab) {
       var tabCrashBtn = document.getElementById('tabCrashBtn');
+      var tabGameLogBtn = document.getElementById('tabGameLogBtn');
       var tabLaunchBtn = document.getElementById('tabLaunchBtn');
       var contentDiv = document.getElementById('crashTextContent');
 
+      tabCrashBtn.style.background = 'rgba(255, 255, 255, 0.06)';
+      tabGameLogBtn.style.background = 'rgba(255, 255, 255, 0.06)';
+      tabLaunchBtn.style.background = 'rgba(255, 255, 255, 0.06)';
+
       if (tab === 'crash_report') {
         tabCrashBtn.style.background = 'rgba(59, 130, 246, 0.4)';
-        tabLaunchBtn.style.background = 'rgba(255, 255, 255, 0.06)';
         contentDiv.innerText = crashLogsCache.crash_report || 'No crash report available.';
+      } else if (tab === 'game_log') {
+        tabGameLogBtn.style.background = 'rgba(59, 130, 246, 0.4)';
+        contentDiv.innerText = crashLogsCache.game_log || 'No game log available.';
       } else {
-        tabCrashBtn.style.background = 'rgba(255, 255, 255, 0.06)';
         tabLaunchBtn.style.background = 'rgba(59, 130, 246, 0.4)';
         contentDiv.innerText = crashLogsCache.launch_log || 'No launch log available.';
       }
@@ -1331,10 +1338,7 @@
         isUpdateActive = false;
         updateLaunchButtonState(document.getElementById('username').value);
         initLauncher();
-        var container = document.getElementById('packCardsContainer');
-        if (container && container.style.display === 'block') {
-          showPackDownloaderCards(true);
-        }
+        showPackDownloaderCards(true);
       }
     };
 
