@@ -1768,10 +1768,10 @@ class Api:
         if warn_low_allocated or warn_low_system:
             reasons = []
             if warn_low_allocated:
-                reasons.append(f"Allocated memory is set below 6GB ({allocated_mb}MB).")
+                reasons.append(f"Allocated memory is set below 6144MB, You have {allocated_mb}MB.")
             if warn_low_system:
-                reasons.append(f"System has 8GB or less total RAM ({total_ram_mb}MB).")
-            msg = "Warning: " + " ".join(reasons) + " The game may be unplayable or unstable."
+                reasons.append(f"System has 8192MB or less total RAM ({total_ram_mb}MB).")
+            msg = "Warning: " + " ".join(reasons) + " The game may be unplayable or really unstable."
             return {"warn": True, "message": msg, "allocated_mb": allocated_mb, "total_ram_mb": total_ram_mb}
 
         return {"warn": False, "message": "", "allocated_mb": allocated_mb, "total_ram_mb": total_ram_mb}
