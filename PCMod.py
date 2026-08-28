@@ -428,6 +428,72 @@ def bootstrap_missing_files():
 # Run bootstrap check before anything else
 bootstrap_missing_files()
 
+def sync_pack_file(local_path, remote_url, label="Pack File"):
+    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+    local_size = os.path.getsize(local_path) if os.path.exists(local_path) else -1
+    remote_exists = False
+    remote_size = -1
+
+    log_init(f"[{label} Sync] Checking remote server for {remote_url}...")
+    try:
+        req_head = urllib.request.Request(remote_url, method='HEAD', headers={'User-Agent': 'Mozilla/5.0'})
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(req_head, timeout=5.0, context=ctx) as resp:
+            if resp.status == 200:
+                remote_exists = True
+                cl = resp.headers.get('Content-Length')
+                if cl and cl.isdigit():
+                    remote_size = int(cl)
+    except urllib.error.HTTPError as e:
+        log_init(f"[{label} Sync] Remote file check response: HTTP {e.code} ({e.reason})")
+    except Exception as e:
+        log_init(f"[{label} Sync] Remote check warning: {e}")
+
+    if not remote_exists:
+        log_init(f"[{label} Sync] Remote file does not exist on server ({remote_url}). Skipping sync.")
+        return False
+
+    log_init(f"[{label} Sync] Remote file exists. File size check -> Local: {local_size} bytes | Remote: {remote_size} bytes")
+
+    if not os.path.exists(local_path) or (remote_size > 0 and local_size != remote_size):
+        log_init(f"[{label} Sync] File missing or size mismatch. Downloading {label} from {remote_url}...")
+        try:
+            req_get = urllib.request.Request(remote_url, headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req_get, timeout=10.0, context=ctx) as resp:
+                content = resp.read()
+                if content:
+                    with open(local_path, "wb") as f:
+                        f.write(content)
+                    log_init(f"[{label} Sync] Successfully downloaded and saved {local_path} ({len(content)} bytes written).")
+                    return True
+        except Exception as e:
+            log_init(f"[{label} Sync] Download failed: {e}")
+            return False
+    else:
+        log_init(f"[{label} Sync] Local {label} is up to date ({local_path}). No download needed.")
+        return True
+
+def sync_active_pack_resources(pack_name=None):
+    if not pack_name:
+        pack_name = get_pack_name()
+    if not pack_name:
+        return
+
+    # 1. sync script.zs
+    script_local = os.path.join(DATA_DIR, "packs", pack_name, "scripts", "script.zs")
+    script_remote = f"https://files.pcmod.ddns.me/download/pack/scripts/script_{pack_name}.zs"
+    sync_pack_file(script_local, script_remote, label=f"Pack Script ({pack_name})")
+
+    # 2. sync servers.dat
+    servers_local = os.path.join(DATA_DIR, "packs", pack_name, "servers.dat")
+    servers_remote = f"https://files.pcmod.ddns.me/download/pack/servers/servers_{pack_name}.dat"
+    sync_pack_file(servers_local, servers_remote, label=f"Pack Servers ({pack_name})")
+
 def sync_updates_page():
     remote_url = "https://pcmod.ddns.me/updates.html"
     local_updates_path = os.path.join(DATA_DIR, "pages", "updates.html")
@@ -837,6 +903,10 @@ def startup_checks():
     log_init(f"Checking for PORTABLEMC... {pmc_ver}")
 
 startup_checks()
+try:
+    sync_active_pack_resources()
+except Exception as e:
+    log_init(f"Warning syncing active pack resources on startup: {e}")
 
 def get_offline_uuid(username):
     s = f"OfflinePlayer:{username}"
@@ -1451,6 +1521,12 @@ def download_with_progress_and_size(url, dst_path, progress_callback=None, title
 def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, title="Validating Mods..."):
     global UPDATE_CANCEL_REQUESTED
     log_init(f"Starting mod verification and sync for pack '{pack_name}' (version: {pack_version})...")
+
+    # Sync pack script.zs and servers.dat
+    try:
+        sync_active_pack_resources(pack_name)
+    except Exception as e:
+        log_init(f"Warning syncing pack resources for {pack_name}: {e}")
 
     pack_dir = os.path.join(DATA_DIR, "packs", pack_name)
     mods_dir = os.path.join(pack_dir, "mods")
