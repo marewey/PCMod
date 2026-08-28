@@ -632,6 +632,35 @@ def read_version_indexes(pack_name):
     info = read_version_info(pack_name)
     return info["launcher_ver"], info["pack_ver"]
 
+def get_system_total_ram_mb():
+    if OS_NAME == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            class MEMORYSTATUSEX(ctypes.Structure):
+                _fields_ = [
+                    ('dwLength', wintypes.DWORD),
+                    ('dwMemoryLoad', wintypes.DWORD),
+                    ('ullTotalPhys', ctypes.c_uint64),
+                    ('ullAvailPhys', ctypes.c_uint64),
+                    ('ullTotalPageFile', ctypes.c_uint64),
+                    ('ullAvailPageFile', ctypes.c_uint64),
+                    ('ullTotalVirtual', ctypes.c_uint64),
+                    ('ullAvailVirtual', ctypes.c_uint64),
+                    ('sullAvailExtendedVirtual', ctypes.c_uint64),
+                ]
+            stat = MEMORYSTATUSEX()
+            stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
+            return int(stat.ullTotalPhys / (1024 * 1024))
+        except Exception:
+            return 16384
+    else:
+        try:
+            return int(os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / (1024 * 1024))
+        except Exception:
+            return 16384
+
 def is_pid_running(pid):
     if pid <= 0:
         return False
@@ -937,8 +966,8 @@ def read_auth_token(username):
     token = None
     try:
         with open(auth_file, "rb") as f:
-            raw = f.read().strip()
-        if raw == b"404":
+            raw = f.read()
+        if raw.strip() == b"404":
             return "404"
 
         # Check if plain text ASCII
@@ -1725,6 +1754,28 @@ class Api:
     def check_game_running(self, *args, **kwargs):
         return get_running_game_info()
 
+    def check_ram_warning(self, *args, **kwargs):
+        s = read_settings()
+        try:
+            allocated_mb = int(s.get("memory", s.get("maxram", "4096")))
+        except Exception:
+            allocated_mb = 4096
+        total_ram_mb = get_system_total_ram_mb()
+
+        warn_low_allocated = allocated_mb < 6144
+        warn_low_system = total_ram_mb <= 8192
+
+        if warn_low_allocated or warn_low_system:
+            reasons = []
+            if warn_low_allocated:
+                reasons.append(f"Allocated memory is set below 6GB ({allocated_mb}MB).")
+            if warn_low_system:
+                reasons.append(f"System has 8GB or less total RAM ({total_ram_mb}MB).")
+            msg = "Warning: " + " ".join(reasons) + " The game may be unplayable or unstable."
+            return {"warn": True, "message": msg, "allocated_mb": allocated_mb, "total_ram_mb": total_ram_mb}
+
+        return {"warn": False, "message": "", "allocated_mb": allocated_mb, "total_ram_mb": total_ram_mb}
+
     def force_unlock(self, *args, **kwargs):
         return force_unlock_game()
 
@@ -2399,14 +2450,16 @@ class Api:
                                     log_init(f"Pack auto-update download attempt failed from {u}: {e}")
                             if not p_downloaded:
                                 p_vinfo = read_version_info(p_name)
-                                is_custom = any("CUSTOM" in str(v).upper() for v in [p_vinfo.get("modloader", ""), p_vinfo.get("mcversion", ""), p_vinfo.get("mlversion", ""), p_name])
-                                if is_custom:
-                                    log_init(f"Pack update zip for custom pack '{p_name}' not found on server (Update not available). Updating version index to v{p_ver} and syncing mods...")
+                                is_custom_or_vanilla = any(x in str(v).upper() for v in [p_vinfo.get("modloader", ""), p_vinfo.get("mcversion", ""), p_vinfo.get("mlversion", ""), p_name] for x in ["CUSTOM", "VANILLA", "#-BTW", "BTW"])
+                                if is_custom_or_vanilla:
+                                    log_init(f"Pack update zip for custom/vanilla pack '{p_name}' not found on server (Update not available). Updating version index to v{p_ver} quietly...")
                                     notify_progress({"status": "downloading", "title": f"Updating Pack {p_name} v{p_ver}", "message": "Update not available.", "percent": 50, "update_in_progress": True})
                                     update_version_index(p_name, p_ver)
                                     verify_and_sync_mods(p_name, pack_version=p_ver, progress_callback=notify_progress, title=f"Verifying Mods ({p_name})...")
                                 else:
-                                    raise Exception(f"Failed to download pack update for {p_name} from all mirrors.")
+                                    log_init(f"Pack update zip for '{p_name}' not found on server. Local version file NOT updated.")
+                                    notify_progress({"status": "error", "title": "Update Available", "message": f"Update Available for {p_name}, but no download found for the update. Please contact System Admin.", "percent": 0, "update_in_progress": False})
+                                    raise Exception(f"Update Available for {p_name}, but no download found for the update. Please contact System Admin.")
                             else:
                                 ext_dir = os.path.join(DATA_DIR, "update", f"pack_{p_ver}")
                                 extract_zip_with_progress(zip_path, ext_dir, notify_progress, f"Extracting Pack {p_name} v{p_ver}")
@@ -2631,9 +2684,9 @@ class Api:
                                 notify_progress({"status": "error", "title": "Pack Update Error", "message": str(e), "percent": 0, "update_in_progress": False})
                     else:
                         p_vinfo = read_version_info(pack)
-                        is_custom = any("CUSTOM" in str(v).upper() for v in [p_vinfo.get("modloader", ""), p_vinfo.get("mcversion", ""), p_vinfo.get("mlversion", ""), pack])
-                        if is_custom and not UPDATE_CANCEL_REQUESTED:
-                            log_init(f"Pack update zip for custom pack '{pack}' not found on server (Update not available). Updating version index to v{ver} and syncing mods...")
+                        is_custom_or_vanilla = any(x in str(v).upper() for v in [p_vinfo.get("modloader", ""), p_vinfo.get("mcversion", ""), p_vinfo.get("mlversion", ""), pack] for x in ["CUSTOM", "VANILLA", "#-BTW", "BTW"])
+                        if is_custom_or_vanilla and not UPDATE_CANCEL_REQUESTED:
+                            log_init(f"Pack update zip for custom/vanilla pack '{pack}' not found on server (Update not available). Updating version index to v{ver} quietly...")
                             notify_progress({"status": "downloading", "title": f"Updating Pack {pack} v{ver}", "message": "Update not available.", "percent": 50, "update_in_progress": True})
                             update_version_index(pack, ver)
                             verify_and_sync_mods(pack, pack_version=ver, progress_callback=notify_progress, title=f"Verifying Mods ({pack})...")
@@ -2642,7 +2695,8 @@ class Api:
                         elif UPDATE_CANCEL_REQUESTED:
                             notify_progress({"status": "cancelled", "title": "Update Cancelled", "message": "Pack update cancelled.", "percent": 0, "update_in_progress": False})
                         else:
-                            notify_progress({"status": "error", "title": "Pack Update Error", "message": "Failed to download pack update zip.", "percent": 0, "update_in_progress": False})
+                            log_init(f"Pack update zip for '{pack}' not found on server. Local version file NOT updated.")
+                            notify_progress({"status": "error", "title": "Update Available", "message": f"Update Available for {pack}, but no download found for the update. Please contact System Admin.", "percent": 0, "update_in_progress": False})
 
                 elif action in ["pack_downloader", "download_full_pack"]:
                     target_pack = target_version or pack
