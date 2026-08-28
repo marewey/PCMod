@@ -420,25 +420,54 @@ def bootstrap_missing_files():
         except Exception as e:
             log_init(f"Error extracting bootstrap zip archive: {e}")
 
-    # Verify news.html
-    news_file = os.path.join(DATA_DIR, "pages", "news.html")
-    if not os.path.exists(news_file):
-        try:
-            log_init("Fetching default news page...")
-            req = urllib.request.Request("https://pcmod.ddns.me/updates/news.html", headers={'User-Agent': 'Mozilla/5.0'})
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=3.0, context=ctx) as resp:
-                with open(news_file, "wb") as f:
-                    f.write(resp.read())
-        except Exception as e:
-            log_init(f"News fetch warning: {e}")
+    # Verify & sync updates.html
+    sync_updates_page()
 
     log_init("=== Launcher Bootstrap Completed ===")
 
 # Run bootstrap check before anything else
 bootstrap_missing_files()
+
+def sync_updates_page():
+    remote_url = "https://pcmod.ddns.me/updates.html"
+    local_updates_path = os.path.join(DATA_DIR, "pages", "updates.html")
+    os.makedirs(os.path.join(DATA_DIR, "pages"), exist_ok=True)
+
+    log_init(f"[Updates Page Sync] Checking '{remote_url}'...")
+    local_size = os.path.getsize(local_updates_path) if os.path.exists(local_updates_path) else -1
+    remote_size = -1
+
+    try:
+        req_head = urllib.request.Request(remote_url, method='HEAD', headers={'User-Agent': 'Mozilla/5.0'})
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(req_head, timeout=5.0, context=ctx) as resp:
+            cl = resp.headers.get('Content-Length')
+            if cl and cl.isdigit():
+                remote_size = int(cl)
+    except Exception as e:
+        log_init(f"[Updates Page Sync] HEAD request check warning: {e}")
+
+    log_init(f"[Updates Page Sync] File size check -> Local: {local_size} bytes | Remote: {remote_size} bytes")
+
+    if not os.path.exists(local_updates_path) or (remote_size > 0 and local_size != remote_size):
+        log_init(f"[Updates Page Sync] File missing or size mismatch. Downloading updated updates.html from {remote_url}...")
+        try:
+            req_get = urllib.request.Request(remote_url, headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req_get, timeout=8.0, context=ctx) as resp:
+                content = resp.read()
+                if content:
+                    with open(local_updates_path, "wb") as f:
+                        f.write(content)
+                    log_init(f"[Updates Page Sync] Successfully updated local updates.html ({len(content)} bytes written).")
+        except Exception as e:
+            log_init(f"[Updates Page Sync] Download failed: {e}")
+    else:
+        log_init("[Updates Page Sync] Local updates.html is up to date. No download needed.")
 
 def update_console_title(username):
     if OS_NAME == "win32":
@@ -1734,7 +1763,7 @@ class Api:
             "main_pack": main_pack,
             "main_pack_installed": main_pack_installed,
             "online_players": "Loading...",
-            "news_url": "news.html"
+            "news_url": "updates.html"
         }
 
     def get_settings(self, *args, **kwargs):
@@ -1940,29 +1969,11 @@ class Api:
         return self.open_link(url)
 
     def get_news_url(self, *args, **kwargs):
-        remote_url = "https://pcmod.ddns.me/updates/news.html"
-        local_news_path = os.path.join(DATA_DIR, "pages", "news.html")
-        os.makedirs(os.path.join(DATA_DIR, "pages"), exist_ok=True)
-        try:
-            req = urllib.request.Request(remote_url, headers={'User-Agent': 'Mozilla/5.0'})
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
-                content = resp.read().decode('utf-8', errors='ignore')
-                if content and len(content) > 10:
-                    try:
-                        with open(local_news_path, "w", encoding="utf-8") as f:
-                            f.write(content)
-                    except Exception:
-                        pass
-                    return remote_url
-        except Exception:
-            pass
-
-        if os.path.exists(local_news_path):
-            return "news.html"
-        return "news.html"
+        sync_updates_page()
+        local_updates_path = os.path.join(DATA_DIR, "pages", "updates.html")
+        if os.path.exists(local_updates_path):
+            return "updates.html"
+        return "https://pcmod.ddns.me/updates.html"
 
     def get_players_online(self, *args, **kwargs):
         pack = get_pack_name()
