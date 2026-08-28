@@ -904,9 +904,10 @@ def startup_checks():
 
 startup_checks()
 try:
+    sync_updates_page()
     sync_active_pack_resources()
 except Exception as e:
-    log_init(f"Warning syncing active pack resources on startup: {e}")
+    log_init(f"Warning syncing launcher/pack resources on startup: {e}")
 
 def get_offline_uuid(username):
     s = f"OfflinePlayer:{username}"
