@@ -628,7 +628,7 @@
         </div>
 
         <div class="panel news-card">
-          <iframe src="news.html" class="news-iframe" id="newsIframe"></iframe>
+          <iframe src="updates.html" class="news-iframe" id="newsIframe"></iframe>
         </div>
 
         <div class="action-bar">
@@ -849,13 +849,27 @@
     <!-- 5. UPDATE NOTIFICATION MODAL -->
     <div id="updateAlertModal" class="modal-overlay" style="display: none;">
       <div class="modal-card">
-        <div style="font-size: 18px; font-weight: 800; color: #38bdf8; margin-bottom: 8px;">New Update Available!</div>
+        <div style="font-size: 18px; font-weight: 800; color: #38bdf8; margin-bottom: 8px;" id="updateAlertTitle">New Update Available!</div>
         <div style="font-size: 13px; color: var(--text-main); margin-bottom: 16px;" id="updateAlertDetails">
           A new update was found for PCMod.
         </div>
-        <div style="display: flex; gap: 10px; justify-content: center;">
+        <div style="display: flex; gap: 10px; justify-content: center;" id="updateAlertButtons">
           <button class="btn-login" style="width: 140px; margin-top:0;" onclick="startModalAutoUpdate()">Update Now</button>
           <button class="btn-secondary" style="width: 100px;" onclick="closeUpdateModal()">Later</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. RAM WARNING MODAL -->
+    <div id="ramWarningModal" class="modal-overlay" style="display: none;">
+      <div class="modal-card" style="width: 440px;">
+        <div style="font-size: 18px; font-weight: 800; color: #f59e0b; margin-bottom: 10px;">⚠️ Memory Warning</div>
+        <div style="font-size: 13px; color: var(--text-main); margin-bottom: 18px; line-height: 1.5;" id="ramWarningDetails">
+          Allocated RAM is low or system RAM is 8GB or less. The game might be unplayable or really unstable.
+        </div>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+          <button class="btn-login" style="width: 150px; margin-top:0; background: #f59e0b; color: #0f172a;" onclick="confirmRamWarningLaunch()">Continue Anyway</button>
+          <button class="btn-secondary" style="width: 110px;" onclick="closeRamWarningModal()">Cancel</button>
         </div>
       </div>
     </div>
@@ -1463,7 +1477,7 @@
       }
     }
 
-    function launchGame() {
+    function launchGame(bypassRamCheck) {
       if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.check_game_running().then(function(res) {
           if (res && res.running) {
@@ -1481,7 +1495,22 @@
               alert("Please enter a username and login first!");
               return;
             }
-            window.pywebview.api.launch_game();
+
+            if (!bypassRamCheck && window.pywebview.api.check_ram_warning) {
+              window.pywebview.api.check_ram_warning().then(function(ramRes) {
+                if (ramRes && ramRes.warn) {
+                  var warningMsg = ramRes.message + "<br><br>Do you want to continue anyway?";
+                  document.getElementById('ramWarningDetails').innerHTML = warningMsg;
+                  document.getElementById('ramWarningModal').style.display = 'flex';
+                } else {
+                  window.pywebview.api.launch_game();
+                }
+              }).catch(function() {
+                window.pywebview.api.launch_game();
+              });
+            } else {
+              window.pywebview.api.launch_game();
+            }
           }
         });
         return;
@@ -1495,6 +1524,15 @@
       if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.launch_game();
       }
+    }
+
+    function confirmRamWarningLaunch() {
+      closeRamWarningModal();
+      launchGame(true);
+    }
+
+    function closeRamWarningModal() {
+      document.getElementById('ramWarningModal').style.display = 'none';
     }
 
     function updateGame() {

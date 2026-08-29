@@ -420,25 +420,120 @@ def bootstrap_missing_files():
         except Exception as e:
             log_init(f"Error extracting bootstrap zip archive: {e}")
 
-    # Verify news.html
-    news_file = os.path.join(DATA_DIR, "pages", "news.html")
-    if not os.path.exists(news_file):
-        try:
-            log_init("Fetching default news page...")
-            req = urllib.request.Request("https://pcmod.ddns.me/updates/news.html", headers={'User-Agent': 'Mozilla/5.0'})
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=3.0, context=ctx) as resp:
-                with open(news_file, "wb") as f:
-                    f.write(resp.read())
-        except Exception as e:
-            log_init(f"News fetch warning: {e}")
+    # Verify & sync updates.html
+    sync_updates_page()
 
     log_init("=== Launcher Bootstrap Completed ===")
 
 # Run bootstrap check before anything else
 bootstrap_missing_files()
+
+def sync_pack_file(local_path, remote_url, label="Pack File"):
+    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+    local_size = os.path.getsize(local_path) if os.path.exists(local_path) else -1
+    remote_exists = False
+    remote_size = -1
+
+    log_init(f"[{label} Sync] Checking remote server for {remote_url}...")
+    try:
+        req_head = urllib.request.Request(remote_url, method='HEAD', headers={'User-Agent': 'Mozilla/5.0'})
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(req_head, timeout=5.0, context=ctx) as resp:
+            if resp.status == 200:
+                remote_exists = True
+                cl = resp.headers.get('Content-Length')
+                if cl and cl.isdigit():
+                    remote_size = int(cl)
+    except urllib.error.HTTPError as e:
+        log_init(f"[{label} Sync] Remote file check response: HTTP {e.code} ({e.reason})")
+    except Exception as e:
+        log_init(f"[{label} Sync] Remote check warning: {e}")
+
+    if not remote_exists:
+        log_init(f"[{label} Sync] Remote file does not exist on server ({remote_url}). Skipping sync.")
+        return False
+
+    log_init(f"[{label} Sync] Remote file exists. File size check -> Local: {local_size} bytes | Remote: {remote_size} bytes")
+
+    if not os.path.exists(local_path) or (remote_size > 0 and local_size != remote_size):
+        log_init(f"[{label} Sync] File missing or size mismatch. Downloading {label} from {remote_url}...")
+        try:
+            req_get = urllib.request.Request(remote_url, headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req_get, timeout=10.0, context=ctx) as resp:
+                content = resp.read()
+                if content:
+                    with open(local_path, "wb") as f:
+                        f.write(content)
+                    log_init(f"[{label} Sync] Successfully downloaded and saved {local_path} ({len(content)} bytes written).")
+                    return True
+        except Exception as e:
+            log_init(f"[{label} Sync] Download failed: {e}")
+            return False
+    else:
+        log_init(f"[{label} Sync] Local {label} is up to date ({local_path}). No download needed.")
+        return True
+
+def sync_active_pack_resources(pack_name=None):
+    if not pack_name:
+        pack_name = get_pack_name()
+    if not pack_name:
+        return
+
+    # 1. sync script.zs
+    script_local = os.path.join(DATA_DIR, "packs", pack_name, "scripts", "script.zs")
+    script_remote = f"https://files.pcmod.ddns.me/download/pack/scripts/script_{pack_name}.zs"
+    sync_pack_file(script_local, script_remote, label=f"Pack Script ({pack_name})")
+
+    # 2. sync servers.dat
+    servers_local = os.path.join(DATA_DIR, "packs", pack_name, "servers.dat")
+    servers_remote = f"https://files.pcmod.ddns.me/download/pack/servers/servers_{pack_name}.dat"
+    sync_pack_file(servers_local, servers_remote, label=f"Pack Servers ({pack_name})")
+
+def sync_updates_page():
+    remote_url = "https://pcmod.ddns.me/updates.html"
+    local_updates_path = os.path.join(DATA_DIR, "pages", "updates.html")
+    os.makedirs(os.path.join(DATA_DIR, "pages"), exist_ok=True)
+
+    log_init(f"[Updates Page Sync] Checking '{remote_url}'...")
+    local_size = os.path.getsize(local_updates_path) if os.path.exists(local_updates_path) else -1
+    remote_size = -1
+
+    try:
+        req_head = urllib.request.Request(remote_url, method='HEAD', headers={'User-Agent': 'Mozilla/5.0'})
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(req_head, timeout=5.0, context=ctx) as resp:
+            cl = resp.headers.get('Content-Length')
+            if cl and cl.isdigit():
+                remote_size = int(cl)
+    except Exception as e:
+        log_init(f"[Updates Page Sync] HEAD request check warning: {e}")
+
+    log_init(f"[Updates Page Sync] File size check -> Local: {local_size} bytes | Remote: {remote_size} bytes")
+
+    if not os.path.exists(local_updates_path) or (remote_size > 0 and local_size != remote_size):
+        log_init(f"[Updates Page Sync] File missing or size mismatch. Downloading updated updates.html from {remote_url}...")
+        try:
+            req_get = urllib.request.Request(remote_url, headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req_get, timeout=8.0, context=ctx) as resp:
+                content = resp.read()
+                if content:
+                    with open(local_updates_path, "wb") as f:
+                        f.write(content)
+                    log_init(f"[Updates Page Sync] Successfully updated local updates.html ({len(content)} bytes written).")
+        except Exception as e:
+            log_init(f"[Updates Page Sync] Download failed: {e}")
+    else:
+        log_init("[Updates Page Sync] Local updates.html is up to date. No download needed.")
 
 def update_console_title(username):
     if OS_NAME == "win32":
@@ -632,6 +727,35 @@ def read_version_indexes(pack_name):
     info = read_version_info(pack_name)
     return info["launcher_ver"], info["pack_ver"]
 
+def get_system_total_ram_mb():
+    if OS_NAME == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            class MEMORYSTATUSEX(ctypes.Structure):
+                _fields_ = [
+                    ('dwLength', wintypes.DWORD),
+                    ('dwMemoryLoad', wintypes.DWORD),
+                    ('ullTotalPhys', ctypes.c_uint64),
+                    ('ullAvailPhys', ctypes.c_uint64),
+                    ('ullTotalPageFile', ctypes.c_uint64),
+                    ('ullAvailPageFile', ctypes.c_uint64),
+                    ('ullTotalVirtual', ctypes.c_uint64),
+                    ('ullAvailVirtual', ctypes.c_uint64),
+                    ('sullAvailExtendedVirtual', ctypes.c_uint64),
+                ]
+            stat = MEMORYSTATUSEX()
+            stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
+            return int(stat.ullTotalPhys / (1024 * 1024))
+        except Exception:
+            return 16384
+    else:
+        try:
+            return int(os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / (1024 * 1024))
+        except Exception:
+            return 16384
+
 def is_pid_running(pid):
     if pid <= 0:
         return False
@@ -779,6 +903,11 @@ def startup_checks():
     log_init(f"Checking for PORTABLEMC... {pmc_ver}")
 
 startup_checks()
+try:
+    sync_updates_page()
+    sync_active_pack_resources()
+except Exception as e:
+    log_init(f"Warning syncing launcher/pack resources on startup: {e}")
 
 def get_offline_uuid(username):
     s = f"OfflinePlayer:{username}"
@@ -937,8 +1066,8 @@ def read_auth_token(username):
     token = None
     try:
         with open(auth_file, "rb") as f:
-            raw = f.read().strip()
-        if raw == b"404":
+            raw = f.read()
+        if raw.strip() == b"404":
             return "404"
 
         # Check if plain text ASCII
@@ -1394,6 +1523,12 @@ def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, t
     global UPDATE_CANCEL_REQUESTED
     log_init(f"Starting mod verification and sync for pack '{pack_name}' (version: {pack_version})...")
 
+    # Sync pack script.zs and servers.dat
+    try:
+        sync_active_pack_resources(pack_name)
+    except Exception as e:
+        log_init(f"Warning syncing pack resources for {pack_name}: {e}")
+
     pack_dir = os.path.join(DATA_DIR, "packs", pack_name)
     mods_dir = os.path.join(pack_dir, "mods")
     os.makedirs(mods_dir, exist_ok=True)
@@ -1705,7 +1840,7 @@ class Api:
             "main_pack": main_pack,
             "main_pack_installed": main_pack_installed,
             "online_players": "Loading...",
-            "news_url": "news.html"
+            "news_url": "updates.html"
         }
 
     def get_settings(self, *args, **kwargs):
@@ -1724,6 +1859,28 @@ class Api:
 
     def check_game_running(self, *args, **kwargs):
         return get_running_game_info()
+
+    def check_ram_warning(self, *args, **kwargs):
+        s = read_settings()
+        try:
+            allocated_mb = int(s.get("memory", s.get("maxram", "4096")))
+        except Exception:
+            allocated_mb = 4096
+        total_ram_mb = get_system_total_ram_mb()
+
+        warn_low_allocated = allocated_mb < 6144
+        warn_low_system = total_ram_mb <= 8192
+
+        if warn_low_allocated or warn_low_system:
+            reasons = []
+            if warn_low_allocated:
+                reasons.append(f"Allocated memory is set below 6144MB, You have {allocated_mb}MB.")
+            if warn_low_system:
+                reasons.append(f"System has 8192MB or less total RAM ({total_ram_mb}MB).")
+            msg = "Warning: " + " ".join(reasons) + " The game may be unplayable or really unstable."
+            return {"warn": True, "message": msg, "allocated_mb": allocated_mb, "total_ram_mb": total_ram_mb}
+
+        return {"warn": False, "message": "", "allocated_mb": allocated_mb, "total_ram_mb": total_ram_mb}
 
     def force_unlock(self, *args, **kwargs):
         return force_unlock_game()
@@ -1889,29 +2046,11 @@ class Api:
         return self.open_link(url)
 
     def get_news_url(self, *args, **kwargs):
-        remote_url = "https://pcmod.ddns.me/updates/news.html"
-        local_news_path = os.path.join(DATA_DIR, "pages", "news.html")
-        os.makedirs(os.path.join(DATA_DIR, "pages"), exist_ok=True)
-        try:
-            req = urllib.request.Request(remote_url, headers={'User-Agent': 'Mozilla/5.0'})
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
-                content = resp.read().decode('utf-8', errors='ignore')
-                if content and len(content) > 10:
-                    try:
-                        with open(local_news_path, "w", encoding="utf-8") as f:
-                            f.write(content)
-                    except Exception:
-                        pass
-                    return remote_url
-        except Exception:
-            pass
-
-        if os.path.exists(local_news_path):
-            return "news.html"
-        return "news.html"
+        sync_updates_page()
+        local_updates_path = os.path.join(DATA_DIR, "pages", "updates.html")
+        if os.path.exists(local_updates_path):
+            return "updates.html"
+        return "https://pcmod.ddns.me/updates.html"
 
     def get_players_online(self, *args, **kwargs):
         pack = get_pack_name()
@@ -2399,14 +2538,16 @@ class Api:
                                     log_init(f"Pack auto-update download attempt failed from {u}: {e}")
                             if not p_downloaded:
                                 p_vinfo = read_version_info(p_name)
-                                is_custom = any("CUSTOM" in str(v).upper() for v in [p_vinfo.get("modloader", ""), p_vinfo.get("mcversion", ""), p_vinfo.get("mlversion", ""), p_name])
-                                if is_custom:
-                                    log_init(f"Pack update zip for custom pack '{p_name}' not found on server (Update not available). Updating version index to v{p_ver} and syncing mods...")
+                                is_custom_or_vanilla = any(x in str(v).upper() for v in [p_vinfo.get("modloader", ""), p_vinfo.get("mcversion", ""), p_vinfo.get("mlversion", ""), p_name] for x in ["CUSTOM", "VANILLA", "#-BTW", "BTW"])
+                                if is_custom_or_vanilla:
+                                    log_init(f"Pack update zip for custom/vanilla pack '{p_name}' not found on server (Update not available). Updating version index to v{p_ver} quietly...")
                                     notify_progress({"status": "downloading", "title": f"Updating Pack {p_name} v{p_ver}", "message": "Update not available.", "percent": 50, "update_in_progress": True})
                                     update_version_index(p_name, p_ver)
                                     verify_and_sync_mods(p_name, pack_version=p_ver, progress_callback=notify_progress, title=f"Verifying Mods ({p_name})...")
                                 else:
-                                    raise Exception(f"Failed to download pack update for {p_name} from all mirrors.")
+                                    log_init(f"Pack update zip for '{p_name}' not found on server. Local version file NOT updated.")
+                                    notify_progress({"status": "error", "title": "Update Available", "message": f"Update Available for {p_name}, but no download found for the update. Please contact System Admin.", "percent": 0, "update_in_progress": False})
+                                    raise Exception(f"Update Available for {p_name}, but no download found for the update. Please contact System Admin.")
                             else:
                                 ext_dir = os.path.join(DATA_DIR, "update", f"pack_{p_ver}")
                                 extract_zip_with_progress(zip_path, ext_dir, notify_progress, f"Extracting Pack {p_name} v{p_ver}")
@@ -2631,9 +2772,9 @@ class Api:
                                 notify_progress({"status": "error", "title": "Pack Update Error", "message": str(e), "percent": 0, "update_in_progress": False})
                     else:
                         p_vinfo = read_version_info(pack)
-                        is_custom = any("CUSTOM" in str(v).upper() for v in [p_vinfo.get("modloader", ""), p_vinfo.get("mcversion", ""), p_vinfo.get("mlversion", ""), pack])
-                        if is_custom and not UPDATE_CANCEL_REQUESTED:
-                            log_init(f"Pack update zip for custom pack '{pack}' not found on server (Update not available). Updating version index to v{ver} and syncing mods...")
+                        is_custom_or_vanilla = any(x in str(v).upper() for v in [p_vinfo.get("modloader", ""), p_vinfo.get("mcversion", ""), p_vinfo.get("mlversion", ""), pack] for x in ["CUSTOM", "VANILLA", "#-BTW", "BTW"])
+                        if is_custom_or_vanilla and not UPDATE_CANCEL_REQUESTED:
+                            log_init(f"Pack update zip for custom/vanilla pack '{pack}' not found on server (Update not available). Updating version index to v{ver} quietly...")
                             notify_progress({"status": "downloading", "title": f"Updating Pack {pack} v{ver}", "message": "Update not available.", "percent": 50, "update_in_progress": True})
                             update_version_index(pack, ver)
                             verify_and_sync_mods(pack, pack_version=ver, progress_callback=notify_progress, title=f"Verifying Mods ({pack})...")
@@ -2642,7 +2783,8 @@ class Api:
                         elif UPDATE_CANCEL_REQUESTED:
                             notify_progress({"status": "cancelled", "title": "Update Cancelled", "message": "Pack update cancelled.", "percent": 0, "update_in_progress": False})
                         else:
-                            notify_progress({"status": "error", "title": "Pack Update Error", "message": "Failed to download pack update zip.", "percent": 0, "update_in_progress": False})
+                            log_init(f"Pack update zip for '{pack}' not found on server. Local version file NOT updated.")
+                            notify_progress({"status": "error", "title": "Update Available", "message": f"Update Available for {pack}, but no download found for the update. Please contact System Admin.", "percent": 0, "update_in_progress": False})
 
                 elif action in ["pack_downloader", "download_full_pack"]:
                     target_pack = target_version or pack
