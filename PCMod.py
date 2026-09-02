@@ -496,70 +496,43 @@ def sync_active_pack_resources(pack_name=None):
 
 def sync_updates_page():
     remote_urls = [
-        "https://files.pcmod.ddns.me/updates.html",
-        "https://pcmod.ddns.me/updates.html"
+        "https://pcmod.ddns.me/updates.html",
+        "https://files.pcmod.ddns.me/updates.html"
     ]
     local_updates_path = os.path.join(DATA_DIR, "pages", "updates.html")
     os.makedirs(os.path.join(DATA_DIR, "pages"), exist_ok=True)
 
-    local_size = os.path.getsize(local_updates_path) if os.path.exists(local_updates_path) else -1
+    local_content = b""
+    if os.path.exists(local_updates_path):
+        try:
+            with open(local_updates_path, "rb") as f:
+                local_content = f.read()
+        except Exception:
+            pass
+
+    local_size = len(local_content) if local_content else -1
 
     for remote_url in remote_urls:
         log_init(f"[Updates Page Sync] Checking '{remote_url}'...")
-        remote_size = -1
         try:
-            req_head = urllib.request.Request(remote_url, method='HEAD', headers={'User-Agent': 'Mozilla/5.0'})
+            req_get = urllib.request.Request(remote_url, headers={'User-Agent': 'Mozilla/5.0'})
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req_head, timeout=5.0, context=ctx) as resp:
-                cl = resp.headers.get('Content-Length')
-                if cl and cl.isdigit():
-                    remote_size = int(cl)
-        except Exception as e:
-            log_init(f"[Updates Page Sync] HEAD request check warning from {remote_url}: {e}")
-
-        log_init(f"[Updates Page Sync] File size check -> Local: {local_size} bytes | Remote: {remote_size} bytes")
-
-        if remote_size > 0:
-            if not os.path.exists(local_updates_path) or local_size != remote_size:
-                log_init(f"[Updates Page Sync] File missing or size mismatch. Downloading updated updates.html from {remote_url}...")
-                try:
-                    req_get = urllib.request.Request(remote_url, headers={'User-Agent': 'Mozilla/5.0'})
-                    ctx = ssl.create_default_context()
-                    ctx.check_hostname = False
-                    ctx.verify_mode = ssl.CERT_NONE
-                    with urllib.request.urlopen(req_get, timeout=8.0, context=ctx) as resp:
-                        content = resp.read()
-                        if content:
-                            with open(local_updates_path, "wb") as f:
-                                f.write(content)
-                            log_init(f"[Updates Page Sync] Successfully updated local updates.html ({len(content)} bytes written).")
-                            return
-                except Exception as e:
-                    log_init(f"[Updates Page Sync] Download failed from {remote_url}: {e}")
-            else:
-                log_init(f"[Updates Page Sync] Local updates.html is up to date with {remote_url}. No download needed.")
-                return
-
-    # Fallback if HEAD failed on all endpoints but file is missing or GET download attempt
-    if not os.path.exists(local_updates_path):
-        for remote_url in remote_urls:
-            try:
-                log_init(f"[Updates Page Sync] Attempting fallback GET download from {remote_url}...")
-                req_get = urllib.request.Request(remote_url, headers={'User-Agent': 'Mozilla/5.0'})
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-                with urllib.request.urlopen(req_get, timeout=8.0, context=ctx) as resp:
-                    content = resp.read()
-                    if content:
+            with urllib.request.urlopen(req_get, timeout=8.0, context=ctx) as resp:
+                remote_content = resp.read()
+                if remote_content:
+                    remote_size = len(remote_content)
+                    log_init(f"[Updates Page Sync] File size check -> Local: {local_size} bytes | Remote: {remote_size} bytes")
+                    if remote_content != local_content:
                         with open(local_updates_path, "wb") as f:
-                            f.write(content)
-                        log_init(f"[Updates Page Sync] Successfully updated local updates.html ({len(content)} bytes written).")
-                        return
-            except Exception as e:
-                log_init(f"[Updates Page Sync] Fallback download failed from {remote_url}: {e}")
+                            f.write(remote_content)
+                        log_init(f"[Updates Page Sync] Successfully updated local updates.html ({remote_size} bytes written).")
+                    else:
+                        log_init("[Updates Page Sync] Local updates.html is up to date. No download needed.")
+                    return
+        except Exception as e:
+            log_init(f"[Updates Page Sync] Check/Download failed from {remote_url}: {e}")
 
 def update_console_title(username):
     if OS_NAME == "win32":
