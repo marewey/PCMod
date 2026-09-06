@@ -636,7 +636,7 @@
             <span id="launchBtnText">LAUNCH</span>
             <span id="launchBtnSubText" style="display: none; font-size: 10px; font-weight: 500; margin-top: 2px; color: #bae6fd;">Downloading Missing Resources...</span>
           </button>
-          <button class="btn-update" onclick="showUpdateView()">UPDATE</button>
+          <button class="btn-update" onclick="handleUpdateButtonClick()">UPDATE</button>
         </div>
 
         <div class="version-footer" id="versionFooter">Launcher: 1.2a / Pack: 2.5.3a</div>
@@ -881,6 +881,8 @@
 
     var currentGameLaunchState = 'idle';
     var isUpdateActive = false;
+    var hasShownStartupPopup = false;
+    var hasShownUpdateBtnPopup = false;
 
     function onGameLaunchState(state) {
       currentGameLaunchState = state;
@@ -1211,6 +1213,7 @@
     }
 
     function selectActivePack(packName) {
+      hasShownStartupPopup = false;
       if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.set_version_select(packName).then(function() {
           initLauncher();
@@ -1350,6 +1353,10 @@
 
       if (info.status === 'complete' || info.status === 'error' || info.status === 'cancelled' || info.update_in_progress === false) {
         isUpdateActive = false;
+        if (info.status === 'complete') {
+          hasShownStartupPopup = false;
+          hasShownUpdateBtnPopup = false;
+        }
         updateLaunchButtonState(document.getElementById('username').value);
         initLauncher();
         showPackDownloaderCards(true);
@@ -1357,9 +1364,28 @@
     };
 
     function checkUpdatesOnStartup() {
+      if (hasShownStartupPopup) return;
       if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.check_updates().then(function(info) {
           if (info && info.update_available) {
+            hasShownStartupPopup = true;
+            var details = "";
+            if (info.launcher_update) details += "New Launcher Update v" + info.launcher_update + " is available.<br>";
+            if (info.pack_update) details += "New Pack Update v" + info.pack_update + " is available.<br>";
+            details += "Click Update Now to install.";
+            document.getElementById('updateAlertDetails').innerHTML = details;
+            document.getElementById('updateAlertModal').style.display = 'flex';
+          }
+        });
+      }
+    }
+
+    function handleUpdateButtonClick() {
+      showUpdateView();
+      if (!hasShownUpdateBtnPopup && window.pywebview && window.pywebview.api) {
+        window.pywebview.api.check_updates().then(function(info) {
+          if (info && info.update_available) {
+            hasShownUpdateBtnPopup = true;
             var details = "";
             if (info.launcher_update) details += "New Launcher Update v" + info.launcher_update + " is available.<br>";
             if (info.pack_update) details += "New Pack Update v" + info.pack_update + " is available.<br>";
@@ -1429,6 +1455,7 @@
     }
 
     function changeVersion() {
+      hasShownStartupPopup = false;
       var select = document.getElementById('selver');
       var val = select.value;
       if (window.pywebview && window.pywebview.api) {
