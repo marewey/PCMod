@@ -22,6 +22,14 @@ EXEC_DIR = os.path.dirname(os.path.abspath(sys.argv[0] if getattr(sys, 'frozen',
 import shutil
 
 def check_cli_entrypoint():
+    # Handle server-alerts-worker daemon process if present
+    if "--server-alerts-worker" in sys.argv:
+        try:
+            run_server_alerts_worker()
+        except Exception as e:
+            print(f"Server alerts worker crashed: {e}")
+        sys.exit(0)
+
     # Handle cleanup-old argument if present
     if "--cleanup-old" in sys.argv:
         try:
@@ -83,8 +91,6 @@ def check_cli_entrypoint():
             print(f"Error running PortableMC CLI: {e}")
             sys.exit(1)
         sys.exit(0)
-
-check_cli_entrypoint()
 
 def get_clean_env():
     env = os.environ.copy()
@@ -542,6 +548,213 @@ def update_console_title(username):
         except Exception:
             pass
 
+def show_tray_balloon_notification(title, msg):
+    if OS_NAME == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            shell32 = ctypes.windll.shell32
+            user32 = ctypes.windll.user32
+
+            NIM_ADD = 0
+            NIM_DELETE = 2
+            NIF_ICON = 0x00000002
+            NIF_TIP = 0x00000004
+            NIF_INFO = 0x00000010
+            NIIF_INFO = 0x00000001
+            IMAGE_ICON = 1
+            LR_LOADFROMFILE = 0x00000010
+
+            class NOTIFYICONDATAW(ctypes.Structure):
+                _fields_ = [
+                    ("cbSize", wintypes.DWORD),
+                    ("hWnd", wintypes.HWND),
+                    ("uID", wintypes.UINT),
+                    ("uFlags", wintypes.UINT),
+                    ("uCallbackMessage", wintypes.UINT),
+                    ("hIcon", wintypes.HICON),
+                    ("szTip", wintypes.WCHAR * 128),
+                    ("dwState", wintypes.DWORD),
+                    ("dwStateMask", wintypes.DWORD),
+                    ("szInfo", wintypes.WCHAR * 256),
+                    ("uTimeoutOrVersion", wintypes.DWORD),
+                    ("szInfoTitle", wintypes.WCHAR * 64),
+                    ("dwInfoFlags", wintypes.DWORD),
+                ]
+
+            icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
+            hicon = None
+            if os.path.exists(icon_path):
+                hicon = user32.LoadImageW(None, icon_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
+
+            nid = NOTIFYICONDATAW()
+            nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
+            nid.hWnd = None
+            nid.uID = 1001
+            nid.uFlags = NIF_ICON | NIF_TIP | NIF_INFO
+            if hicon:
+                nid.hIcon = hicon
+            nid.szTip = "PCMod Client"
+            nid.szInfo = str(msg)[:255]
+            nid.szInfoTitle = str(title)[:63]
+            nid.dwInfoFlags = NIIF_INFO
+
+            shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid))
+
+            def _remove_icon():
+                time.sleep(10)
+                try:
+                    shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid))
+                    if hicon:
+                        user32.DestroyIcon(hicon)
+                except Exception:
+                    pass
+
+            threading.Thread(target=_remove_icon, daemon=True).start()
+        except Exception as e:
+            log_init(f"Tray notification error: {e}")
+
+def kill_server_alerts_worker():
+    alerts_lock = os.path.join(DATA_DIR, "alerts.lock")
+    if os.path.exists(alerts_lock):
+        try:
+            with open(alerts_lock, "r", encoding="utf-8") as f:
+                pid_str = f.read().strip()
+                if pid_str.isdigit():
+                    pid = int(pid_str)
+                    if pid != os.getpid() and is_pid_running(pid):
+                        if OS_NAME == "win32":
+                            subprocess.run(["taskkill", "/F", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        else:
+                            os.kill(pid, 9)
+        except Exception as e:
+            log_init(f"Error terminating server alerts worker: {e}")
+        try:
+            os.remove(alerts_lock)
+        except Exception:
+            pass
+
+def start_server_alerts_worker():
+    s = read_settings()
+    if str(s.get("server_alerts", "0")).strip() not in ["1", "true", "True"]:
+        kill_server_alerts_worker()
+        return
+
+    alerts_lock = os.path.join(DATA_DIR, "alerts.lock")
+    if os.path.exists(alerts_lock):
+        try:
+            with open(alerts_lock, "r", encoding="utf-8") as f:
+                pid_str = f.read().strip()
+                if pid_str.isdigit():
+                    pid = int(pid_str)
+                    if is_pid_running(pid):
+                        log_init(f"Server alerts worker already running with PID {pid}")
+                        return
+        except Exception:
+            pass
+
+    clean_env = get_clean_env()
+    if getattr(sys, 'frozen', False) or sys.argv[0].lower().endswith(".exe"):
+        exe = os.path.abspath(sys.argv[0])
+        cmd = [exe, "--server-alerts-worker"]
+    else:
+        cmd = [sys.executable, os.path.abspath(__file__), "--server-alerts-worker"]
+
+    try:
+        creationflags = 0
+        if OS_NAME == "win32":
+            creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000) | getattr(subprocess, 'DETACHED_PROCESS', 0x00000008)
+        subprocess.Popen(cmd, env=clean_env, cwd=BASE_DIR, creationflags=creationflags)
+        log_init("Spawned background server alerts worker process.")
+    except Exception as e:
+        log_init(f"Error spawning server alerts worker process: {e}")
+
+def run_server_alerts_worker():
+    log_init("Server alerts worker background process started.")
+    alerts_lock = os.path.join(DATA_DIR, "alerts.lock")
+    try:
+        with open(alerts_lock, "w", encoding="utf-8") as f:
+            f.write(str(os.getpid()))
+    except Exception as e:
+        log_init(f"Worker failed writing alerts.lock: {e}")
+
+    previous_players = None
+
+    try:
+        while True:
+            # Check if setting is still enabled
+            st = read_settings()
+            if str(st.get("server_alerts", "0")).strip() not in ["1", "true", "True"]:
+                log_init("Server alerts disabled in settings. Worker exiting.")
+                break
+
+            # Skip checking/notifications if game is currently running
+            game_info = get_running_game_info()
+            if not game_info.get("running"):
+                pack = get_pack_name()
+                user = st.get("username", "").strip()
+                url = f"https://pcmod.ddns.me/players/list-{pack}"
+
+                players = []
+                try:
+                    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                    ctx = ssl.create_default_context()
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
+                    with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
+                        text = resp.read().decode('utf-8', errors='ignore').strip()
+                        if text and not text.startswith("<") and "Server Offline" not in text:
+                            players = [l.strip() for l in text.splitlines() if l.strip() and not l.startswith("<")]
+                except Exception as e:
+                    log_init(f"Worker error fetching players list: {e}")
+
+                current_players_set = set(players)
+
+                if previous_players is None:
+                    # Establish initial baseline on startup without notifying
+                    previous_players = current_players_set
+                    log_init(f"Server alerts worker baseline established: {len(previous_players)} players online.")
+                else:
+                    # Notify only if new players joined
+                    new_players = current_players_set - previous_players
+                    # Exclude user's own username if present
+                    if user:
+                        new_players = {p for p in new_players if p.lower() != user.lower()}
+
+                    if new_players and len(current_players_set) > 0:
+                        joined_names = ", ".join(sorted(list(new_players)))
+                        if len(new_players) == 1:
+                            notif_msg = f"{joined_names} joined the server"
+                        else:
+                            notif_msg = f"{joined_names} joined the server"
+
+                        log_init(f"Server Alert Triggered: {notif_msg}")
+                        show_tray_balloon_notification(f"Server Alert ({pack})", notif_msg)
+
+                    previous_players = current_players_set
+
+            # Sleep in 1s increments for 300 seconds (5 mins)
+            for _ in range(300):
+                time.sleep(1)
+                if not os.path.exists(alerts_lock):
+                    break
+                try:
+                    with open(alerts_lock, "r", encoding="utf-8") as f:
+                        if f.read().strip() != str(os.getpid()):
+                            log_init("Lock file PID mismatch. Worker exiting.")
+                            return
+                except Exception:
+                    pass
+    finally:
+        if os.path.exists(alerts_lock):
+            try:
+                with open(alerts_lock, "r", encoding="utf-8") as f:
+                    if f.read().strip() == str(os.getpid()):
+                        os.remove(alerts_lock)
+            except Exception:
+                pass
+        log_init("Server alerts worker process terminated.")
+
 def toggle_desktop_shortcut(enable):
     if OS_NAME == "win32":
         try:
@@ -598,6 +811,7 @@ def get_default_settings():
         "lite": "0",
         "showconsole": "0",
         "cleanup_updates": "1",
+        "server_alerts": "0",
         "pack": "2-5-x",
         "memory": "6144",
         "username": ""
@@ -645,6 +859,17 @@ def write_settings(settings):
 
 init_settings = read_settings(log_event=True)
 clean_update_dir()
+
+def check_cli_worker_entrypoint():
+    if "--server-alerts-worker" in sys.argv:
+        try:
+            run_server_alerts_worker()
+        except Exception as e:
+            log_init(f"Server alerts worker crashed: {e}")
+        sys.exit(0)
+
+check_cli_worker_entrypoint()
+start_server_alerts_worker()
 
 def apply_console_visibility():
     if OS_NAME == "win32":
@@ -1829,6 +2054,7 @@ class Api:
                 "log-logins": "1" if str(s.get("log-logins", s.get("log_logins", "1"))).strip() in ["1", "true", "True"] else "0",
                 "lite": "1" if str(s.get("lite", s.get("litemode", "0"))).strip() in ["1", "true", "True"] else "0",
                 "showconsole": "1" if str(s.get("showconsole")).strip() in ["1", "true", "True"] else "0",
+                "server_alerts": "1" if str(s.get("server_alerts", "0")).strip() in ["1", "true", "True"] else "0",
                 "memory": str(s.get("memory", s.get("maxram", "4096"))),
                 "pack": pack
             },
@@ -1944,6 +2170,11 @@ class Api:
             write_settings(s)
             if str(k) == "shortcut":
                 toggle_desktop_shortcut(str(v) in ["1", "true", "True"])
+            elif str(k) == "server_alerts":
+                if str(v) in ["1", "true", "True"]:
+                    start_server_alerts_worker()
+                else:
+                    kill_server_alerts_worker()
         return True
 
     def set_lite_mode(self, *args, **kwargs):

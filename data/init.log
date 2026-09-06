@@ -1,0 +1,169 @@
+[2026-09-06 23:49:18] === PCMod Client Starting ===
+[2026-09-06 23:49:18] Read settings.txt successfully: {'shortcut': '1', 'autoserver': '0', 'log-logins': '1', 'lite': '0', 'showconsole': '0', 'cleanup_updates': '1', 'server_alerts': '0', 'pack': '2-5-x', 'memory': '4096', 'username': ''}
+[2026-09-06 23:49:18] Checking for updates... Pack 2-5-x [2.5.3b] Launcher [2.0a]
+[2026-09-06 23:49:18] Checking for PORTABLEMC... 4.4.1
+[2026-09-06 23:49:18] [Updates Page Sync] Checking 'https://pcmod.ddns.me/updates.html'...
+[2026-09-06 23:49:18] [Updates Page Sync] File size check -> Local: 46864 bytes | Remote: 47163 bytes
+[2026-09-06 23:49:18] [Updates Page Sync] Successfully updated local updates.html (47163 bytes written).
+[2026-09-06 23:49:18] [Pack Script (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/scripts/script_2-5-x.zs...
+[2026-09-06 23:49:18] [Pack Script (2-5-x) Sync] Remote file exists. File size check -> Local: 474 bytes | Remote: 480 bytes
+[2026-09-06 23:49:18] [Pack Script (2-5-x) Sync] File missing or size mismatch. Downloading Pack Script (2-5-x) from https://files.pcmod.ddns.me/download/pack/scripts/script_2-5-x.zs...
+[2026-09-06 23:49:19] [Pack Script (2-5-x) Sync] Successfully downloaded and saved /app/data/packs/2-5-x/scripts/script.zs (480 bytes written).
+[2026-09-06 23:49:19] [Pack Servers (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/servers/servers_2-5-x.dat...
+[2026-09-06 23:49:19] [Pack Servers (2-5-x) Sync] Remote file exists. File size check -> Local: 13442 bytes | Remote: 13442 bytes
+[2026-09-06 23:49:19] [Pack Servers (2-5-x) Sync] Local Pack Servers (2-5-x) is up to date (/app/data/packs/2-5-x/servers.dat). No download needed.
+[2026-09-06 23:49:32] === PCMod Client Starting ===
+[2026-09-06 23:49:32] Read settings.txt successfully: {'shortcut': '1', 'autoserver': '0', 'log-logins': '1', 'lite': '0', 'showconsole': '0', 'cleanup_updates': '1', 'server_alerts': '0', 'pack': '2-5-x', 'memory': '4096', 'username': ''}
+[2026-09-06 23:49:32] Checking for updates... Pack 2-5-x [2.5.3b] Launcher [2.0a]
+[2026-09-06 23:49:32] Checking for PORTABLEMC... 4.4.1
+[2026-09-06 23:49:32] [Updates Page Sync] Checking 'https://pcmod.ddns.me/updates.html'...
+[2026-09-06 23:49:32] [Updates Page Sync] File size check -> Local: 47163 bytes | Remote: 47163 bytes
+[2026-09-06 23:49:32] [Updates Page Sync] Local updates.html is up to date. No download needed.
+[2026-09-06 23:49:32] [Pack Script (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/scripts/script_2-5-x.zs...
+[2026-09-06 23:49:32] [Pack Script (2-5-x) Sync] Remote file exists. File size check -> Local: 480 bytes | Remote: 480 bytes
+[2026-09-06 23:49:32] [Pack Script (2-5-x) Sync] Local Pack Script (2-5-x) is up to date (/app/data/packs/2-5-x/scripts/script.zs). No download needed.
+[2026-09-06 23:49:32] [Pack Servers (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/servers/servers_2-5-x.dat...
+[2026-09-06 23:49:33] [Pack Servers (2-5-x) Sync] Remote file exists. File size check -> Local: 13442 bytes | Remote: 13442 bytes
+[2026-09-06 23:49:33] [Pack Servers (2-5-x) Sync] Local Pack Servers (2-5-x) is up to date (/app/data/packs/2-5-x/servers.dat). No download needed.
+[2026-09-06 23:49:33] Wrote settings.txt successfully
+[2026-09-06 23:49:33] Spawned background server alerts worker process.
+[2026-09-06 23:49:36] Wrote settings.txt successfully
+[2026-09-06 23:49:51] === PCMod Client Starting ===
+[2026-09-06 23:49:51] Read settings.txt successfully: {'shortcut': '1', 'autoserver': '0', 'log-logins': '1', 'lite': '0', 'showconsole': '0', 'cleanup_updates': '1', 'server_alerts': '0', 'pack': '2-5-x', 'memory': '6144', 'username': ''}
+[2026-09-06 23:49:51] Checking for updates... Pack 2-5-x [2.5.3b] Launcher [2.0a]
+[2026-09-06 23:49:51] Checking for PORTABLEMC... 4.4.1
+[2026-09-06 23:49:51] [Updates Page Sync] Checking 'https://pcmod.ddns.me/updates.html'...
+[2026-09-06 23:49:52] [Updates Page Sync] File size check -> Local: 47163 bytes | Remote: 47163 bytes
+[2026-09-06 23:49:52] [Updates Page Sync] Local updates.html is up to date. No download needed.
+[2026-09-06 23:49:52] [Pack Script (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/scripts/script_2-5-x.zs...
+[2026-09-06 23:49:52] [Pack Script (2-5-x) Sync] Remote file exists. File size check -> Local: 480 bytes | Remote: 480 bytes
+[2026-09-06 23:49:52] [Pack Script (2-5-x) Sync] Local Pack Script (2-5-x) is up to date (/app/data/packs/2-5-x/scripts/script.zs). No download needed.
+[2026-09-06 23:49:52] [Pack Servers (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/servers/servers_2-5-x.dat...
+[2026-09-06 23:49:52] [Pack Servers (2-5-x) Sync] Remote file exists. File size check -> Local: 13442 bytes | Remote: 13442 bytes
+[2026-09-06 23:49:52] [Pack Servers (2-5-x) Sync] Local Pack Servers (2-5-x) is up to date (/app/data/packs/2-5-x/servers.dat). No download needed.
+[2026-09-06 23:50:04] === PCMod Client Starting ===
+[2026-09-06 23:50:04] Read settings.txt successfully: {'shortcut': '1', 'autoserver': '0', 'log-logins': '1', 'lite': '0', 'showconsole': '0', 'cleanup_updates': '1', 'server_alerts': '0', 'pack': '2-5-x', 'memory': '6144', 'username': ''}
+[2026-09-06 23:50:04] Checking for updates... Pack 2-5-x [2.5.3b] Launcher [2.0a]
+[2026-09-06 23:50:04] Checking for PORTABLEMC... 4.4.1
+[2026-09-06 23:50:04] [Updates Page Sync] Checking 'https://pcmod.ddns.me/updates.html'...
+[2026-09-06 23:50:04] [Updates Page Sync] File size check -> Local: 47163 bytes | Remote: 47163 bytes
+[2026-09-06 23:50:04] [Updates Page Sync] Local updates.html is up to date. No download needed.
+[2026-09-06 23:50:04] [Pack Script (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/scripts/script_2-5-x.zs...
+[2026-09-06 23:50:04] [Pack Script (2-5-x) Sync] Remote file exists. File size check -> Local: 480 bytes | Remote: 480 bytes
+[2026-09-06 23:50:04] [Pack Script (2-5-x) Sync] Local Pack Script (2-5-x) is up to date (/app/data/packs/2-5-x/scripts/script.zs). No download needed.
+[2026-09-06 23:50:04] [Pack Servers (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/servers/servers_2-5-x.dat...
+[2026-09-06 23:50:04] [Pack Servers (2-5-x) Sync] Remote file exists. File size check -> Local: 13442 bytes | Remote: 13442 bytes
+[2026-09-06 23:50:04] [Pack Servers (2-5-x) Sync] Local Pack Servers (2-5-x) is up to date (/app/data/packs/2-5-x/servers.dat). No download needed.
+[2026-09-06 23:50:04] Wrote settings.txt successfully
+[2026-09-06 23:50:04] Spawned background server alerts worker process.
+[2026-09-06 23:50:07] Wrote settings.txt successfully
+[2026-09-06 23:50:41] === PCMod Client Starting ===
+[2026-09-06 23:50:41] Read settings.txt successfully: {'shortcut': '1', 'autoserver': '0', 'log-logins': '1', 'lite': '0', 'showconsole': '0', 'cleanup_updates': '1', 'server_alerts': '0', 'pack': '2-5-x', 'memory': '6144', 'username': ''}
+[2026-09-06 23:50:41] Checking for updates... Pack 2-5-x [2.5.3b] Launcher [2.0a]
+[2026-09-06 23:50:41] Checking for PORTABLEMC... 4.4.1
+[2026-09-06 23:50:41] [Updates Page Sync] Checking 'https://pcmod.ddns.me/updates.html'...
+[2026-09-06 23:50:41] [Updates Page Sync] File size check -> Local: 47163 bytes | Remote: 47163 bytes
+[2026-09-06 23:50:41] [Updates Page Sync] Local updates.html is up to date. No download needed.
+[2026-09-06 23:50:41] [Pack Script (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/scripts/script_2-5-x.zs...
+[2026-09-06 23:50:41] [Pack Script (2-5-x) Sync] Remote file exists. File size check -> Local: 480 bytes | Remote: 480 bytes
+[2026-09-06 23:50:41] [Pack Script (2-5-x) Sync] Local Pack Script (2-5-x) is up to date (/app/data/packs/2-5-x/scripts/script.zs). No download needed.
+[2026-09-06 23:50:41] [Pack Servers (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/servers/servers_2-5-x.dat...
+[2026-09-06 23:50:41] [Pack Servers (2-5-x) Sync] Remote file exists. File size check -> Local: 13442 bytes | Remote: 13442 bytes
+[2026-09-06 23:50:41] [Pack Servers (2-5-x) Sync] Local Pack Servers (2-5-x) is up to date (/app/data/packs/2-5-x/servers.dat). No download needed.
+[2026-09-06 23:50:41] Wrote settings.txt successfully
+[2026-09-06 23:50:41] Spawned background server alerts worker process.
+[2026-09-06 23:50:44] Wrote settings.txt successfully
+[2026-09-06 23:51:01] === PCMod Client Starting ===
+[2026-09-06 23:51:01] Read settings.txt successfully: {'shortcut': '1', 'autoserver': '0', 'log-logins': '1', 'lite': '0', 'showconsole': '0', 'cleanup_updates': '1', 'server_alerts': '0', 'pack': '2-5-x', 'memory': '6144', 'username': ''}
+[2026-09-06 23:51:01] Checking for updates... Pack 2-5-x [2.5.3b] Launcher [2.0a]
+[2026-09-06 23:51:01] Checking for PORTABLEMC... 4.4.1
+[2026-09-06 23:51:01] [Updates Page Sync] Checking 'https://pcmod.ddns.me/updates.html'...
+[2026-09-06 23:51:01] [Updates Page Sync] File size check -> Local: 47163 bytes | Remote: 47163 bytes
+[2026-09-06 23:51:01] [Updates Page Sync] Local updates.html is up to date. No download needed.
+[2026-09-06 23:51:01] [Pack Script (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/scripts/script_2-5-x.zs...
+[2026-09-06 23:51:02] [Pack Script (2-5-x) Sync] Remote file exists. File size check -> Local: 480 bytes | Remote: 480 bytes
+[2026-09-06 23:51:02] [Pack Script (2-5-x) Sync] Local Pack Script (2-5-x) is up to date (/app/data/packs/2-5-x/scripts/script.zs). No download needed.
+[2026-09-06 23:51:02] [Pack Servers (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/servers/servers_2-5-x.dat...
+[2026-09-06 23:51:02] [Pack Servers (2-5-x) Sync] Remote file exists. File size check -> Local: 13442 bytes | Remote: 13442 bytes
+[2026-09-06 23:51:02] [Pack Servers (2-5-x) Sync] Local Pack Servers (2-5-x) is up to date (/app/data/packs/2-5-x/servers.dat). No download needed.
+[2026-09-06 23:51:02] Wrote settings.txt successfully
+[2026-09-06 23:51:02] Spawned background server alerts worker process.
+[2026-09-06 23:51:02] === PCMod Client Starting ===
+[2026-09-06 23:51:02] Server alerts worker background process started.
+[2026-09-06 23:51:02] Server alerts worker process terminated.
+[2026-09-06 23:51:05] Wrote settings.txt successfully
+[2026-09-06 23:51:20] === PCMod Client Starting ===
+[2026-09-06 23:51:20] Read settings.txt successfully: {'shortcut': '1', 'autoserver': '0', 'log-logins': '1', 'lite': '0', 'showconsole': '0', 'cleanup_updates': '1', 'server_alerts': '0', 'pack': '2-5-x', 'memory': '6144', 'username': ''}
+[2026-09-06 23:51:20] Checking for updates... Pack 2-5-x [2.5.3b] Launcher [2.0a]
+[2026-09-06 23:51:20] Checking for PORTABLEMC... 4.4.1
+[2026-09-06 23:51:20] [Updates Page Sync] Checking 'https://pcmod.ddns.me/updates.html'...
+[2026-09-06 23:51:20] [Updates Page Sync] File size check -> Local: 47163 bytes | Remote: 47163 bytes
+[2026-09-06 23:51:20] [Updates Page Sync] Local updates.html is up to date. No download needed.
+[2026-09-06 23:51:20] [Pack Script (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/scripts/script_2-5-x.zs...
+[2026-09-06 23:51:21] [Pack Script (2-5-x) Sync] Remote file exists. File size check -> Local: 480 bytes | Remote: 480 bytes
+[2026-09-06 23:51:21] [Pack Script (2-5-x) Sync] Local Pack Script (2-5-x) is up to date (/app/data/packs/2-5-x/scripts/script.zs). No download needed.
+[2026-09-06 23:51:21] [Pack Servers (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/servers/servers_2-5-x.dat...
+[2026-09-06 23:51:21] [Pack Servers (2-5-x) Sync] Remote file exists. File size check -> Local: 13442 bytes | Remote: 13442 bytes
+[2026-09-06 23:51:21] [Pack Servers (2-5-x) Sync] Local Pack Servers (2-5-x) is up to date (/app/data/packs/2-5-x/servers.dat). No download needed.
+[2026-09-06 23:51:21] Wrote settings.txt successfully
+[2026-09-06 23:51:21] Spawned background server alerts worker process.
+[2026-09-06 23:51:21] === PCMod Client Starting ===
+[2026-09-06 23:51:21] Read settings.txt successfully: {'shortcut': '1', 'autoserver': '0', 'log-logins': '1', 'lite': '0', 'showconsole': '0', 'cleanup_updates': '1', 'server_alerts': '1', 'pack': '2-5-x', 'memory': '6144', 'username': ''}
+[2026-09-06 23:51:21] Server alerts worker background process started.
+[2026-09-06 23:51:21] Server alerts worker process terminated.
+[2026-09-06 23:51:24] Wrote settings.txt successfully
+[2026-09-06 23:51:41] === PCMod Client Starting ===
+[2026-09-06 23:51:41] Read settings.txt successfully: {'shortcut': '1', 'autoserver': '0', 'log-logins': '1', 'lite': '0', 'showconsole': '0', 'cleanup_updates': '1', 'server_alerts': '0', 'pack': '2-5-x', 'memory': '6144', 'username': ''}
+[2026-09-06 23:51:41] Checking for updates... Pack 2-5-x [2.5.3b] Launcher [2.0a]
+[2026-09-06 23:51:41] Checking for PORTABLEMC... 4.4.1
+[2026-09-06 23:51:41] [Updates Page Sync] Checking 'https://pcmod.ddns.me/updates.html'...
+[2026-09-06 23:51:41] [Updates Page Sync] File size check -> Local: 47163 bytes | Remote: 47163 bytes
+[2026-09-06 23:51:41] [Updates Page Sync] Local updates.html is up to date. No download needed.
+[2026-09-06 23:51:41] [Pack Script (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/scripts/script_2-5-x.zs...
+[2026-09-06 23:51:41] [Pack Script (2-5-x) Sync] Remote file exists. File size check -> Local: 480 bytes | Remote: 480 bytes
+[2026-09-06 23:51:41] [Pack Script (2-5-x) Sync] Local Pack Script (2-5-x) is up to date (/app/data/packs/2-5-x/scripts/script.zs). No download needed.
+[2026-09-06 23:51:41] [Pack Servers (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/servers/servers_2-5-x.dat...
+[2026-09-06 23:51:41] [Pack Servers (2-5-x) Sync] Remote file exists. File size check -> Local: 13442 bytes | Remote: 13442 bytes
+[2026-09-06 23:51:41] [Pack Servers (2-5-x) Sync] Local Pack Servers (2-5-x) is up to date (/app/data/packs/2-5-x/servers.dat). No download needed.
+[2026-09-06 23:51:41] Wrote settings.txt successfully
+[2026-09-06 23:51:41] Spawned background server alerts worker process.
+[2026-09-06 23:51:42] === PCMod Client Starting ===
+[2026-09-06 23:51:42] Read settings.txt successfully: {'shortcut': '1', 'autoserver': '0', 'log-logins': '1', 'lite': '0', 'showconsole': '0', 'cleanup_updates': '1', 'server_alerts': '1', 'pack': '2-5-x', 'memory': '6144', 'username': ''}
+[2026-09-06 23:51:42] Server alerts worker background process started.
+[2026-09-06 23:51:42] Server alerts worker process terminated.
+[2026-09-06 23:51:42] Server alerts worker crashed: name 'get_running_game_info' is not defined
+[2026-09-06 23:51:44] Wrote settings.txt successfully
+[2026-09-06 23:52:42] === PCMod Client Starting ===
+[2026-09-06 23:52:42] Read settings.txt successfully: {'shortcut': '1', 'autoserver': '0', 'log-logins': '1', 'lite': '0', 'showconsole': '0', 'cleanup_updates': '1', 'server_alerts': '0', 'pack': '2-5-x', 'memory': '6144', 'username': ''}
+[2026-09-06 23:52:42] Checking for updates... Pack 2-5-x [2.5.3b] Launcher [2.0a]
+[2026-09-06 23:52:42] Checking for PORTABLEMC... 4.4.1
+[2026-09-06 23:52:42] [Updates Page Sync] Checking 'https://pcmod.ddns.me/updates.html'...
+[2026-09-06 23:52:43] [Updates Page Sync] File size check -> Local: 47163 bytes | Remote: 47163 bytes
+[2026-09-06 23:52:43] [Updates Page Sync] Local updates.html is up to date. No download needed.
+[2026-09-06 23:52:43] [Pack Script (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/scripts/script_2-5-x.zs...
+[2026-09-06 23:52:43] [Pack Script (2-5-x) Sync] Remote file exists. File size check -> Local: 480 bytes | Remote: 480 bytes
+[2026-09-06 23:52:43] [Pack Script (2-5-x) Sync] Local Pack Script (2-5-x) is up to date (/app/data/packs/2-5-x/scripts/script.zs). No download needed.
+[2026-09-06 23:52:43] [Pack Servers (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/servers/servers_2-5-x.dat...
+[2026-09-06 23:52:43] [Pack Servers (2-5-x) Sync] Remote file exists. File size check -> Local: 13442 bytes | Remote: 13442 bytes
+[2026-09-06 23:52:43] [Pack Servers (2-5-x) Sync] Local Pack Servers (2-5-x) is up to date (/app/data/packs/2-5-x/servers.dat). No download needed.
+[2026-09-06 23:52:57] === PCMod Client Starting ===
+[2026-09-06 23:52:57] Read settings.txt successfully: {'shortcut': '1', 'autoserver': '0', 'log-logins': '1', 'lite': '0', 'showconsole': '0', 'cleanup_updates': '1', 'server_alerts': '0', 'pack': '2-5-x', 'memory': '6144', 'username': ''}
+[2026-09-06 23:52:57] Checking for updates... Pack 2-5-x [2.5.3b] Launcher [2.0a]
+[2026-09-06 23:52:57] Checking for PORTABLEMC... 4.4.1
+[2026-09-06 23:52:57] [Updates Page Sync] Checking 'https://pcmod.ddns.me/updates.html'...
+[2026-09-06 23:52:57] [Updates Page Sync] File size check -> Local: 47163 bytes | Remote: 47163 bytes
+[2026-09-06 23:52:57] [Updates Page Sync] Local updates.html is up to date. No download needed.
+[2026-09-06 23:52:57] [Pack Script (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/scripts/script_2-5-x.zs...
+[2026-09-06 23:52:57] [Pack Script (2-5-x) Sync] Remote file exists. File size check -> Local: 480 bytes | Remote: 480 bytes
+[2026-09-06 23:52:57] [Pack Script (2-5-x) Sync] Local Pack Script (2-5-x) is up to date (/app/data/packs/2-5-x/scripts/script.zs). No download needed.
+[2026-09-06 23:52:57] [Pack Servers (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/servers/servers_2-5-x.dat...
+[2026-09-06 23:52:57] [Pack Servers (2-5-x) Sync] Remote file exists. File size check -> Local: 13442 bytes | Remote: 13442 bytes
+[2026-09-06 23:52:57] [Pack Servers (2-5-x) Sync] Local Pack Servers (2-5-x) is up to date (/app/data/packs/2-5-x/servers.dat). No download needed.
+[2026-09-06 23:52:57] Wrote settings.txt successfully
+[2026-09-06 23:52:57] Spawned background server alerts worker process.
+[2026-09-06 23:52:58] === PCMod Client Starting ===
+[2026-09-06 23:52:58] Read settings.txt successfully: {'shortcut': '1', 'autoserver': '0', 'log-logins': '1', 'lite': '0', 'showconsole': '0', 'cleanup_updates': '1', 'server_alerts': '1', 'pack': '2-5-x', 'memory': '6144', 'username': ''}
+[2026-09-06 23:52:58] Server alerts worker background process started.
+[2026-09-06 23:52:58] Server alerts worker process terminated.
+[2026-09-06 23:52:58] Server alerts worker crashed: name 'get_running_game_info' is not defined
+[2026-09-06 23:53:01] Wrote settings.txt successfully

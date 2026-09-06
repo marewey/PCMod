@@ -667,6 +667,10 @@
             <label for="showconsole">Console</label>
             <input type="checkbox" id="showconsole" onchange="toggleShowConsole()">
           </div>
+          <div class="setting-row">
+            <label for="serveralerts">Server Alerts</label>
+            <input type="checkbox" id="serveralerts" onchange="toggleServerAlerts()">
+          </div>
           <div class="setting-row" style="margin-top: 4px;">
             <label for="selver">Version</label>
             <select id="selver" onchange="changeVersion()">
@@ -967,6 +971,7 @@
           document.getElementById('loglogins').checked = (data.settings.log_logins === "1" || data.settings['log-logins'] === "1");
           document.getElementById('litemode').checked = (data.settings.lite === "1");
           document.getElementById('showconsole').checked = (data.settings.showconsole === "1");
+          document.getElementById('serveralerts').checked = (data.settings.server_alerts === "1");
           if (data.settings.memory) {
             document.getElementById('maxram').value = data.settings.memory;
           }
@@ -1442,6 +1447,13 @@
       var val = document.getElementById('showconsole').checked ? "1" : "0";
       if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.set_setting('showconsole', val);
+      }
+    }
+
+    function toggleServerAlerts() {
+      var val = document.getElementById('serveralerts').checked ? "1" : "0";
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_setting('server_alerts', val);
       }
     }
 
