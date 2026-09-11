@@ -618,74 +618,8 @@ def show_tray_balloon_notification(title, msg):
         except Exception as e:
             log_init(f"Tray notification error: {e}")
 
-def kill_server_alerts_worker():
-    alerts_lock = os.path.join(DATA_DIR, "alerts.lock")
-    if os.path.exists(alerts_lock):
-        try:
-            with open(alerts_lock, "r", encoding="utf-8") as f:
-                pid_str = f.read().strip()
-                if pid_str.isdigit():
-                    pid = int(pid_str)
-                    if pid != os.getpid() and is_pid_running(pid):
-                        log_server_alert(f"Terminating background worker process PID {pid}...")
-                        if OS_NAME == "win32":
-                            creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)
-                            subprocess.run(["taskkill", "/F", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=creationflags)
-                        else:
-                            os.kill(pid, 15)
-        except Exception as e:
-            log_init(f"Error terminating server alerts worker: {e}")
-        try:
-            os.remove(alerts_lock)
-        except Exception:
-            pass
-
-def start_server_alerts_worker():
-    s = read_settings()
-    if str(s.get("server_alerts", "0")).strip() not in ["1", "true", "True"]:
-        kill_server_alerts_worker()
-        return
-
-    alerts_lock = os.path.join(DATA_DIR, "alerts.lock")
-    if os.path.exists(alerts_lock):
-        try:
-            with open(alerts_lock, "r", encoding="utf-8") as f:
-                pid_str = f.read().strip()
-                if pid_str.isdigit():
-                    pid = int(pid_str)
-                    if is_pid_running(pid):
-                        log_init(f"Server alerts worker already running with PID {pid}")
-                        return
-        except Exception:
-            pass
-
-    clean_env = get_clean_env()
-    if getattr(sys, 'frozen', False) or sys.argv[0].lower().endswith(".exe"):
-        exe = os.path.abspath(sys.argv[0])
-        cmd = [exe, "--server-alerts-worker"]
-    else:
-        cmd = [sys.executable, os.path.abspath(__file__), "--server-alerts-worker"]
-
-    try:
-        creationflags = 0
-        if OS_NAME == "win32":
-            creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000) | getattr(subprocess, 'DETACHED_PROCESS', 0x00000008)
-        subprocess.Popen(cmd, env=clean_env, cwd=BASE_DIR, creationflags=creationflags)
-        log_init("Spawned background server alerts worker process.")
-    except Exception as e:
-        log_init(f"Error spawning server alerts worker process: {e}")
-
-SERVER_ALERTS_LOG = os.path.join(DATA_DIR, "server_alerts.log")
-
 def log_server_alert(msg):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    entry = f"[{timestamp}] {msg}"
     log_init(f"[ServerAlerts] {msg}")
-    try:
-        with open(SERVER_ALERTS_LOG, "a", encoding="utf-8") as f:
-            f.write(entry + "\n")
-    except Exception:
-        pass
 
 def hide_worker_console():
     if OS_NAME == "win32":
@@ -696,118 +630,6 @@ def hide_worker_console():
                 ctypes.windll.user32.ShowWindow(hwnd, 0)
         except Exception:
             pass
-
-def run_server_alerts_worker():
-    hide_worker_console()
-    log_init("Server alerts worker background process started.")
-    log_server_alert("Background worker process initialized.")
-
-    def handle_signal(signum, frame):
-        log_server_alert(f"Received termination signal ({signum}). Exiting background worker process.")
-        sys.exit(0)
-
-    try:
-        signal.signal(signal.SIGTERM, handle_signal)
-        signal.signal(signal.SIGINT, handle_signal)
-        if hasattr(signal, 'SIGBREAK'):
-            signal.signal(signal.SIGBREAK, handle_signal)
-    except Exception:
-        pass
-
-    alerts_lock = os.path.join(DATA_DIR, "alerts.lock")
-    try:
-        with open(alerts_lock, "w", encoding="utf-8") as f:
-            f.write(str(os.getpid()))
-    except Exception as e:
-        log_init(f"Worker failed writing alerts.lock: {e}")
-
-    previous_players = None
-
-    try:
-        while True:
-            # Check if setting is still enabled
-            st = read_settings()
-            if str(st.get("server_alerts", "0")).strip() not in ["1", "true", "True"]:
-                log_init("Server alerts disabled in settings. Worker exiting.")
-                log_server_alert("Server alerts setting disabled in settings. Worker process exiting.")
-                break
-
-            pack = get_pack_name()
-
-            # Skip checking/notifications if game is currently running
-            game_info = get_running_game_info()
-            if game_info.get("running"):
-                log_server_alert(f"Check skipped for pack '{pack}': Minecraft game is currently running (PID {game_info.get('pid')}).")
-            else:
-                user = st.get("username", "").strip()
-                url = f"https://pcmod.ddns.me/players/list-{pack}"
-
-                players = []
-                fetch_error = None
-                try:
-                    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-                    ctx = ssl.create_default_context()
-                    ctx.check_hostname = False
-                    ctx.verify_mode = ssl.CERT_NONE
-                    with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
-                        text = resp.read().decode('utf-8', errors='ignore').strip()
-                        if text and not text.startswith("<") and "Server Offline" not in text:
-                            players = [l.strip() for l in text.splitlines() if l.strip() and not l.startswith("<")]
-                except Exception as e:
-                    fetch_error = str(e)
-                    log_init(f"Worker error fetching players list: {e}")
-
-                current_players_set = set(players)
-                player_count = len(current_players_set)
-                player_list_str = f"{player_count} online ({', '.join(sorted(list(current_players_set)))})" if player_count > 0 else "0 online / Server Offline"
-                if fetch_error:
-                    player_list_str += f" [Fetch Error: {fetch_error}]"
-
-                if previous_players is None:
-                    # Establish initial baseline on startup without notifying
-                    previous_players = current_players_set
-                    log_server_alert(f"Checked player status for pack '{pack}': {player_list_str} [Initial Baseline Established]")
-                else:
-                    log_server_alert(f"Checked player status for pack '{pack}': {player_list_str}")
-
-                    # Notify only if new players joined
-                    new_players = current_players_set - previous_players
-                    # Exclude user's own username if present
-                    if user:
-                        new_players = {p for p in new_players if p.lower() != user.lower()}
-
-                    if new_players and player_count > 0:
-                        joined_names = ", ".join(sorted(list(new_players)))
-                        notif_msg = f"{joined_names} joined the server"
-                        log_server_alert(f"ALERT TRIGGERED for pack '{pack}': {notif_msg}")
-                        show_tray_balloon_notification(f"Server Alert ({pack})", notif_msg)
-
-                    previous_players = current_players_set
-
-            # Sleep in 1s increments for 300 seconds (5 mins)
-            for _ in range(300):
-                time.sleep(1)
-                if not os.path.exists(alerts_lock):
-                    log_server_alert("Lock file removed. Worker process stopping.")
-                    return
-                try:
-                    with open(alerts_lock, "r", encoding="utf-8") as f:
-                        if f.read().strip() != str(os.getpid()):
-                            log_init("Lock file PID mismatch. Worker exiting.")
-                            log_server_alert("Lock file PID mismatch. Worker process stopping.")
-                            return
-                except Exception:
-                    pass
-    finally:
-        if os.path.exists(alerts_lock):
-            try:
-                with open(alerts_lock, "r", encoding="utf-8") as f:
-                    if f.read().strip() == str(os.getpid()):
-                        os.remove(alerts_lock)
-            except Exception:
-                pass
-        log_init("Server alerts worker process terminated.")
-        log_server_alert("Worker process successfully stopped / closed.")
 
 def toggle_desktop_shortcut(enable):
     if OS_NAME == "win32":
@@ -954,9 +776,6 @@ def check_cli_worker_entrypoint():
             log_server_alert(f"Server alerts worker crashed: {e}")
         sys.exit(0)
 
-check_cli_worker_entrypoint()
-start_server_alerts_worker()
-
 def get_pack_name():
     s = read_settings()
     if s.get("pack"):
@@ -1094,8 +913,9 @@ def force_unlock_game():
         log_init(f"Force unlocking game. Terminating process tree for PID {pid}...")
         try:
             if OS_NAME == "win32":
-                subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                subprocess.run(["taskkill", "/F", "/IM", "javaw.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=creationflags)
+                subprocess.run(["taskkill", "/F", "/IM", "javaw.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=creationflags)
             else:
                 os.kill(pid, 9)
         except Exception as e:
@@ -1106,6 +926,183 @@ def force_unlock_game():
         except Exception:
             pass
     return True
+
+def kill_server_alerts_worker():
+    alerts_lock = os.path.join(DATA_DIR, "alerts.lock")
+    if os.path.exists(alerts_lock):
+        try:
+            with open(alerts_lock, "r", encoding="utf-8") as f:
+                pid_str = f.read().strip()
+                if pid_str.isdigit():
+                    pid = int(pid_str)
+                    if pid != os.getpid() and is_pid_running(pid):
+                        log_server_alert(f"Terminating background worker process PID {pid}...")
+                        if OS_NAME == "win32":
+                            creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)
+                            subprocess.run(["taskkill", "/F", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=creationflags)
+                        else:
+                            os.kill(pid, 15)
+        except Exception as e:
+            log_init(f"Error terminating server alerts worker: {e}")
+        try:
+            os.remove(alerts_lock)
+        except Exception:
+            pass
+
+def start_server_alerts_worker():
+    s = read_settings()
+    if str(s.get("server_alerts", "0")).strip() not in ["1", "true", "True"]:
+        kill_server_alerts_worker()
+        return
+
+    alerts_lock = os.path.join(DATA_DIR, "alerts.lock")
+    if os.path.exists(alerts_lock):
+        try:
+            with open(alerts_lock, "r", encoding="utf-8") as f:
+                pid_str = f.read().strip()
+                if pid_str.isdigit():
+                    pid = int(pid_str)
+                    if is_pid_running(pid):
+                        log_init(f"Server alerts worker already running with PID {pid}")
+                        return
+        except Exception:
+            pass
+
+    clean_env = get_clean_env()
+    if getattr(sys, 'frozen', False) or sys.argv[0].lower().endswith(".exe"):
+        exe = os.path.abspath(sys.argv[0])
+        cmd = [exe, "--server-alerts-worker"]
+    else:
+        python_exe = sys.executable
+        if OS_NAME == "win32":
+            pythonw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+            if os.path.exists(pythonw):
+                python_exe = pythonw
+        cmd = [python_exe, os.path.abspath(__file__), "--server-alerts-worker"]
+
+    try:
+        creationflags = 0
+        if OS_NAME == "win32":
+            creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000) | getattr(subprocess, 'DETACHED_PROCESS', 0x00000008)
+        subprocess.Popen(cmd, env=clean_env, cwd=BASE_DIR, creationflags=creationflags)
+        log_init("Spawned background server alerts worker process.")
+    except Exception as e:
+        log_init(f"Error spawning server alerts worker process: {e}")
+
+def run_server_alerts_worker():
+    hide_worker_console()
+    log_init("Server alerts worker background process started.")
+    log_server_alert("Background worker process initialized.")
+
+    def handle_signal(signum, frame):
+        log_server_alert(f"Received termination signal ({signum}). Exiting background worker process.")
+        sys.exit(0)
+
+    try:
+        signal.signal(signal.SIGTERM, handle_signal)
+        signal.signal(signal.SIGINT, handle_signal)
+        if hasattr(signal, 'SIGBREAK'):
+            signal.signal(signal.SIGBREAK, handle_signal)
+    except Exception:
+        pass
+
+    alerts_lock = os.path.join(DATA_DIR, "alerts.lock")
+    try:
+        with open(alerts_lock, "w", encoding="utf-8") as f:
+            f.write(str(os.getpid()))
+    except Exception as e:
+        log_init(f"Worker failed writing alerts.lock: {e}")
+
+    previous_players = None
+
+    try:
+        while True:
+            # Check if setting is still enabled
+            st = read_settings()
+            if str(st.get("server_alerts", "0")).strip() not in ["1", "true", "True"]:
+                log_init("Server alerts disabled in settings. Worker exiting.")
+                log_server_alert("Server alerts setting disabled in settings. Worker process exiting.")
+                break
+
+            pack = get_pack_name()
+
+            # Skip checking/notifications if game is currently running
+            game_info = get_running_game_info()
+            if game_info.get("running"):
+                log_server_alert(f"Check skipped for pack '{pack}': Minecraft game is currently running (PID {game_info.get('pid')}).")
+            else:
+                user = st.get("username", "").strip()
+                url = f"https://pcmod.ddns.me/players/list-{pack}"
+
+                players = []
+                fetch_error = None
+                try:
+                    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                    ctx = ssl.create_default_context()
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
+                    with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
+                        text = resp.read().decode('utf-8', errors='ignore').strip()
+                        if text and not text.startswith("<") and "Server Offline" not in text:
+                            players = [l.strip() for l in text.splitlines() if l.strip() and not l.startswith("<")]
+                except Exception as e:
+                    fetch_error = str(e)
+                    log_init(f"Worker error fetching players list: {e}")
+
+                current_players_set = set(players)
+                player_count = len(current_players_set)
+                player_list_str = f"{player_count} online ({', '.join(sorted(list(current_players_set)))})" if player_count > 0 else "0 online / Server Offline"
+                if fetch_error:
+                    player_list_str += f" [Fetch Error: {fetch_error}]"
+
+                if previous_players is None:
+                    # Establish initial baseline on startup without notifying
+                    previous_players = current_players_set
+                    log_server_alert(f"Checked player status for pack '{pack}': {player_list_str} [Initial Baseline Established]")
+                else:
+                    log_server_alert(f"Checked player status for pack '{pack}': {player_list_str}")
+
+                    # Notify only if new players joined
+                    new_players = current_players_set - previous_players
+                    # Exclude user's own username if present
+                    if user:
+                        new_players = {p for p in new_players if p.lower() != user.lower()}
+
+                    if new_players and player_count > 0:
+                        joined_names = ", ".join(sorted(list(new_players)))
+                        notif_msg = f"{joined_names} joined the server"
+                        log_server_alert(f"ALERT TRIGGERED for pack '{pack}': {notif_msg}")
+                        show_tray_balloon_notification(f"Server Alert ({pack})", notif_msg)
+
+                    previous_players = current_players_set
+
+            # Sleep in 1s increments for 300 seconds (5 mins)
+            for _ in range(300):
+                time.sleep(1)
+                if not os.path.exists(alerts_lock):
+                    log_server_alert("Lock file removed. Worker process stopping.")
+                    return
+                try:
+                    with open(alerts_lock, "r", encoding="utf-8") as f:
+                        if f.read().strip() != str(os.getpid()):
+                            log_init("Lock file PID mismatch. Worker exiting.")
+                            log_server_alert("Lock file PID mismatch. Worker process stopping.")
+                            return
+                except Exception:
+                    pass
+    finally:
+        if os.path.exists(alerts_lock):
+            try:
+                with open(alerts_lock, "r", encoding="utf-8") as f:
+                    if f.read().strip() == str(os.getpid()):
+                        os.remove(alerts_lock)
+            except Exception:
+                pass
+        log_init("Server alerts worker process terminated.")
+        log_server_alert("Worker process successfully stopped / closed.")
+
+check_cli_worker_entrypoint()
+start_server_alerts_worker()
 
 def get_portablemc_version_spec(pack_name):
     info = read_version_info(pack_name)
