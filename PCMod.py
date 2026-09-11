@@ -13,6 +13,8 @@ import ftplib
 import threading
 import socket
 import zipfile
+import signal
+import atexit
 from datetime import datetime
 
 # Dynamic working directory (BASE_DIR) resolution
@@ -615,10 +617,11 @@ def kill_server_alerts_worker():
                 if pid_str.isdigit():
                     pid = int(pid_str)
                     if pid != os.getpid() and is_pid_running(pid):
+                        log_server_alert(f"Terminating background worker process PID {pid}...")
                         if OS_NAME == "win32":
                             subprocess.run(["taskkill", "/F", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                         else:
-                            os.kill(pid, 9)
+                            os.kill(pid, 15)
         except Exception as e:
             log_init(f"Error terminating server alerts worker: {e}")
         try:
@@ -673,9 +676,33 @@ def log_server_alert(msg):
     except Exception:
         pass
 
+def hide_worker_console():
+    if OS_NAME == "win32":
+        try:
+            import ctypes
+            hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+            if hwnd:
+                ctypes.windll.user32.ShowWindow(hwnd, 0)
+        except Exception:
+            pass
+
 def run_server_alerts_worker():
+    hide_worker_console()
     log_init("Server alerts worker background process started.")
     log_server_alert("Background worker process initialized.")
+
+    def handle_signal(signum, frame):
+        log_server_alert(f"Received termination signal ({signum}). Exiting background worker process.")
+        sys.exit(0)
+
+    try:
+        signal.signal(signal.SIGTERM, handle_signal)
+        signal.signal(signal.SIGINT, handle_signal)
+        if hasattr(signal, 'SIGBREAK'):
+            signal.signal(signal.SIGBREAK, handle_signal)
+    except Exception:
+        pass
+
     alerts_lock = os.path.join(DATA_DIR, "alerts.lock")
     try:
         with open(alerts_lock, "w", encoding="utf-8") as f:
@@ -691,7 +718,7 @@ def run_server_alerts_worker():
             st = read_settings()
             if str(st.get("server_alerts", "0")).strip() not in ["1", "true", "True"]:
                 log_init("Server alerts disabled in settings. Worker exiting.")
-                log_server_alert("Server alerts setting disabled. Exiting worker process.")
+                log_server_alert("Server alerts setting disabled in settings. Worker process exiting.")
                 break
 
             pack = get_pack_name()
@@ -750,12 +777,13 @@ def run_server_alerts_worker():
             for _ in range(300):
                 time.sleep(1)
                 if not os.path.exists(alerts_lock):
-                    break
+                    log_server_alert("Lock file removed. Worker process stopping.")
+                    return
                 try:
                     with open(alerts_lock, "r", encoding="utf-8") as f:
                         if f.read().strip() != str(os.getpid()):
                             log_init("Lock file PID mismatch. Worker exiting.")
-                            log_server_alert("Lock file PID mismatch. Worker exiting.")
+                            log_server_alert("Lock file PID mismatch. Worker process stopping.")
                             return
                 except Exception:
                     pass
@@ -768,7 +796,7 @@ def run_server_alerts_worker():
             except Exception:
                 pass
         log_init("Server alerts worker process terminated.")
-        log_server_alert("Worker process terminated.")
+        log_server_alert("Worker process successfully stopped / closed.")
 
 def toggle_desktop_shortcut(enable):
     if OS_NAME == "win32":
@@ -877,10 +905,12 @@ clean_update_dir()
 
 def check_cli_worker_entrypoint():
     if "--server-alerts-worker" in sys.argv:
+        hide_worker_console()
         try:
             run_server_alerts_worker()
         except Exception as e:
             log_init(f"Server alerts worker crashed: {e}")
+            log_server_alert(f"Server alerts worker crashed: {e}")
         sys.exit(0)
 
 def apply_console_visibility():
@@ -1617,6 +1647,7 @@ UPDATE_IN_PROGRESS = False
 UPDATE_CANCEL_REQUESTED = False
 
 # Server Update Check & Download Engine
+check_cli_entrypoint()
 check_cli_worker_entrypoint()
 start_server_alerts_worker()
 
