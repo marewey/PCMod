@@ -926,6 +926,12 @@ def apply_console_visibility():
                 if not hwnd:
                     kernel32.AllocConsole()
                     hwnd = kernel32.GetConsoleWindow()
+                    try:
+                        conout = open("CONOUT$", "w", encoding="utf-8", errors="ignore")
+                        sys.stdout = conout
+                        sys.stderr = conout
+                    except Exception:
+                        pass
                 if hwnd:
                     SW_SHOW = 5
                     SWP_NOMOVE = 0x0002
