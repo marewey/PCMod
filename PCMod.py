@@ -21,6 +21,16 @@ from datetime import datetime
 OS_NAME = sys.platform
 EXEC_DIR = os.path.dirname(os.path.abspath(sys.argv[0] if getattr(sys, 'frozen', False) else __file__))
 
+# Immediately hide console window on Win32 before any initialization to prevent flashing
+if OS_NAME == "win32":
+    try:
+        import ctypes
+        hwnd_boot = ctypes.windll.kernel32.GetConsoleWindow()
+        if hwnd_boot:
+            ctypes.windll.user32.ShowWindow(hwnd_boot, 0)
+    except Exception:
+        pass
+
 import shutil
 
 def check_cli_entrypoint():
@@ -619,7 +629,8 @@ def kill_server_alerts_worker():
                     if pid != os.getpid() and is_pid_running(pid):
                         log_server_alert(f"Terminating background worker process PID {pid}...")
                         if OS_NAME == "win32":
-                            subprocess.run(["taskkill", "/F", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)
+                            subprocess.run(["taskkill", "/F", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=creationflags)
                         else:
                             os.kill(pid, 15)
         except Exception as e:
@@ -806,6 +817,8 @@ def toggle_desktop_shortcut(enable):
             icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
             vbs_file = os.path.join(DATA_DIR, "create_shortcut.vbs")
 
+            creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)
+
             if enable:
                 vbs_script = (
                     'Set ws = WScript.CreateObject("WScript.Shell")\n'
@@ -823,7 +836,7 @@ def toggle_desktop_shortcut(enable):
                 )
                 with open(vbs_file, "w", encoding="utf-8") as f:
                     f.write(vbs_script)
-                subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5)
+                subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5, creationflags=creationflags)
                 if os.path.exists(vbs_file):
                     os.remove(vbs_file)
                 log_init("Created desktop shortcut: PCMod Client.lnk via WScript SpecialFolders")
@@ -837,7 +850,7 @@ def toggle_desktop_shortcut(enable):
                 )
                 with open(vbs_file, "w", encoding="utf-8") as f:
                     f.write(vbs_script)
-                subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5)
+                subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5, creationflags=creationflags)
                 if os.path.exists(vbs_file):
                     os.remove(vbs_file)
                 log_init("Removed desktop shortcut: PCMod Client.lnk via WScript SpecialFolders")
@@ -900,7 +913,35 @@ def write_settings(settings):
     except Exception:
         pass
 
+def apply_console_visibility():
+    if OS_NAME == "win32":
+        try:
+            import ctypes
+            s = read_settings()
+            show = str(s.get("showconsole", "0")).strip() in ["1", "true", "True"]
+            kernel32 = ctypes.windll.kernel32
+            hwnd = kernel32.GetConsoleWindow()
+
+            if hwnd:
+                SW_SHOW = 5
+                SW_HIDE = 0
+                SWP_NOMOVE = 0x0002
+                SWP_NOSIZE = 0x0001
+                SWP_NOZORDER = 0x0004
+                SWP_FRAMECHANGED = 0x0020
+                if show:
+                    ctypes.windll.user32.ShowWindow(hwnd, SW_SHOW)
+                    ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED)
+                    u = s.get("username", "").strip()
+                    if u:
+                        update_console_title(u)
+                else:
+                    ctypes.windll.user32.ShowWindow(hwnd, SW_HIDE)
+        except Exception:
+            pass
+
 init_settings = read_settings(log_event=True)
+apply_console_visibility()
 clean_update_dir()
 
 def check_cli_worker_entrypoint():
@@ -913,43 +954,8 @@ def check_cli_worker_entrypoint():
             log_server_alert(f"Server alerts worker crashed: {e}")
         sys.exit(0)
 
-def apply_console_visibility():
-    if OS_NAME == "win32":
-        try:
-            import ctypes
-            s = read_settings()
-            show = str(s.get("showconsole", "0")).strip() in ["1", "true", "True"]
-            kernel32 = ctypes.windll.kernel32
-            hwnd = kernel32.GetConsoleWindow()
-
-            if show:
-                if not hwnd:
-                    kernel32.AllocConsole()
-                    hwnd = kernel32.GetConsoleWindow()
-                    try:
-                        conout = open("CONOUT$", "w", encoding="utf-8", errors="ignore")
-                        sys.stdout = conout
-                        sys.stderr = conout
-                    except Exception:
-                        pass
-                if hwnd:
-                    SW_SHOW = 5
-                    SWP_NOMOVE = 0x0002
-                    SWP_NOSIZE = 0x0001
-                    SWP_NOZORDER = 0x0004
-                    SWP_FRAMECHANGED = 0x0020
-                    ctypes.windll.user32.ShowWindow(hwnd, SW_SHOW)
-                    ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED)
-                    u = s.get("username", "").strip()
-                    if u:
-                        update_console_title(u)
-            else:
-                if hwnd:
-                    SW_HIDE = 0
-                    ctypes.windll.user32.ShowWindow(hwnd, SW_HIDE)
-                    kernel32.FreeConsole()
-        except Exception:
-            pass
+check_cli_worker_entrypoint()
+start_server_alerts_worker()
 
 def get_pack_name():
     s = read_settings()
@@ -1186,11 +1192,16 @@ def startup_checks():
     log_init(f"Checking for PORTABLEMC... {pmc_ver}")
 
 startup_checks()
-try:
-    sync_updates_page()
-    sync_active_pack_resources()
-except Exception as e:
-    log_init(f"Warning syncing launcher/pack resources on startup: {e}")
+
+def async_post_launch_sync():
+    time.sleep(1.0)
+    try:
+        sync_updates_page()
+        sync_active_pack_resources()
+    except Exception as e:
+        log_init(f"Warning syncing launcher/pack resources post-launch: {e}")
+
+threading.Thread(target=async_post_launch_sync, daemon=True).start()
 
 def get_offline_uuid(username):
     s = f"OfflinePlayer:{username}"
@@ -1665,8 +1676,6 @@ UPDATE_CANCEL_REQUESTED = False
 
 # Server Update Check & Download Engine
 check_cli_entrypoint()
-check_cli_worker_entrypoint()
-start_server_alerts_worker()
 
 def check_updates_server():
     pack = get_pack_name()
@@ -2233,6 +2242,8 @@ class Api:
             write_settings(s)
             if str(k) == "shortcut":
                 toggle_desktop_shortcut(str(v) in ["1", "true", "True"])
+            elif str(k) == "showconsole":
+                apply_console_visibility()
             elif str(k) == "server_alerts":
                 if str(v) in ["1", "true", "True"]:
                     start_server_alerts_worker()
