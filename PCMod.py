@@ -22,14 +22,6 @@ EXEC_DIR = os.path.dirname(os.path.abspath(sys.argv[0] if getattr(sys, 'frozen',
 import shutil
 
 def check_cli_entrypoint():
-    # Handle server-alerts-worker daemon process if present
-    if "--server-alerts-worker" in sys.argv:
-        try:
-            run_server_alerts_worker()
-        except Exception as e:
-            print(f"Server alerts worker crashed: {e}")
-        sys.exit(0)
-
     # Handle cleanup-old argument if present
     if "--cleanup-old" in sys.argv:
         try:
@@ -669,8 +661,21 @@ def start_server_alerts_worker():
     except Exception as e:
         log_init(f"Error spawning server alerts worker process: {e}")
 
+SERVER_ALERTS_LOG = os.path.join(DATA_DIR, "server_alerts.log")
+
+def log_server_alert(msg):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    entry = f"[{timestamp}] {msg}"
+    log_init(f"[ServerAlerts] {msg}")
+    try:
+        with open(SERVER_ALERTS_LOG, "a", encoding="utf-8") as f:
+            f.write(entry + "\n")
+    except Exception:
+        pass
+
 def run_server_alerts_worker():
     log_init("Server alerts worker background process started.")
+    log_server_alert("Background worker process initialized.")
     alerts_lock = os.path.join(DATA_DIR, "alerts.lock")
     try:
         with open(alerts_lock, "w", encoding="utf-8") as f:
@@ -686,16 +691,21 @@ def run_server_alerts_worker():
             st = read_settings()
             if str(st.get("server_alerts", "0")).strip() not in ["1", "true", "True"]:
                 log_init("Server alerts disabled in settings. Worker exiting.")
+                log_server_alert("Server alerts setting disabled. Exiting worker process.")
                 break
+
+            pack = get_pack_name()
 
             # Skip checking/notifications if game is currently running
             game_info = get_running_game_info()
-            if not game_info.get("running"):
-                pack = get_pack_name()
+            if game_info.get("running"):
+                log_server_alert(f"Check skipped for pack '{pack}': Minecraft game is currently running (PID {game_info.get('pid')}).")
+            else:
                 user = st.get("username", "").strip()
                 url = f"https://pcmod.ddns.me/players/list-{pack}"
 
                 players = []
+                fetch_error = None
                 try:
                     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
                     ctx = ssl.create_default_context()
@@ -706,29 +716,32 @@ def run_server_alerts_worker():
                         if text and not text.startswith("<") and "Server Offline" not in text:
                             players = [l.strip() for l in text.splitlines() if l.strip() and not l.startswith("<")]
                 except Exception as e:
+                    fetch_error = str(e)
                     log_init(f"Worker error fetching players list: {e}")
 
                 current_players_set = set(players)
+                player_count = len(current_players_set)
+                player_list_str = f"{player_count} online ({', '.join(sorted(list(current_players_set)))})" if player_count > 0 else "0 online / Server Offline"
+                if fetch_error:
+                    player_list_str += f" [Fetch Error: {fetch_error}]"
 
                 if previous_players is None:
                     # Establish initial baseline on startup without notifying
                     previous_players = current_players_set
-                    log_init(f"Server alerts worker baseline established: {len(previous_players)} players online.")
+                    log_server_alert(f"Checked player status for pack '{pack}': {player_list_str} [Initial Baseline Established]")
                 else:
+                    log_server_alert(f"Checked player status for pack '{pack}': {player_list_str}")
+
                     # Notify only if new players joined
                     new_players = current_players_set - previous_players
                     # Exclude user's own username if present
                     if user:
                         new_players = {p for p in new_players if p.lower() != user.lower()}
 
-                    if new_players and len(current_players_set) > 0:
+                    if new_players and player_count > 0:
                         joined_names = ", ".join(sorted(list(new_players)))
-                        if len(new_players) == 1:
-                            notif_msg = f"{joined_names} joined the server"
-                        else:
-                            notif_msg = f"{joined_names} joined the server"
-
-                        log_init(f"Server Alert Triggered: {notif_msg}")
+                        notif_msg = f"{joined_names} joined the server"
+                        log_server_alert(f"ALERT TRIGGERED for pack '{pack}': {notif_msg}")
                         show_tray_balloon_notification(f"Server Alert ({pack})", notif_msg)
 
                     previous_players = current_players_set
@@ -742,6 +755,7 @@ def run_server_alerts_worker():
                     with open(alerts_lock, "r", encoding="utf-8") as f:
                         if f.read().strip() != str(os.getpid()):
                             log_init("Lock file PID mismatch. Worker exiting.")
+                            log_server_alert("Lock file PID mismatch. Worker exiting.")
                             return
                 except Exception:
                     pass
@@ -754,6 +768,7 @@ def run_server_alerts_worker():
             except Exception:
                 pass
         log_init("Server alerts worker process terminated.")
+        log_server_alert("Worker process terminated.")
 
 def toggle_desktop_shortcut(enable):
     if OS_NAME == "win32":
@@ -867,9 +882,6 @@ def check_cli_worker_entrypoint():
         except Exception as e:
             log_init(f"Server alerts worker crashed: {e}")
         sys.exit(0)
-
-check_cli_worker_entrypoint()
-start_server_alerts_worker()
 
 def apply_console_visibility():
     if OS_NAME == "win32":
@@ -1605,6 +1617,9 @@ UPDATE_IN_PROGRESS = False
 UPDATE_CANCEL_REQUESTED = False
 
 # Server Update Check & Download Engine
+check_cli_worker_entrypoint()
+start_server_alerts_worker()
+
 def check_updates_server():
     pack = get_pack_name()
     l_ver, p_ver = read_version_indexes(pack)
