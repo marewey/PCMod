@@ -618,6 +618,51 @@ def show_tray_balloon_notification(title, msg):
         except Exception as e:
             log_init(f"Tray notification error: {e}")
 
+def play_server_alert_sound():
+    sound_dir = os.path.join(DATA_DIR, "sound")
+    os.makedirs(sound_dir, exist_ok=True)
+    sound_path = os.path.join(sound_dir, "plattecraft.mp3")
+    url = "https://files.pcmod.ddns.me/plattecraft.mp3"
+
+    if not os.path.exists(sound_path) or os.path.getsize(sound_path) == 0:
+        try:
+            log_init(f"Downloading server alert sound from {url}...")
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=10.0, context=ctx) as resp:
+                data = resp.read()
+                if data:
+                    with open(sound_path, "wb") as f:
+                        f.write(data)
+                    log_init(f"Downloaded alert sound ({len(data)} bytes) to {sound_path}")
+        except Exception as e:
+            log_init(f"Error downloading alert sound from {url}: {e}")
+
+    if os.path.exists(sound_path) and os.path.getsize(sound_path) > 0:
+        if OS_NAME == "win32":
+            try:
+                import ctypes
+                winmm = ctypes.windll.winmm
+                winmm.mciSendStringW("close alert_sound", None, 0, 0)
+                cmd_open = f'open "{sound_path}" type mpegvideo alias alert_sound'
+                res = winmm.mciSendStringW(cmd_open, None, 0, 0)
+                if res == 0:
+                    winmm.mciSendStringW("play alert_sound", None, 0, 0)
+                else:
+                    log_init(f"mciSendStringW open error code: {res}")
+            except Exception as e:
+                log_init(f"Error playing sound via winmm: {e}")
+        else:
+            try:
+                if sys.platform == "darwin":
+                    subprocess.Popen(["afplay", sound_path])
+                else:
+                    subprocess.Popen(["paplay", sound_path])
+            except Exception as e:
+                log_init(f"Error playing audio on non-Windows platform: {e}")
+
 def log_server_alert(msg):
     log_init(f"[ServerAlerts] {msg}")
 
@@ -690,6 +735,7 @@ def get_default_settings():
         "showconsole": "0",
         "cleanup_updates": "1",
         "server_alerts": "0",
+        "server_alerts_mode": "1",
         "pack": "2-5-x",
         "memory": "6144",
         "username": ""
@@ -1088,8 +1134,20 @@ def run_server_alerts_worker():
                     if new_players and player_count > 0:
                         joined_names = ", ".join(sorted(list(new_players)))
                         notif_msg = f"{joined_names} joined the server"
-                        log_server_alert(f"ALERT TRIGGERED for pack '{pack}': {notif_msg}")
-                        show_tray_balloon_notification(f"Server Alert ({pack})", notif_msg)
+                        mode = str(st.get("server_alerts_mode", "both")).strip().lower()
+                        log_server_alert(f"ALERT TRIGGERED for pack '{pack}' (mode: {mode}): {notif_msg}")
+
+                        if mode in ["1", "both", "sound_and_popup"]:
+                            play_server_alert_sound()
+                            show_tray_balloon_notification(f"Server Alert ({pack})", notif_msg)
+                        elif mode in ["0", "sound", "sound_only"]:
+                            play_server_alert_sound()
+                        elif mode in ["-1", "muted", "popup", "popup_only"]:
+                            show_tray_balloon_notification(f"Server Alert ({pack})", notif_msg)
+                        else:
+                            # Default fallback if unknown setting value
+                            play_server_alert_sound()
+                            show_tray_balloon_notification(f"Server Alert ({pack})", notif_msg)
 
                     previous_players = current_players_set
 
