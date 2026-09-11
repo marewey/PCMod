@@ -744,20 +744,29 @@ def apply_console_visibility():
             kernel32 = ctypes.windll.kernel32
             hwnd = kernel32.GetConsoleWindow()
 
-            if hwnd:
-                SW_SHOW = 5
-                SW_HIDE = 0
-                SWP_NOMOVE = 0x0002
-                SWP_NOSIZE = 0x0001
-                SWP_NOZORDER = 0x0004
-                SWP_FRAMECHANGED = 0x0020
-                if show:
+            if show:
+                if not hwnd:
+                    try:
+                        kernel32.AllocConsole()
+                        hwnd = kernel32.GetConsoleWindow()
+                        sys.stdout = open("CONOUT$", "w")
+                        sys.stderr = open("CONOUT$", "w")
+                    except Exception:
+                        pass
+                if hwnd:
+                    SW_SHOW = 5
+                    SWP_NOMOVE = 0x0002
+                    SWP_NOSIZE = 0x0001
+                    SWP_NOZORDER = 0x0004
+                    SWP_FRAMECHANGED = 0x0020
                     ctypes.windll.user32.ShowWindow(hwnd, SW_SHOW)
                     ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED)
                     u = s.get("username", "").strip()
                     if u:
                         update_console_title(u)
-                else:
+            else:
+                if hwnd:
+                    SW_HIDE = 0
                     ctypes.windll.user32.ShowWindow(hwnd, SW_HIDE)
         except Exception:
             pass
@@ -939,7 +948,10 @@ def kill_server_alerts_worker():
                         log_server_alert(f"Terminating background worker process PID {pid}...")
                         if OS_NAME == "win32":
                             creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)
-                            subprocess.run(["taskkill", "/F", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=creationflags)
+                            startupinfo = subprocess.STARTUPINFO()
+                            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                            startupinfo.wShowWindow = 0 # SW_HIDE
+                            subprocess.run(["taskkill", "/F", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=creationflags, startupinfo=startupinfo)
                         else:
                             os.kill(pid, 15)
         except Exception as e:
@@ -982,9 +994,14 @@ def start_server_alerts_worker():
 
     try:
         creationflags = 0
+        startupinfo = None
         if OS_NAME == "win32":
             creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000) | getattr(subprocess, 'DETACHED_PROCESS', 0x00000008)
-        subprocess.Popen(cmd, env=clean_env, cwd=BASE_DIR, creationflags=creationflags)
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0 # SW_HIDE
+
+        subprocess.Popen(cmd, env=clean_env, cwd=BASE_DIR, creationflags=creationflags, startupinfo=startupinfo)
         log_init("Spawned background server alerts worker process.")
     except Exception as e:
         log_init(f"Error spawning server alerts worker process: {e}")
@@ -2090,52 +2107,79 @@ class Api:
         self._window = window
 
     def init_launcher(self, *args, **kwargs):
-        s = read_settings()
-        pack = get_pack_name()
-        modcount = self.get_mod_count()
-        launcher_ver, pack_ver = read_version_indexes(pack)
+        try:
+            s = read_settings()
+            pack = get_pack_name()
+            modcount = self.get_mod_count()
+            launcher_ver, pack_ver = read_version_indexes(pack)
 
-        # Check line 2 of version file to determine main default pack
-        main_pack = pack
-        version_file = os.path.join(DATA_DIR, "indexes", "version")
-        if os.path.exists(version_file):
-            try:
-                with open(version_file, "r", encoding="utf-8", errors="ignore") as f:
-                    lines = [l.strip() for l in f if l.strip()]
-                    if len(lines) >= 2:
-                        parts = lines[1].split(";")
-                        if parts[0].strip():
-                            main_pack = parts[0].strip()
-            except Exception:
-                pass
+            # Check line 2 of version file to determine main default pack
+            main_pack = pack
+            version_file = os.path.join(DATA_DIR, "indexes", "version")
+            if os.path.exists(version_file):
+                try:
+                    with open(version_file, "r", encoding="utf-8", errors="ignore") as f:
+                        lines = [l.strip() for l in f if l.strip()]
+                        if len(lines) >= 2:
+                            parts = lines[1].split(";")
+                            if parts[0].strip():
+                                main_pack = parts[0].strip()
+                except Exception:
+                    pass
 
-        main_pack_installed = os.path.exists(os.path.join(DATA_DIR, "packs", main_pack))
-        game_info = get_running_game_info()
+            main_pack_installed = os.path.exists(os.path.join(DATA_DIR, "packs", main_pack))
+            game_info = get_running_game_info()
 
-        return {
-            "user": s.get("username", ""),
-            "game_running": game_info["running"],
-            "game_pid": game_info["pid"],
-            "settings": {
-                "shortcut": "1" if str(s.get("shortcut")).strip() in ["1", "true", "True"] else "0",
-                "autoserver": "1" if str(s.get("autoserver")).strip() in ["1", "true", "True"] else "0",
-                "log_logins": "1" if str(s.get("log-logins", s.get("log_logins", "1"))).strip() in ["1", "true", "True"] else "0",
-                "log-logins": "1" if str(s.get("log-logins", s.get("log_logins", "1"))).strip() in ["1", "true", "True"] else "0",
-                "lite": "1" if str(s.get("lite", s.get("litemode", "0"))).strip() in ["1", "true", "True"] else "0",
-                "showconsole": "1" if str(s.get("showconsole")).strip() in ["1", "true", "True"] else "0",
-                "server_alerts": "1" if str(s.get("server_alerts", "0")).strip() in ["1", "true", "True"] else "0",
-                "memory": str(s.get("memory", s.get("maxram", "4096"))),
-                "pack": pack
-            },
-            "modcount": str(modcount),
-            "launcher_version": launcher_ver,
-            "pack_version": pack_ver,
-            "versions_list": get_versions_list(),
-            "main_pack": main_pack,
-            "main_pack_installed": main_pack_installed,
-            "online_players": "Loading...",
-            "news_url": "updates.html"
-        }
+            return {
+                "user": s.get("username", ""),
+                "game_running": game_info["running"],
+                "game_pid": game_info["pid"],
+                "settings": {
+                    "shortcut": "1" if str(s.get("shortcut", "1")).strip() in ["1", "true", "True"] else "0",
+                    "autoserver": "1" if str(s.get("autoserver", "0")).strip() in ["1", "true", "True"] else "0",
+                    "log_logins": "1" if str(s.get("log-logins", s.get("log_logins", "1"))).strip() in ["1", "true", "True"] else "0",
+                    "log-logins": "1" if str(s.get("log-logins", s.get("log_logins", "1"))).strip() in ["1", "true", "True"] else "0",
+                    "lite": "1" if str(s.get("lite", s.get("litemode", "0"))).strip() in ["1", "true", "True"] else "0",
+                    "showconsole": "1" if str(s.get("showconsole", "0")).strip() in ["1", "true", "True"] else "0",
+                    "server_alerts": "1" if str(s.get("server_alerts", "0")).strip() in ["1", "true", "True"] else "0",
+                    "memory": str(s.get("memory", s.get("maxram", "6144"))),
+                    "pack": pack
+                },
+                "modcount": str(modcount),
+                "launcher_version": launcher_ver,
+                "pack_version": pack_ver,
+                "versions_list": get_versions_list(),
+                "main_pack": main_pack,
+                "main_pack_installed": main_pack_installed,
+                "online_players": "Loading...",
+                "news_url": "updates.html"
+            }
+        except Exception as e:
+            log_init(f"Error in init_launcher API call: {e}")
+            return {
+                "user": "",
+                "game_running": False,
+                "game_pid": 0,
+                "settings": {
+                    "shortcut": "1",
+                    "autoserver": "0",
+                    "log_logins": "1",
+                    "log-logins": "1",
+                    "lite": "0",
+                    "showconsole": "0",
+                    "server_alerts": "0",
+                    "memory": "6144",
+                    "pack": "2-5-x"
+                },
+                "modcount": "0",
+                "launcher_version": "2.0a",
+                "pack_version": "2.5.3b",
+                "versions_list": [{"name": "2-5-x", "path": ""}],
+                "main_pack": "2-5-x",
+                "main_pack_installed": True,
+                "online_players": "Loading...",
+                "news_url": "updates.html"
+            }
 
     def get_settings(self, *args, **kwargs):
         return read_settings()

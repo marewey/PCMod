@@ -947,7 +947,10 @@
     }
 
     function initLauncher() {
-      if (!window.pywebview || !window.pywebview.api) return;
+      if (!window.pywebview || !window.pywebview.api) {
+        setTimeout(initLauncher, 150);
+        return;
+      }
       window.pywebview.api.init_launcher().then(function(data) {
         if (!data) return;
 
@@ -1014,23 +1017,22 @@
             }
           }, 200);
         }
+      }).catch(function(err) {
+        console.error("init_launcher call failed, retrying in 300ms...", err);
+        setTimeout(initLauncher, 300);
       });
     }
 
     var initInterval = setInterval(function() {
-      if (window.pywebview && window.pywebview.api && !isInitialized) {
+      if (window.pywebview && window.pywebview.api) {
         clearInterval(initInterval);
-        isInitialized = true;
         initLauncher();
       }
     }, 100);
 
     window.addEventListener('pywebviewready', function() {
       clearInterval(initInterval);
-      if (!isInitialized) {
-        isInitialized = true;
-        initLauncher();
-      }
+      initLauncher();
     });
 
     // View Navigation
