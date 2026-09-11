@@ -918,19 +918,30 @@ def apply_console_visibility():
         try:
             import ctypes
             s = read_settings()
-            hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-            if hwnd:
-                show = str(s.get("showconsole", "0")).strip() in ["1", "true", "True"]
-                SW_SHOW = 5
-                SW_HIDE = 0
-                SWP_NOMOVE = 0x0002
-                SWP_NOSIZE = 0x0001
-                SWP_NOZORDER = 0x0004
-                SWP_FRAMECHANGED = 0x0020
-                cmd = SW_SHOW if show else SW_HIDE
-                ctypes.windll.user32.ShowWindow(hwnd, cmd)
-                if show:
+            show = str(s.get("showconsole", "0")).strip() in ["1", "true", "True"]
+            kernel32 = ctypes.windll.kernel32
+            hwnd = kernel32.GetConsoleWindow()
+
+            if show:
+                if not hwnd:
+                    kernel32.AllocConsole()
+                    hwnd = kernel32.GetConsoleWindow()
+                if hwnd:
+                    SW_SHOW = 5
+                    SWP_NOMOVE = 0x0002
+                    SWP_NOSIZE = 0x0001
+                    SWP_NOZORDER = 0x0004
+                    SWP_FRAMECHANGED = 0x0020
+                    ctypes.windll.user32.ShowWindow(hwnd, SW_SHOW)
                     ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED)
+                    u = s.get("username", "").strip()
+                    if u:
+                        update_console_title(u)
+            else:
+                if hwnd:
+                    SW_HIDE = 0
+                    ctypes.windll.user32.ShowWindow(hwnd, SW_HIDE)
+                    kernel32.FreeConsole()
         except Exception:
             pass
 
