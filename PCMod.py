@@ -3282,6 +3282,7 @@ def apply_win32_window_icons():
             from ctypes import wintypes
             user32 = ctypes.windll.user32
             kernel32 = ctypes.windll.kernel32
+            shell32 = ctypes.windll.shell32
             current_pid = kernel32.GetCurrentProcessId()
 
             IMAGE_ICON = 1
@@ -3291,6 +3292,9 @@ def apply_win32_window_icons():
             ICON_BIG = 1
             GCLP_HICON = -14
             GCLP_HICONSM = -34
+            GWL_EXSTYLE = -20
+            WS_EX_APPWINDOW = 0x00040000
+            WS_EX_TOOLWINDOW = 0x00000080
 
             # Explicit 64-bit argument and return type definitions for Win32 API calls
             user32.LoadImageW.argtypes = [wintypes.HINSTANCE, wintypes.LPCWSTR, wintypes.UINT, ctypes.c_int, ctypes.c_int, wintypes.UINT]
@@ -3302,8 +3306,15 @@ def apply_win32_window_icons():
                 user32.SetClassLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
                 user32.SetClassLongPtrW.restype = ctypes.c_ssize_t
 
+            if hasattr(user32, 'SetWindowLongPtrW'):
+                user32.GetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
+                user32.GetWindowLongPtrW.restype = ctypes.c_ssize_t
+                user32.SetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
+                user32.SetWindowLongPtrW.restype = ctypes.c_ssize_t
+
+            app_id = "PCMod.Client.1.0"
             try:
-                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("PCMod.Client.1.0")
+                shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
             except Exception:
                 pass
 
@@ -3312,38 +3323,47 @@ def apply_win32_window_icons():
                 kernel32.SetConsoleTitleW("PCMod Console")
 
             icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
+            hicon_small = None
+            hicon_big = None
             if os.path.exists(icon_path):
                 hicon_small = user32.LoadImageW(None, icon_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
                 hicon_big = user32.LoadImageW(None, icon_path, IMAGE_ICON, 32, 32, LR_LOADFROMFILE)
 
-                if console_hwnd:
-                    if hicon_small:
-                        user32.SendMessageW(console_hwnd, WM_SETICON, ICON_SMALL, hicon_small)
-                    if hicon_big:
-                        user32.SendMessageW(console_hwnd, WM_SETICON, ICON_BIG, hicon_big)
+            WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
 
-                WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
-
-                def enum_windows_callback(hwnd, lparam):
-                    pid = ctypes.c_ulong()
-                    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-                    if pid.value == current_pid:
-                        if hicon_small:
-                            user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, hicon_small)
-                        if hicon_big:
-                            user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, hicon_big)
-                        try:
-                            if hasattr(user32, 'SetClassLongPtrW'):
-                                user32.SetClassLongPtrW(hwnd, GCLP_HICON, hicon_big)
-                                user32.SetClassLongPtrW(hwnd, GCLP_HICONSM, hicon_small)
+            def enum_windows_callback(hwnd, lparam):
+                pid = ctypes.c_ulong()
+                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                if pid.value == current_pid and user32.IsWindowVisible(hwnd):
+                    # Ensure each top-level process window has WS_EX_APPWINDOW set and WS_EX_TOOLWINDOW cleared
+                    # so Windows Shell groups them together under the same process AppUserModelID taskbar stack
+                    try:
+                        ex_style = user32.GetWindowLongPtrW(hwnd, GWL_EXSTYLE) if hasattr(user32, 'GetWindowLongPtrW') else user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+                        new_ex_style = (ex_style | WS_EX_APPWINDOW) & ~WS_EX_TOOLWINDOW
+                        if new_ex_style != ex_style:
+                            if hasattr(user32, 'SetWindowLongPtrW'):
+                                user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex_style)
                             else:
-                                user32.SetClassLongW(hwnd, GCLP_HICON, hicon_big)
-                                user32.SetClassLongW(hwnd, GCLP_HICONSM, hicon_small)
-                        except Exception:
-                            pass
-                    return True
+                                user32.SetWindowLongW(hwnd, GWL_EXSTYLE, new_ex_style)
+                    except Exception:
+                        pass
 
-                user32.EnumWindows(WNDENUMPROC(enum_windows_callback), 0)
+                    if hicon_small:
+                        user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, hicon_small)
+                    if hicon_big:
+                        user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, hicon_big)
+                    try:
+                        if hasattr(user32, 'SetClassLongPtrW'):
+                            user32.SetClassLongPtrW(hwnd, GCLP_HICON, hicon_big)
+                            user32.SetClassLongPtrW(hwnd, GCLP_HICONSM, hicon_small)
+                        else:
+                            user32.SetClassLongW(hwnd, GCLP_HICON, hicon_big)
+                            user32.SetClassLongW(hwnd, GCLP_HICONSM, hicon_small)
+                    except Exception:
+                        pass
+                return True
+
+            user32.EnumWindows(WNDENUMPROC(enum_windows_callback), 0)
         except Exception:
             pass
 
