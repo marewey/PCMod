@@ -13,11 +13,23 @@ import ftplib
 import threading
 import socket
 import zipfile
+import signal
+import atexit
 from datetime import datetime
 
 # Dynamic working directory (BASE_DIR) resolution
 OS_NAME = sys.platform
 EXEC_DIR = os.path.dirname(os.path.abspath(sys.argv[0] if getattr(sys, 'frozen', False) else __file__))
+
+# Immediately hide console window on Win32 before any initialization to prevent flashing
+if OS_NAME == "win32":
+    try:
+        import ctypes
+        hwnd_boot = ctypes.windll.kernel32.GetConsoleWindow()
+        if hwnd_boot:
+            ctypes.windll.user32.ShowWindow(hwnd_boot, 0)
+    except Exception:
+        pass
 
 import shutil
 
@@ -83,8 +95,6 @@ def check_cli_entrypoint():
             print(f"Error running PortableMC CLI: {e}")
             sys.exit(1)
         sys.exit(0)
-
-check_cli_entrypoint()
 
 def get_clean_env():
     env = os.environ.copy()
@@ -542,6 +552,130 @@ def update_console_title(username):
         except Exception:
             pass
 
+def show_tray_balloon_notification(title, msg):
+    if OS_NAME == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            shell32 = ctypes.windll.shell32
+            user32 = ctypes.windll.user32
+
+            NIM_ADD = 0
+            NIM_DELETE = 2
+            NIF_ICON = 0x00000002
+            NIF_TIP = 0x00000004
+            NIF_INFO = 0x00000010
+            NIIF_INFO = 0x00000001
+            IMAGE_ICON = 1
+            LR_LOADFROMFILE = 0x00000010
+
+            class NOTIFYICONDATAW(ctypes.Structure):
+                _fields_ = [
+                    ("cbSize", wintypes.DWORD),
+                    ("hWnd", wintypes.HWND),
+                    ("uID", wintypes.UINT),
+                    ("uFlags", wintypes.UINT),
+                    ("uCallbackMessage", wintypes.UINT),
+                    ("hIcon", wintypes.HICON),
+                    ("szTip", wintypes.WCHAR * 128),
+                    ("dwState", wintypes.DWORD),
+                    ("dwStateMask", wintypes.DWORD),
+                    ("szInfo", wintypes.WCHAR * 256),
+                    ("uTimeoutOrVersion", wintypes.DWORD),
+                    ("szInfoTitle", wintypes.WCHAR * 64),
+                    ("dwInfoFlags", wintypes.DWORD),
+                ]
+
+            icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
+            hicon = None
+            if os.path.exists(icon_path):
+                hicon = user32.LoadImageW(None, icon_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
+
+            nid = NOTIFYICONDATAW()
+            nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
+            nid.hWnd = None
+            nid.uID = 1001
+            nid.uFlags = NIF_ICON | NIF_TIP | NIF_INFO
+            if hicon:
+                nid.hIcon = hicon
+            nid.szTip = "PCMod Client"
+            nid.szInfo = str(msg)[:255]
+            nid.szInfoTitle = str(title)[:63]
+            nid.dwInfoFlags = NIIF_INFO
+
+            shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid))
+
+            def _remove_icon():
+                time.sleep(10)
+                try:
+                    shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid))
+                    if hicon:
+                        user32.DestroyIcon(hicon)
+                except Exception:
+                    pass
+
+            threading.Thread(target=_remove_icon, daemon=True).start()
+        except Exception as e:
+            log_init(f"Tray notification error: {e}")
+
+def play_server_alert_sound():
+    sound_dir = os.path.join(DATA_DIR, "sound")
+    os.makedirs(sound_dir, exist_ok=True)
+    sound_path = os.path.join(sound_dir, "plattecraft.mp3")
+    url = "https://files.pcmod.ddns.me/plattecraft.mp3"
+
+    if not os.path.exists(sound_path) or os.path.getsize(sound_path) == 0:
+        try:
+            log_init(f"Downloading server alert sound from {url}...")
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=10.0, context=ctx) as resp:
+                data = resp.read()
+                if data:
+                    with open(sound_path, "wb") as f:
+                        f.write(data)
+                    log_init(f"Downloaded alert sound ({len(data)} bytes) to {sound_path}")
+        except Exception as e:
+            log_init(f"Error downloading alert sound from {url}: {e}")
+
+    if os.path.exists(sound_path) and os.path.getsize(sound_path) > 0:
+        if OS_NAME == "win32":
+            try:
+                import ctypes
+                winmm = ctypes.windll.winmm
+                winmm.mciSendStringW("close alert_sound", None, 0, 0)
+                cmd_open = f'open "{sound_path}" type mpegvideo alias alert_sound'
+                res = winmm.mciSendStringW(cmd_open, None, 0, 0)
+                if res == 0:
+                    winmm.mciSendStringW("play alert_sound", None, 0, 0)
+                else:
+                    log_init(f"mciSendStringW open error code: {res}")
+            except Exception as e:
+                log_init(f"Error playing sound via winmm: {e}")
+        else:
+            try:
+                if sys.platform == "darwin":
+                    subprocess.Popen(["afplay", sound_path])
+                else:
+                    subprocess.Popen(["paplay", sound_path])
+            except Exception as e:
+                log_init(f"Error playing audio on non-Windows platform: {e}")
+
+def log_server_alert(msg):
+    log_init(f"[ServerAlerts] {msg}")
+
+def hide_worker_console():
+    if OS_NAME == "win32":
+        try:
+            import ctypes
+            hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+            if hwnd:
+                ctypes.windll.user32.ShowWindow(hwnd, 0)
+        except Exception:
+            pass
+
 def toggle_desktop_shortcut(enable):
     if OS_NAME == "win32":
         try:
@@ -549,6 +683,8 @@ def toggle_desktop_shortcut(enable):
             script_file = os.path.abspath(__file__)
             icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
             vbs_file = os.path.join(DATA_DIR, "create_shortcut.vbs")
+
+            creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)
 
             if enable:
                 vbs_script = (
@@ -567,7 +703,7 @@ def toggle_desktop_shortcut(enable):
                 )
                 with open(vbs_file, "w", encoding="utf-8") as f:
                     f.write(vbs_script)
-                subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5)
+                subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5, creationflags=creationflags)
                 if os.path.exists(vbs_file):
                     os.remove(vbs_file)
                 log_init("Created desktop shortcut: PCMod Client.lnk via WScript SpecialFolders")
@@ -581,7 +717,7 @@ def toggle_desktop_shortcut(enable):
                 )
                 with open(vbs_file, "w", encoding="utf-8") as f:
                     f.write(vbs_script)
-                subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5)
+                subprocess.run(["cscript", "//Nologo", vbs_file], timeout=5, creationflags=creationflags)
                 if os.path.exists(vbs_file):
                     os.remove(vbs_file)
                 log_init("Removed desktop shortcut: PCMod Client.lnk via WScript SpecialFolders")
@@ -598,6 +734,8 @@ def get_default_settings():
         "lite": "0",
         "showconsole": "0",
         "cleanup_updates": "1",
+        "server_alerts": "0",
+        "server_alerts_mode": "1",
         "pack": "2-5-x",
         "memory": "6144",
         "username": ""
@@ -643,29 +781,55 @@ def write_settings(settings):
     except Exception:
         pass
 
-init_settings = read_settings(log_event=True)
-clean_update_dir()
-
 def apply_console_visibility():
     if OS_NAME == "win32":
         try:
             import ctypes
             s = read_settings()
-            hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-            if hwnd:
-                show = str(s.get("showconsole", "0")).strip() in ["1", "true", "True"]
-                SW_SHOW = 5
-                SW_HIDE = 0
-                SWP_NOMOVE = 0x0002
-                SWP_NOSIZE = 0x0001
-                SWP_NOZORDER = 0x0004
-                SWP_FRAMECHANGED = 0x0020
-                cmd = SW_SHOW if show else SW_HIDE
-                ctypes.windll.user32.ShowWindow(hwnd, cmd)
-                if show:
+            show = str(s.get("showconsole", "0")).strip() in ["1", "true", "True"]
+            kernel32 = ctypes.windll.kernel32
+            hwnd = kernel32.GetConsoleWindow()
+
+            if show:
+                if not hwnd:
+                    try:
+                        kernel32.AllocConsole()
+                        hwnd = kernel32.GetConsoleWindow()
+                        sys.stdout = open("CONOUT$", "w")
+                        sys.stderr = open("CONOUT$", "w")
+                    except Exception:
+                        pass
+                if hwnd:
+                    SW_SHOW = 5
+                    SWP_NOMOVE = 0x0002
+                    SWP_NOSIZE = 0x0001
+                    SWP_NOZORDER = 0x0004
+                    SWP_FRAMECHANGED = 0x0020
+                    ctypes.windll.user32.ShowWindow(hwnd, SW_SHOW)
                     ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED)
+                    u = s.get("username", "").strip()
+                    if u:
+                        update_console_title(u)
+            else:
+                if hwnd:
+                    SW_HIDE = 0
+                    ctypes.windll.user32.ShowWindow(hwnd, SW_HIDE)
         except Exception:
             pass
+
+init_settings = read_settings(log_event=True)
+apply_console_visibility()
+clean_update_dir()
+
+def check_cli_worker_entrypoint():
+    if "--server-alerts-worker" in sys.argv:
+        hide_worker_console()
+        try:
+            run_server_alerts_worker()
+        except Exception as e:
+            log_init(f"Server alerts worker crashed: {e}")
+            log_server_alert(f"Server alerts worker crashed: {e}")
+        sys.exit(0)
 
 def get_pack_name():
     s = read_settings()
@@ -804,8 +968,9 @@ def force_unlock_game():
         log_init(f"Force unlocking game. Terminating process tree for PID {pid}...")
         try:
             if OS_NAME == "win32":
-                subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                subprocess.run(["taskkill", "/F", "/IM", "javaw.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=creationflags)
+                subprocess.run(["taskkill", "/F", "/IM", "javaw.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=creationflags)
             else:
                 os.kill(pid, 9)
         except Exception as e:
@@ -816,6 +981,203 @@ def force_unlock_game():
         except Exception:
             pass
     return True
+
+def kill_server_alerts_worker():
+    alerts_lock = os.path.join(DATA_DIR, "alerts.lock")
+    if os.path.exists(alerts_lock):
+        try:
+            with open(alerts_lock, "r", encoding="utf-8") as f:
+                pid_str = f.read().strip()
+                if pid_str.isdigit():
+                    pid = int(pid_str)
+                    if pid != os.getpid() and is_pid_running(pid):
+                        log_server_alert(f"Terminating background worker process PID {pid}...")
+                        if OS_NAME == "win32":
+                            creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)
+                            startupinfo = subprocess.STARTUPINFO()
+                            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                            startupinfo.wShowWindow = 0 # SW_HIDE
+                            subprocess.run(["taskkill", "/F", "/PID", str(pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=creationflags, startupinfo=startupinfo)
+                        else:
+                            os.kill(pid, 15)
+        except Exception as e:
+            log_init(f"Error terminating server alerts worker: {e}")
+        try:
+            os.remove(alerts_lock)
+        except Exception:
+            pass
+
+def start_server_alerts_worker():
+    s = read_settings()
+    if str(s.get("server_alerts", "0")).strip() not in ["1", "true", "True"]:
+        kill_server_alerts_worker()
+        return
+
+    alerts_lock = os.path.join(DATA_DIR, "alerts.lock")
+    if os.path.exists(alerts_lock):
+        try:
+            with open(alerts_lock, "r", encoding="utf-8") as f:
+                pid_str = f.read().strip()
+                if pid_str.isdigit():
+                    pid = int(pid_str)
+                    if is_pid_running(pid):
+                        log_init(f"Server alerts worker already running with PID {pid}")
+                        return
+        except Exception:
+            pass
+
+    clean_env = get_clean_env()
+    if getattr(sys, 'frozen', False) or sys.argv[0].lower().endswith(".exe"):
+        exe = os.path.abspath(sys.argv[0])
+        cmd = [exe, "--server-alerts-worker"]
+    else:
+        python_exe = sys.executable
+        if OS_NAME == "win32":
+            pythonw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+            if os.path.exists(pythonw):
+                python_exe = pythonw
+        cmd = [python_exe, os.path.abspath(__file__), "--server-alerts-worker"]
+
+    try:
+        creationflags = 0
+        startupinfo = None
+        if OS_NAME == "win32":
+            creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000) | getattr(subprocess, 'DETACHED_PROCESS', 0x00000008)
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0 # SW_HIDE
+
+        subprocess.Popen(cmd, env=clean_env, cwd=BASE_DIR, creationflags=creationflags, startupinfo=startupinfo)
+        log_init("Spawned background server alerts worker process.")
+    except Exception as e:
+        log_init(f"Error spawning server alerts worker process: {e}")
+
+def run_server_alerts_worker():
+    hide_worker_console()
+    log_init("Server alerts worker background process started.")
+    log_server_alert("Background worker process initialized.")
+
+    def handle_signal(signum, frame):
+        log_server_alert(f"Received termination signal ({signum}). Exiting background worker process.")
+        sys.exit(0)
+
+    try:
+        signal.signal(signal.SIGTERM, handle_signal)
+        signal.signal(signal.SIGINT, handle_signal)
+        if hasattr(signal, 'SIGBREAK'):
+            signal.signal(signal.SIGBREAK, handle_signal)
+    except Exception:
+        pass
+
+    alerts_lock = os.path.join(DATA_DIR, "alerts.lock")
+    try:
+        with open(alerts_lock, "w", encoding="utf-8") as f:
+            f.write(str(os.getpid()))
+    except Exception as e:
+        log_init(f"Worker failed writing alerts.lock: {e}")
+
+    previous_players = None
+
+    try:
+        while True:
+            # Check if setting is still enabled
+            st = read_settings()
+            if str(st.get("server_alerts", "0")).strip() not in ["1", "true", "True"]:
+                log_init("Server alerts disabled in settings. Worker exiting.")
+                log_server_alert("Server alerts setting disabled in settings. Worker process exiting.")
+                break
+
+            pack = get_pack_name()
+
+            # Skip checking/notifications if game is currently running
+            game_info = get_running_game_info()
+            if game_info.get("running"):
+                log_server_alert(f"Check skipped for pack '{pack}': Minecraft game is currently running (PID {game_info.get('pid')}).")
+            else:
+                user = st.get("username", "").strip()
+                url = f"https://pcmod.ddns.me/players/list-{pack}"
+
+                players = []
+                fetch_error = None
+                try:
+                    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                    ctx = ssl.create_default_context()
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
+                    with urllib.request.urlopen(req, timeout=8.0, context=ctx) as resp:
+                        text = resp.read().decode('utf-8', errors='ignore').strip()
+                        if text and not text.startswith("<") and "Server Offline" not in text:
+                            players = [l.strip() for l in text.splitlines() if l.strip() and not l.startswith("<")]
+                except Exception as e:
+                    fetch_error = str(e)
+                    log_init(f"Worker error fetching players list: {e}")
+
+                current_players_set = set(players)
+                player_count = len(current_players_set)
+                player_list_str = f"{player_count} online ({', '.join(sorted(list(current_players_set)))})" if player_count > 0 else "0 online / Server Offline"
+                if fetch_error:
+                    player_list_str += f" [Fetch Error: {fetch_error}]"
+
+                if previous_players is None:
+                    # Establish initial baseline on startup without notifying
+                    previous_players = current_players_set
+                    log_server_alert(f"Checked player status for pack '{pack}': {player_list_str} [Initial Baseline Established]")
+                else:
+                    log_server_alert(f"Checked player status for pack '{pack}': {player_list_str}")
+
+                    # Notify only if new players joined
+                    new_players = current_players_set - previous_players
+                    # Exclude user's own username if present
+                    if user:
+                        new_players = {p for p in new_players if p.lower() != user.lower()}
+
+                    if new_players and player_count > 0:
+                        joined_names = ", ".join(sorted(list(new_players)))
+                        notif_msg = f"{joined_names} joined the server"
+                        mode = str(st.get("server_alerts_mode", "both")).strip().lower()
+                        log_server_alert(f"ALERT TRIGGERED for pack '{pack}' (mode: {mode}): {notif_msg}")
+
+                        if mode in ["1", "both", "sound_and_popup"]:
+                            play_server_alert_sound()
+                            show_tray_balloon_notification(f"Server Alert ({pack})", notif_msg)
+                        elif mode in ["0", "sound", "sound_only"]:
+                            play_server_alert_sound()
+                        elif mode in ["-1", "muted", "popup", "popup_only"]:
+                            show_tray_balloon_notification(f"Server Alert ({pack})", notif_msg)
+                        else:
+                            # Default fallback if unknown setting value
+                            play_server_alert_sound()
+                            show_tray_balloon_notification(f"Server Alert ({pack})", notif_msg)
+
+                    previous_players = current_players_set
+
+            # Sleep in 1s increments for 300 seconds (5 mins)
+            for _ in range(300):
+                time.sleep(1)
+                if not os.path.exists(alerts_lock):
+                    log_server_alert("Lock file removed. Worker process stopping.")
+                    return
+                try:
+                    with open(alerts_lock, "r", encoding="utf-8") as f:
+                        if f.read().strip() != str(os.getpid()):
+                            log_init("Lock file PID mismatch. Worker exiting.")
+                            log_server_alert("Lock file PID mismatch. Worker process stopping.")
+                            return
+                except Exception:
+                    pass
+    finally:
+        if os.path.exists(alerts_lock):
+            try:
+                with open(alerts_lock, "r", encoding="utf-8") as f:
+                    if f.read().strip() == str(os.getpid()):
+                        os.remove(alerts_lock)
+            except Exception:
+                pass
+        log_init("Server alerts worker process terminated.")
+        log_server_alert("Worker process successfully stopped / closed.")
+
+check_cli_worker_entrypoint()
+start_server_alerts_worker()
 
 def get_portablemc_version_spec(pack_name):
     info = read_version_info(pack_name)
@@ -902,11 +1264,16 @@ def startup_checks():
     log_init(f"Checking for PORTABLEMC... {pmc_ver}")
 
 startup_checks()
-try:
-    sync_updates_page()
-    sync_active_pack_resources()
-except Exception as e:
-    log_init(f"Warning syncing launcher/pack resources on startup: {e}")
+
+def async_post_launch_sync():
+    time.sleep(1.0)
+    try:
+        sync_updates_page()
+        sync_active_pack_resources()
+    except Exception as e:
+        log_init(f"Warning syncing launcher/pack resources post-launch: {e}")
+
+threading.Thread(target=async_post_launch_sync, daemon=True).start()
 
 def get_offline_uuid(username):
     s = f"OfflinePlayer:{username}"
@@ -1380,6 +1747,8 @@ UPDATE_IN_PROGRESS = False
 UPDATE_CANCEL_REQUESTED = False
 
 # Server Update Check & Download Engine
+check_cli_entrypoint()
+
 def check_updates_server():
     pack = get_pack_name()
     l_ver, p_ver = read_version_indexes(pack)
@@ -1796,51 +2165,79 @@ class Api:
         self._window = window
 
     def init_launcher(self, *args, **kwargs):
-        s = read_settings()
-        pack = get_pack_name()
-        modcount = self.get_mod_count()
-        launcher_ver, pack_ver = read_version_indexes(pack)
+        try:
+            s = read_settings()
+            pack = get_pack_name()
+            modcount = self.get_mod_count()
+            launcher_ver, pack_ver = read_version_indexes(pack)
 
-        # Check line 2 of version file to determine main default pack
-        main_pack = pack
-        version_file = os.path.join(DATA_DIR, "indexes", "version")
-        if os.path.exists(version_file):
-            try:
-                with open(version_file, "r", encoding="utf-8", errors="ignore") as f:
-                    lines = [l.strip() for l in f if l.strip()]
-                    if len(lines) >= 2:
-                        parts = lines[1].split(";")
-                        if parts[0].strip():
-                            main_pack = parts[0].strip()
-            except Exception:
-                pass
+            # Check line 2 of version file to determine main default pack
+            main_pack = pack
+            version_file = os.path.join(DATA_DIR, "indexes", "version")
+            if os.path.exists(version_file):
+                try:
+                    with open(version_file, "r", encoding="utf-8", errors="ignore") as f:
+                        lines = [l.strip() for l in f if l.strip()]
+                        if len(lines) >= 2:
+                            parts = lines[1].split(";")
+                            if parts[0].strip():
+                                main_pack = parts[0].strip()
+                except Exception:
+                    pass
 
-        main_pack_installed = os.path.exists(os.path.join(DATA_DIR, "packs", main_pack))
-        game_info = get_running_game_info()
+            main_pack_installed = os.path.exists(os.path.join(DATA_DIR, "packs", main_pack))
+            game_info = get_running_game_info()
 
-        return {
-            "user": s.get("username", ""),
-            "game_running": game_info["running"],
-            "game_pid": game_info["pid"],
-            "settings": {
-                "shortcut": "1" if str(s.get("shortcut")).strip() in ["1", "true", "True"] else "0",
-                "autoserver": "1" if str(s.get("autoserver")).strip() in ["1", "true", "True"] else "0",
-                "log_logins": "1" if str(s.get("log-logins", s.get("log_logins", "1"))).strip() in ["1", "true", "True"] else "0",
-                "log-logins": "1" if str(s.get("log-logins", s.get("log_logins", "1"))).strip() in ["1", "true", "True"] else "0",
-                "lite": "1" if str(s.get("lite", s.get("litemode", "0"))).strip() in ["1", "true", "True"] else "0",
-                "showconsole": "1" if str(s.get("showconsole")).strip() in ["1", "true", "True"] else "0",
-                "memory": str(s.get("memory", s.get("maxram", "4096"))),
-                "pack": pack
-            },
-            "modcount": str(modcount),
-            "launcher_version": launcher_ver,
-            "pack_version": pack_ver,
-            "versions_list": get_versions_list(),
-            "main_pack": main_pack,
-            "main_pack_installed": main_pack_installed,
-            "online_players": "Loading...",
-            "news_url": "updates.html"
-        }
+            return {
+                "user": s.get("username", ""),
+                "game_running": game_info["running"],
+                "game_pid": game_info["pid"],
+                "settings": {
+                    "shortcut": "1" if str(s.get("shortcut", "1")).strip() in ["1", "true", "True"] else "0",
+                    "autoserver": "1" if str(s.get("autoserver", "0")).strip() in ["1", "true", "True"] else "0",
+                    "log_logins": "1" if str(s.get("log-logins", s.get("log_logins", "1"))).strip() in ["1", "true", "True"] else "0",
+                    "log-logins": "1" if str(s.get("log-logins", s.get("log_logins", "1"))).strip() in ["1", "true", "True"] else "0",
+                    "lite": "1" if str(s.get("lite", s.get("litemode", "0"))).strip() in ["1", "true", "True"] else "0",
+                    "showconsole": "1" if str(s.get("showconsole", "0")).strip() in ["1", "true", "True"] else "0",
+                    "server_alerts": "1" if str(s.get("server_alerts", "0")).strip() in ["1", "true", "True"] else "0",
+                    "memory": str(s.get("memory", s.get("maxram", "6144"))),
+                    "pack": pack
+                },
+                "modcount": str(modcount),
+                "launcher_version": launcher_ver,
+                "pack_version": pack_ver,
+                "versions_list": get_versions_list(),
+                "main_pack": main_pack,
+                "main_pack_installed": main_pack_installed,
+                "online_players": "Loading...",
+                "news_url": "updates.html"
+            }
+        except Exception as e:
+            log_init(f"Error in init_launcher API call: {e}")
+            return {
+                "user": "",
+                "game_running": False,
+                "game_pid": 0,
+                "settings": {
+                    "shortcut": "1",
+                    "autoserver": "0",
+                    "log_logins": "1",
+                    "log-logins": "1",
+                    "lite": "0",
+                    "showconsole": "0",
+                    "server_alerts": "0",
+                    "memory": "6144",
+                    "pack": "2-5-x"
+                },
+                "modcount": "0",
+                "launcher_version": "2.0a",
+                "pack_version": "2.5.3b",
+                "versions_list": [{"name": "2-5-x", "path": ""}],
+                "main_pack": "2-5-x",
+                "main_pack_installed": True,
+                "online_players": "Loading...",
+                "news_url": "updates.html"
+            }
 
     def get_settings(self, *args, **kwargs):
         return read_settings()
@@ -1944,6 +2341,13 @@ class Api:
             write_settings(s)
             if str(k) == "shortcut":
                 toggle_desktop_shortcut(str(v) in ["1", "true", "True"])
+            elif str(k) == "showconsole":
+                apply_console_visibility()
+            elif str(k) == "server_alerts":
+                if str(v) in ["1", "true", "True"]:
+                    start_server_alerts_worker()
+                else:
+                    kill_server_alerts_worker()
         return True
 
     def set_lite_mode(self, *args, **kwargs):
@@ -2878,6 +3282,7 @@ def apply_win32_window_icons():
             from ctypes import wintypes
             user32 = ctypes.windll.user32
             kernel32 = ctypes.windll.kernel32
+            shell32 = ctypes.windll.shell32
             current_pid = kernel32.GetCurrentProcessId()
 
             IMAGE_ICON = 1
@@ -2887,6 +3292,9 @@ def apply_win32_window_icons():
             ICON_BIG = 1
             GCLP_HICON = -14
             GCLP_HICONSM = -34
+            GWL_EXSTYLE = -20
+            WS_EX_APPWINDOW = 0x00040000
+            WS_EX_TOOLWINDOW = 0x00000080
 
             # Explicit 64-bit argument and return type definitions for Win32 API calls
             user32.LoadImageW.argtypes = [wintypes.HINSTANCE, wintypes.LPCWSTR, wintypes.UINT, ctypes.c_int, ctypes.c_int, wintypes.UINT]
@@ -2898,8 +3306,15 @@ def apply_win32_window_icons():
                 user32.SetClassLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
                 user32.SetClassLongPtrW.restype = ctypes.c_ssize_t
 
+            if hasattr(user32, 'SetWindowLongPtrW'):
+                user32.GetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
+                user32.GetWindowLongPtrW.restype = ctypes.c_ssize_t
+                user32.SetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
+                user32.SetWindowLongPtrW.restype = ctypes.c_ssize_t
+
+            app_id = "PCMod.Client.1.0"
             try:
-                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("PCMod.Client.1.0")
+                shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
             except Exception:
                 pass
 
@@ -2908,38 +3323,47 @@ def apply_win32_window_icons():
                 kernel32.SetConsoleTitleW("PCMod Console")
 
             icon_path = os.path.join(DATA_DIR, "icons", "icon.ico")
+            hicon_small = None
+            hicon_big = None
             if os.path.exists(icon_path):
                 hicon_small = user32.LoadImageW(None, icon_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
                 hicon_big = user32.LoadImageW(None, icon_path, IMAGE_ICON, 32, 32, LR_LOADFROMFILE)
 
-                if console_hwnd:
-                    if hicon_small:
-                        user32.SendMessageW(console_hwnd, WM_SETICON, ICON_SMALL, hicon_small)
-                    if hicon_big:
-                        user32.SendMessageW(console_hwnd, WM_SETICON, ICON_BIG, hicon_big)
+            WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
 
-                WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
-
-                def enum_windows_callback(hwnd, lparam):
-                    pid = ctypes.c_ulong()
-                    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-                    if pid.value == current_pid:
-                        if hicon_small:
-                            user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, hicon_small)
-                        if hicon_big:
-                            user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, hicon_big)
-                        try:
-                            if hasattr(user32, 'SetClassLongPtrW'):
-                                user32.SetClassLongPtrW(hwnd, GCLP_HICON, hicon_big)
-                                user32.SetClassLongPtrW(hwnd, GCLP_HICONSM, hicon_small)
+            def enum_windows_callback(hwnd, lparam):
+                pid = ctypes.c_ulong()
+                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                if pid.value == current_pid and user32.IsWindowVisible(hwnd):
+                    # Ensure each top-level process window has WS_EX_APPWINDOW set and WS_EX_TOOLWINDOW cleared
+                    # so Windows Shell groups them together under the same process AppUserModelID taskbar stack
+                    try:
+                        ex_style = user32.GetWindowLongPtrW(hwnd, GWL_EXSTYLE) if hasattr(user32, 'GetWindowLongPtrW') else user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+                        new_ex_style = (ex_style | WS_EX_APPWINDOW) & ~WS_EX_TOOLWINDOW
+                        if new_ex_style != ex_style:
+                            if hasattr(user32, 'SetWindowLongPtrW'):
+                                user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex_style)
                             else:
-                                user32.SetClassLongW(hwnd, GCLP_HICON, hicon_big)
-                                user32.SetClassLongW(hwnd, GCLP_HICONSM, hicon_small)
-                        except Exception:
-                            pass
-                    return True
+                                user32.SetWindowLongW(hwnd, GWL_EXSTYLE, new_ex_style)
+                    except Exception:
+                        pass
 
-                user32.EnumWindows(WNDENUMPROC(enum_windows_callback), 0)
+                    if hicon_small:
+                        user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, hicon_small)
+                    if hicon_big:
+                        user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, hicon_big)
+                    try:
+                        if hasattr(user32, 'SetClassLongPtrW'):
+                            user32.SetClassLongPtrW(hwnd, GCLP_HICON, hicon_big)
+                            user32.SetClassLongPtrW(hwnd, GCLP_HICONSM, hicon_small)
+                        else:
+                            user32.SetClassLongW(hwnd, GCLP_HICON, hicon_big)
+                            user32.SetClassLongW(hwnd, GCLP_HICONSM, hicon_small)
+                    except Exception:
+                        pass
+                return True
+
+            user32.EnumWindows(WNDENUMPROC(enum_windows_callback), 0)
         except Exception:
             pass
 
