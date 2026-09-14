@@ -43,7 +43,7 @@ ao:false
 prioritizeChunkUpdates:0
 biomeBlendRadius:0
 renderClouds:"true"
-resourcePacks:["tacz_resources","vanilla","mod_resources","file/Gentler Weather Sounds 2.1.0.zip","file/FreshAnimations_v1.10.3.zip","file/FA+All_Extensions-v1.7.zip","file/-1.21.2 Fresh Moves v3.1 (With Animated Eyes).zip","file/cubic-sun-moon-v1.8.5.zip"]
+resourcePacks:["tacz_resources","vanilla","mod_resources","file/Gentler Weather Sounds 2.1.0.zip","file/FreshAnimations_v1.10.3.zip","file/FA+All_Extensions-v1.7.zip","file/-1.21.2 Fresh Moves v3.1 (With Animated Eyes).zip","file/cubic-sun-moon-v1.8.5.zip","file/reweyplanets-textures.zip"]
 incompatibleResourcePacks:[]
 lastServer:
 lang:en_us

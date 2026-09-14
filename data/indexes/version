@@ -1,5 +1,5 @@
-Launcher;2.0a;PCMod;2-5-x;PCMod
-2-5-x;2.5.3b;forge;1.20.1;47.4.10
+Launcher;2.0f;PCMod;2-5-x;PCMod
+2-5-x;2.5.4;forge;1.20.1;47.4.10
 2-4-x;2.4.3;forge;1.19.2;43.3.5
 2-3-x;2.3.2;forge;1.18.2;40.2.9
 2-1-x;2.1.1e;fabric;1.18.1;0.13.2
@@ -7,5 +7,5 @@ Launcher;2.0a;PCMod;2-5-x;PCMod
 1-9;1.9.3f;forge;1.12.2;14.23.5.2860
 1-8-x;1.8.7b;forge;1.12.2;14.23.5.2847
 1-7-x;1.7.5;forge;1.12.2;14.23.5.2847
-Vanilla;Vanilla Latest;vanilla;release;vanilla
-BTW;CUSTOM;#-BTW;1.5.2;cursed-fabric-loader-b280cbd-btw-1.5.2
+Vanilla;-Latest;vanilla;release;vanilla
+BTW;1.0;CUSTOM;1.5.2;cursed-fabric-loader-b280cbd-btw-1.5.2
