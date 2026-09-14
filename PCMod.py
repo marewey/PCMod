@@ -261,11 +261,11 @@ def relocate_if_needed(target_dir):
 
 def resolve_base_directory():
     # If base launcher assets or data folder already exist locally, keep EXEC_DIR as BASE_DIR
-    local_version = os.path.join(EXEC_DIR, "data", "indexes", "version")
+    local_launcher = os.path.join(EXEC_DIR, "data", "pages", "launcher.html")
     local_data = os.path.join(EXEC_DIR, "data")
     local_bin = os.path.join(EXEC_DIR, "bin")
 
-    if os.path.exists(local_version) or os.path.exists(local_data) or os.path.exists(local_bin):
+    if os.path.exists(local_launcher) or os.path.exists(local_data) or os.path.exists(local_bin):
         return EXEC_DIR
 
     # When missing base files, determine if Option A (local folder) or Option B (%APPDATA%\PCMod3) applies
@@ -308,7 +308,6 @@ cleanup_old_files([EXEC_DIR, BASE_DIR])
 DATA_DIR = os.path.join(BASE_DIR, "data")
 BIN_DIR = os.path.join(BASE_DIR, "bin")
 OLD_CMD_DIR = os.path.join(BASE_DIR, "_old")
-SETTINGS_FILE = os.path.join(BASE_DIR, "settings.txt")
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(os.path.join(DATA_DIR, "indexes"), exist_ok=True)
 
@@ -334,190 +333,6 @@ if OS_NAME == "win32":
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("PCMod.Client.1.0")
     except Exception:
         pass
-
-def get_default_settings():
-    return {
-        "shortcut": "1",
-        "autoserver": "0",
-        "log-logins": "1",
-        "lite": "0",
-        "showconsole": "0",
-        "cleanup_updates": "1",
-        "server_alerts": "0",
-        "server_alerts_mode": "1",
-        "pack": "2-5-x",
-        "memory": "6144",
-        "username": ""
-    }
-
-def read_settings(log_event=False):
-    settings_exist = os.path.exists(SETTINGS_FILE)
-    settings = get_default_settings()
-    if settings_exist:
-        try:
-            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line and "=" in line:
-                        k, v = line.split("=", 1)
-                        if k.strip().lower() not in ["password", "debug"]:
-                            settings[k.strip()] = v.strip()
-            if log_event:
-                log_init(f"Read settings.txt successfully: {settings}")
-        except Exception:
-            pass
-    else:
-        # Initial creation of settings.txt with defaults
-        write_settings(settings)
-        if log_event:
-            log_init(f"Created initial settings.txt with defaults: {settings}")
-        if str(settings.get("shortcut")).strip() in ["1", "true", "True"]:
-            toggle_desktop_shortcut(True)
-    return settings
-
-def write_settings(settings):
-    try:
-        lines = []
-        for k, v in settings.items():
-            if k.lower() in ["password", "debug"]:
-                continue
-            lines.append(f"{k}={v}\n")
-        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-            f.writelines(lines)
-        log_init("Wrote settings.txt successfully")
-
-        apply_console_visibility()
-    except Exception:
-        pass
-
-def sync_pack_file(local_path, remote_url, label="Pack File"):
-    os.makedirs(os.path.dirname(local_path), exist_ok=True)
-    local_size = os.path.getsize(local_path) if os.path.exists(local_path) else -1
-    remote_exists = False
-    remote_size = -1
-
-    log_init(f"[{label} Sync] Checking remote server for {remote_url}...")
-    try:
-        req_head = urllib.request.Request(remote_url, method='HEAD', headers={'User-Agent': 'Mozilla/5.0'})
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        with urllib.request.urlopen(req_head, timeout=5.0, context=ctx) as resp:
-            if resp.status == 200:
-                remote_exists = True
-                cl = resp.headers.get('Content-Length')
-                if cl and cl.isdigit():
-                    remote_size = int(cl)
-    except urllib.error.HTTPError as e:
-        log_init(f"[{label} Sync] Remote file check response: HTTP {e.code} ({e.reason})")
-    except Exception as e:
-        log_init(f"[{label} Sync] Remote check warning: {e}")
-
-    if not remote_exists:
-        log_init(f"[{label} Sync] Remote file does not exist on server ({remote_url}). Skipping sync.")
-        return False
-
-    log_init(f"[{label} Sync] Remote file exists. File size check -> Local: {local_size} bytes | Remote: {remote_size} bytes")
-
-    if not os.path.exists(local_path) or (remote_size > 0 and local_size != remote_size):
-        log_init(f"[{label} Sync] File missing or size mismatch. Downloading {label} from {remote_url}...")
-        try:
-            req_get = urllib.request.Request(remote_url, headers={'User-Agent': 'Mozilla/5.0'})
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req_get, timeout=10.0, context=ctx) as resp:
-                content = resp.read()
-                if content:
-                    with open(local_path, "wb") as f:
-                        f.write(content)
-                    log_init(f"[{label} Sync] Successfully downloaded and saved {local_path} ({len(content)} bytes written).")
-                    return True
-        except Exception as e:
-            log_init(f"[{label} Sync] Download failed: {e}")
-            return False
-    else:
-        log_init(f"[{label} Sync] Local {label} is up to date ({local_path}). No download needed.")
-        return True
-
-def sync_active_pack_resources(pack_name=None):
-    if not pack_name:
-        pack_name = get_pack_name()
-    if not pack_name:
-        return
-
-    # 1. sync script.zs
-    script_local = os.path.join(DATA_DIR, "packs", pack_name, "scripts", "script.zs")
-    script_remote = f"https://files.pcmod.ddns.me/download/pack/scripts/script_{pack_name}.zs"
-    sync_pack_file(script_local, script_remote, label=f"Pack Script ({pack_name})")
-
-    # 2. sync servers.dat
-    servers_local = os.path.join(DATA_DIR, "packs", pack_name, "servers.dat")
-    servers_remote = f"https://files.pcmod.ddns.me/download/pack/servers/servers_{pack_name}.dat"
-    sync_pack_file(servers_local, servers_remote, label=f"Pack Servers ({pack_name})")
-
-def sync_updates_page():
-    remote_urls = [
-        "https://pcmod.ddns.me/updates.html",
-        "https://files.pcmod.ddns.me/updates.html"
-    ]
-    local_updates_path = os.path.join(DATA_DIR, "pages", "updates.html")
-    os.makedirs(os.path.join(DATA_DIR, "pages"), exist_ok=True)
-
-    local_content = b""
-    if os.path.exists(local_updates_path):
-        try:
-            with open(local_updates_path, "rb") as f:
-                local_content = f.read()
-        except Exception:
-            pass
-
-    local_size = len(local_content) if local_content else -1
-
-    for remote_url in remote_urls:
-        log_init(f"[Updates Page Sync] Checking '{remote_url}'...")
-        try:
-            req_get = urllib.request.Request(remote_url, headers={'User-Agent': 'Mozilla/5.0'})
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req_get, timeout=8.0, context=ctx) as resp:
-                remote_content = resp.read()
-                if remote_content:
-                    remote_size = len(remote_content)
-                    log_init(f"[Updates Page Sync] File size check -> Local: {local_size} bytes | Remote: {remote_size} bytes")
-                    if remote_content != local_content:
-                        with open(local_updates_path, "wb") as f:
-                            f.write(remote_content)
-                        log_init(f"[Updates Page Sync] Successfully updated local updates.html ({remote_size} bytes written).")
-                        return
-                    else:
-                        log_init("[Updates Page Sync] Local updates.html is up to date. No download needed.")
-                        return
-        except Exception as e:
-            log_init(f"[Updates Page Sync] Failed sync attempt from '{remote_url}': {e}")
-
-def restart_launcher():
-    log_init("Restarting PCMod Launcher...")
-    clean_env = get_clean_env()
-    if getattr(sys, 'frozen', False):
-        clean_args = []
-        skip_next = False
-        for arg in sys.argv[1:]:
-            if skip_next:
-                skip_next = False
-                continue
-            if arg == "--cleanup-old":
-                skip_next = True
-                continue
-            clean_args.append(arg)
-        target_exe = os.path.join(BASE_DIR, "PCMod.exe") if os.path.exists(os.path.join(BASE_DIR, "PCMod.exe")) else sys.executable
-        subprocess.Popen([target_exe] + clean_args, env=clean_env, cwd=BASE_DIR)
-    else:
-        python_exe = sys.executable
-        script_file = os.path.abspath(__file__)
-        subprocess.Popen([python_exe, script_file] + sys.argv[1:], env=clean_env, cwd=BASE_DIR)
-    os._exit(0)
 
 def bootstrap_missing_files():
     required_files = [
@@ -932,6 +747,62 @@ def toggle_desktop_shortcut(enable):
         except Exception as e:
             log_init(f"Desktop shortcut error: {e}")
 
+SETTINGS_FILE = os.path.join(BASE_DIR, "settings.txt")
+
+def get_default_settings():
+    return {
+        "shortcut": "1",
+        "autoserver": "0",
+        "log-logins": "1",
+        "lite": "0",
+        "showconsole": "0",
+        "cleanup_updates": "1",
+        "server_alerts": "0",
+        "server_alerts_mode": "1",
+        "pack": "Vanilla",
+        "memory": "6144",
+        "username": ""
+    }
+
+def read_settings(log_event=False):
+    settings_exist = os.path.exists(SETTINGS_FILE)
+    settings = get_default_settings()
+    if settings_exist:
+        try:
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and "=" in line:
+                        k, v = line.split("=", 1)
+                        if k.strip().lower() not in ["password", "debug"]:
+                            settings[k.strip()] = v.strip()
+            if log_event:
+                log_init(f"Read settings.txt successfully: {settings}")
+        except Exception:
+            pass
+    else:
+        # Initial creation of settings.txt with defaults
+        write_settings(settings)
+        if log_event:
+            log_init(f"Created initial settings.txt with defaults: {settings}")
+        if str(settings.get("shortcut")).strip() in ["1", "true", "True"]:
+            toggle_desktop_shortcut(True)
+    return settings
+
+def write_settings(settings):
+    try:
+        lines = []
+        for k, v in settings.items():
+            if k.lower() in ["password", "debug"]:
+                continue
+            lines.append(f"{k}={v}\n")
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+        log_init("Wrote settings.txt successfully")
+
+        apply_console_visibility()
+    except Exception:
+        pass
 
 def apply_console_visibility():
     if OS_NAME == "win32":
@@ -996,7 +867,7 @@ def get_pack_name():
                     return val
         except Exception:
             pass
-    return "2-5-x"
+    return "Vanilla"
 
 def read_version_info(pack_name):
     launcher_ver = "2.0c"
@@ -2285,6 +2156,28 @@ def extract_zip_with_progress(zip_path, extract_dir, progress_callback=None, tit
                 })
     log_init(f"Extraction Completed: {title}")
 
+def restart_launcher():
+    log_init("Restarting PCMod Launcher...")
+    clean_env = get_clean_env()
+    if getattr(sys, 'frozen', False):
+        clean_args = []
+        skip_next = False
+        for arg in sys.argv[1:]:
+            if skip_next:
+                skip_next = False
+                continue
+            if arg == "--cleanup-old":
+                skip_next = True
+                continue
+            clean_args.append(arg)
+        target_exe = os.path.join(BASE_DIR, "PCMod.exe") if os.path.exists(os.path.join(BASE_DIR, "PCMod.exe")) else sys.executable
+        subprocess.Popen([target_exe] + clean_args, env=clean_env, cwd=BASE_DIR)
+    else:
+        python_exe = sys.executable
+        script_file = os.path.abspath(__file__)
+        subprocess.Popen([python_exe, script_file] + sys.argv[1:], env=clean_env, cwd=BASE_DIR)
+    os._exit(0)
+
 class Api:
     def __init__(self):
         global global_api_instance
@@ -2340,8 +2233,7 @@ class Api:
                 "main_pack": main_pack,
                 "main_pack_installed": main_pack_installed,
                 "online_players": "Loading...",
-                "news_url": self.get_news_url(),
-                "logo_url": f"file:///{os.path.abspath(os.path.join(DATA_DIR, 'icons', 'pcmod.png')).replace(os.sep, '/')}" if os.path.exists(os.path.join(DATA_DIR, "icons", "pcmod.png")) else ""
+                "news_url": "updates.html"
             }
         except Exception as e:
             log_init(f"Error in init_launcher API call: {e}")
@@ -2358,17 +2250,16 @@ class Api:
                     "showconsole": "0",
                     "server_alerts": "0",
                     "memory": "6144",
-                    "pack": "2-5-x"
+                    "pack": "Vanilla"
                 },
                 "modcount": "0",
                 "launcher_version": "2.0a",
-                "pack_version": "2.5.3b",
-                "versions_list": [{"name": "2-5-x", "path": ""}],
-                "main_pack": "2-5-x",
+                "pack_version": "1.0",
+                "versions_list": [{"name": "Vanilla", "path": ""}],
+                "main_pack": "Vanilla",
                 "main_pack_installed": True,
                 "online_players": "Loading...",
-                "news_url": self.get_news_url(),
-                "logo_url": f"file:///{os.path.abspath(os.path.join(DATA_DIR, 'icons', 'pcmod.png')).replace(os.sep, '/')}" if os.path.exists(os.path.join(DATA_DIR, "icons", "pcmod.png")) else ""
+                "news_url": self.get_news_url()
             }
 
     def get_settings(self, *args, **kwargs):
@@ -2622,8 +2513,7 @@ class Api:
         sync_updates_page()
         local_updates_path = os.path.join(DATA_DIR, "pages", "updates.html")
         if os.path.exists(local_updates_path):
-            abs_p = os.path.abspath(local_updates_path).replace("\\", "/")
-            return f"file:///{abs_p}"
+            return "updates.html"
         return "https://pcmod.ddns.me/updates.html"
 
     def get_players_online(self, *args, **kwargs):
@@ -4283,7 +4173,7 @@ LAUNCHER_HTML = """<!DOCTYPE html>
       <div class="header-bar">
         <button class="btn-back" onclick="showMainView()">← Back to Launcher</button>
         <div style="font-weight: 700; font-size: 16px; color: #38bdf8;" id="modlistTitle">
-          Mod List (<span id="modlistCount">0</span> mods) - Pack: <span id="modlistPack">2-5-x</span>
+          Mod List (<span id="modlistCount">0</span> mods) - Pack: <span id="modlistPack">Vanilla</span>
         </div>
         <input type="text" class="input-field" id="modSearch" placeholder="Filter mods..." oninput="filterModList()" style="width: 180px; margin-bottom: 0;">
       </div>
