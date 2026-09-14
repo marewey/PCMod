@@ -335,6 +335,61 @@ if OS_NAME == "win32":
     except Exception:
         pass
 
+def get_default_settings():
+    return {
+        "shortcut": "1",
+        "autoserver": "0",
+        "log-logins": "1",
+        "lite": "0",
+        "showconsole": "0",
+        "cleanup_updates": "1",
+        "server_alerts": "0",
+        "server_alerts_mode": "1",
+        "pack": "2-5-x",
+        "memory": "6144",
+        "username": ""
+    }
+
+def read_settings(log_event=False):
+    settings_exist = os.path.exists(SETTINGS_FILE)
+    settings = get_default_settings()
+    if settings_exist:
+        try:
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and "=" in line:
+                        k, v = line.split("=", 1)
+                        if k.strip().lower() not in ["password", "debug"]:
+                            settings[k.strip()] = v.strip()
+            if log_event:
+                log_init(f"Read settings.txt successfully: {settings}")
+        except Exception:
+            pass
+    else:
+        # Initial creation of settings.txt with defaults
+        write_settings(settings)
+        if log_event:
+            log_init(f"Created initial settings.txt with defaults: {settings}")
+        if str(settings.get("shortcut")).strip() in ["1", "true", "True"]:
+            toggle_desktop_shortcut(True)
+    return settings
+
+def write_settings(settings):
+    try:
+        lines = []
+        for k, v in settings.items():
+            if k.lower() in ["password", "debug"]:
+                continue
+            lines.append(f"{k}={v}\n")
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+        log_init("Wrote settings.txt successfully")
+
+        apply_console_visibility()
+    except Exception:
+        pass
+
 def bootstrap_missing_files():
     required_files = [
         os.path.join(DATA_DIR, "indexes", "version"),
@@ -346,12 +401,6 @@ def bootstrap_missing_files():
 
     if not missing:
         return
-
-    if SETTINGS_FILE in missing and not os.path.exists(SETTINGS_FILE):
-        read_settings()
-        missing = [f for f in required_files if not os.path.exists(f)]
-        if not missing:
-            return
 
     log_init("=== Initializing PCMod Launcher Bootstrap ===")
     log_init(f"Missing required base files: {[os.path.basename(m) for m in missing]}")
@@ -755,62 +804,6 @@ def toggle_desktop_shortcut(enable):
         except Exception as e:
             log_init(f"Desktop shortcut error: {e}")
 
-SETTINGS_FILE = os.path.join(BASE_DIR, "settings.txt")
-
-def get_default_settings():
-    return {
-        "shortcut": "1",
-        "autoserver": "0",
-        "log-logins": "1",
-        "lite": "0",
-        "showconsole": "0",
-        "cleanup_updates": "1",
-        "server_alerts": "0",
-        "server_alerts_mode": "1",
-        "pack": "2-5-x",
-        "memory": "6144",
-        "username": ""
-    }
-
-def read_settings(log_event=False):
-    settings_exist = os.path.exists(SETTINGS_FILE)
-    settings = get_default_settings()
-    if settings_exist:
-        try:
-            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line and "=" in line:
-                        k, v = line.split("=", 1)
-                        if k.strip().lower() not in ["password", "debug"]:
-                            settings[k.strip()] = v.strip()
-            if log_event:
-                log_init(f"Read settings.txt successfully: {settings}")
-        except Exception:
-            pass
-    else:
-        # Initial creation of settings.txt with defaults
-        write_settings(settings)
-        if log_event:
-            log_init(f"Created initial settings.txt with defaults: {settings}")
-        if str(settings.get("shortcut")).strip() in ["1", "true", "True"]:
-            toggle_desktop_shortcut(True)
-    return settings
-
-def write_settings(settings):
-    try:
-        lines = []
-        for k, v in settings.items():
-            if k.lower() in ["password", "debug"]:
-                continue
-            lines.append(f"{k}={v}\n")
-        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-            f.writelines(lines)
-        log_init("Wrote settings.txt successfully")
-
-        apply_console_visibility()
-    except Exception:
-        pass
 
 def apply_console_visibility():
     if OS_NAME == "win32":
