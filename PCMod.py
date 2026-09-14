@@ -523,8 +523,7 @@ def bootstrap_missing_files():
     required_files = [
         os.path.join(DATA_DIR, "indexes", "version"),
         os.path.join(DATA_DIR, "icons", "icon.ico"),
-        os.path.join(DATA_DIR, "icons", "pcmod.png"),
-        SETTINGS_FILE
+        os.path.join(DATA_DIR, "icons", "pcmod.png")
     ]
     missing = [f for f in required_files if not os.path.exists(f)]
 
@@ -4196,11 +4195,11 @@ LAUNCHER_HTML = """<!DOCTYPE html>
       <!-- Middle Column: Logo, News & Main Actions -->
       <div class="main-content" style="grid-column: 2;">
         <div class="logo-header">
-          <img src="" alt="PCMod Client" id="logoImg">
+          <img src="../icons/pcmod.png" alt="PCMod Client" id="logoImg">
         </div>
 
         <div class="panel news-card">
-          <iframe src="about:blank" class="news-iframe" id="newsIframe"></iframe>
+          <iframe src="updates.html" class="news-iframe" id="newsIframe"></iframe>
         </div>
 
         <div class="action-bar">
@@ -5228,13 +5227,34 @@ LAUNCHER_HTML = """<!DOCTYPE html>
 </body>
 </html>"""
 
+def ensure_launcher_html():
+    pages_dir = os.path.join(DATA_DIR, "pages")
+    os.makedirs(pages_dir, exist_ok=True)
+    html_path = os.path.join(pages_dir, "launcher.html")
+    try:
+        needs_write = True
+        if os.path.exists(html_path):
+            with open(html_path, "r", encoding="utf-8") as f:
+                if f.read() == LAUNCHER_HTML:
+                    needs_write = False
+        if needs_write:
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(LAUNCHER_HTML)
+            log_init("Synchronized local launcher.html with embedded LAUNCHER_HTML.")
+    except Exception as e:
+        log_init(f"Error writing launcher.html: {e}")
+    return html_path
+
 def main():
     import webview
     apply_console_visibility()
     api = Api()
+    html_path = ensure_launcher_html()
+    abs_html = os.path.abspath(html_path).replace("\\", "/")
+    url = f"file:///{abs_html}" if not abs_html.startswith("/") else f"file://{abs_html}"
     window = webview.create_window(
         "PCMod Client",
-        html=LAUNCHER_HTML,
+        url=url,
         js_api=api,
         width=1160,
         height=690,
