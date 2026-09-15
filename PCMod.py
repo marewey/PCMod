@@ -1450,6 +1450,24 @@ def rot13_5(text):
             res.append(ch)
     return "".join(res)
 
+def encode_multipart_formdata(fields, files):
+    """Encodes form fields and files into (content_type, body_bytes) for multipart/form-data POST."""
+    boundary = "----WebKitFormBoundary" + hashlib.md5(str(time.time()).encode()).hexdigest()[:16]
+    body = bytearray()
+    for name, value in fields.items():
+        body.extend(f"--{boundary}\r\n".encode("utf-8"))
+        body.extend(f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode("utf-8"))
+        body.extend(f"{value}\r\n".encode("utf-8"))
+    for name, filename, content_bytes, content_type in files:
+        body.extend(f"--{boundary}\r\n".encode("utf-8"))
+        body.extend(f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'.encode("utf-8"))
+        body.extend(f"Content-Type: {content_type}\r\n\r\n".encode("utf-8"))
+        body.extend(content_bytes)
+        body.extend(b"\r\n")
+    body.extend(f"--{boundary}--\r\n".encode("utf-8"))
+    content_type_header = f"multipart/form-data; boundary={boundary}"
+    return content_type_header, bytes(body)
+
 def xor_crypt(data_bytes, key_bytes):
     if not key_bytes:
         return data_bytes
@@ -3007,25 +3025,27 @@ class Api:
                     clean_user = username.strip() if username.strip() else "anonymous"
                     ftp_filename = f"{clean_user}_crash_{file_ts}.log"
 
-                    # 1. Attempt HTTPS POST upload to https://files.pcmod.ddns.me/upload_crash.php
+                    # 1. Attempt HTTPS POST upload to https://files.pcmod.ddns.me/upload_crash.php via multipart/form-data
                     https_uploaded = False
                     try:
                         upload_url = "https://files.pcmod.ddns.me/upload_crash.php"
+                        fields = {"username": clean_user}
+                        files = [("file", ftp_filename, final_log_str.encode("utf-8", errors="ignore"), "text/plain")]
+                        c_type, post_data = encode_multipart_formdata(fields, files)
+
                         req = urllib.request.Request(
                             upload_url,
-                            data=final_log_str.encode("utf-8", errors="ignore"),
+                            data=post_data,
                             headers={
                                 "User-Agent": "PCModClient/2.0",
-                                "Content-Type": "text/plain; charset=utf-8",
-                                "X-User": clean_user,
-                                "X-Filename": ftp_filename
+                                "Content-Type": c_type
                             },
                             method="POST"
                         )
                         ctx = ssl.create_default_context()
                         ctx.check_hostname = False
                         ctx.verify_mode = ssl.CERT_NONE
-                        with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:
+                        with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
                             if resp.status == 200:
                                 https_uploaded = True
                                 log_init(f"Crash log uploaded via HTTPS successfully: {ftp_filename}")
