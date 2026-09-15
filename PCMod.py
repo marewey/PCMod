@@ -228,6 +228,52 @@ def clean_old_crash_reports(max_days=90):
     except Exception as e:
         log_init(f"Error during crash report cleanup: {e}")
 
+def apply_lite_mode_changes(enabled):
+    """Renames *-client.jar to *-client.disabled (when enabled=True) or vice-versa (when enabled=False), logging every mod modified."""
+    try:
+        pack = get_pack_name()
+        mods_dir = os.path.join(DATA_DIR, "packs", pack, "mods")
+        if not os.path.exists(mods_dir):
+            log_init(f"Mods directory '{mods_dir}' does not exist yet. Skipping Lite Mode mod renaming.")
+            return
+
+        if enabled:
+            disabled_mods = []
+            for f in os.listdir(mods_dir):
+                if f.endswith("-client.jar"):
+                    old_path = os.path.join(mods_dir, f)
+                    new_file = f[:-4] + ".disabled"
+                    new_path = os.path.join(mods_dir, new_file)
+                    try:
+                        os.rename(old_path, new_path)
+                        disabled_mods.append(f)
+                        log_init(f"[Lite Mode ON] Disabled client mod: {f} -> {new_file}")
+                    except Exception as e:
+                        log_init(f"[Lite Mode ON] Error disabling mod {f}: {e}")
+            if disabled_mods:
+                log_init(f"Lite Mode Enabled: Disabled {len(disabled_mods)} client mod(s): {', '.join(disabled_mods)}")
+            else:
+                log_init("Lite Mode Enabled: No active '-client.jar' mods were found to disable.")
+        else:
+            enabled_mods = []
+            for f in os.listdir(mods_dir):
+                if f.endswith("-client.disabled"):
+                    old_path = os.path.join(mods_dir, f)
+                    new_file = f[:-9] + ".jar"
+                    new_path = os.path.join(mods_dir, new_file)
+                    try:
+                        os.rename(old_path, new_path)
+                        enabled_mods.append(new_file)
+                        log_init(f"[Lite Mode OFF] Re-enabled client mod: {f} -> {new_file}")
+                    except Exception as e:
+                        log_init(f"[Lite Mode OFF] Error re-enabling mod {f}: {e}")
+            if enabled_mods:
+                log_init(f"Lite Mode Disabled: Re-enabled {len(enabled_mods)} client mod(s): {', '.join(enabled_mods)}")
+            else:
+                log_init("Lite Mode Disabled: No '-client.disabled' mods were found to re-enable.")
+    except Exception as e:
+        log_init(f"Error applying Lite Mode changes: {e}")
+
 def relocate_if_needed(target_dir):
     is_frozen = getattr(sys, 'frozen', False) or sys.argv[0].lower().endswith(".exe")
     if not is_frozen:
@@ -2046,6 +2092,7 @@ def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, t
                 "update_in_progress": True
             })
 
+        alt_disabled = src_path[:-4] + ".disabled" if src_path.endswith("-client.jar") else None
         if os.path.exists(src_path):
             try:
                 os.rename(src_path, dst_path)
@@ -2054,6 +2101,16 @@ def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, t
                 shutil.copy2(src_path, dst_path)
                 try:
                     os.remove(src_path)
+                except Exception:
+                    pass
+        elif alt_disabled and os.path.exists(alt_disabled):
+            try:
+                os.rename(alt_disabled, dst_path)
+            except Exception:
+                import shutil
+                shutil.copy2(alt_disabled, dst_path)
+                try:
+                    os.remove(alt_disabled)
                 except Exception:
                     pass
         else:
@@ -2149,6 +2206,9 @@ def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, t
                 log_init(f"FAILED to download mod {m_name} ({m_file}) after 3 attempts.")
 
     log_init(f"Mod verification and sync completed for pack '{pack_name}'.")
+    st = read_settings()
+    is_lite = str(st.get("lite", "0")).strip() in ["1", "true", "True"]
+    apply_lite_mode_changes(is_lite)
 
 def extract_zip_with_progress(zip_path, extract_dir, progress_callback=None, title="Extracting..."):
     global UPDATE_CANCEL_REQUESTED
@@ -2445,6 +2505,9 @@ class Api:
         s = read_settings()
         s["lite"] = str(val)
         write_settings(s)
+        is_lite = str(val).strip() in ["1", "true", "True"]
+        log_init(f"Lite Mode setting changed to: {'ON' if is_lite else 'OFF'}")
+        apply_lite_mode_changes(is_lite)
         return True
 
     def set_memory(self, *args, **kwargs):
@@ -2709,18 +2772,7 @@ class Api:
         # Telemetry logging with 'launcher' state
         threading.Thread(target=send_login2_telemetry, args=("launcher",), daemon=True).start()
 
-        mods_dir = os.path.join(DATA_DIR, "packs", pack, "mods")
-        if os.path.exists(mods_dir):
-            try:
-                for f in os.listdir(mods_dir):
-                    if litemode:
-                        if f.endswith("-client.jar"):
-                            os.rename(os.path.join(mods_dir, f), os.path.join(mods_dir, f[:-4] + ".disabled"))
-                    else:
-                        if f.endswith("-client.disabled"):
-                            os.rename(os.path.join(mods_dir, f), os.path.join(mods_dir, f[:-9] + ".jar"))
-            except Exception:
-                pass
+        apply_lite_mode_changes(litemode)
 
         # Fetch and cache skindex
         skindex_file = os.path.join(DATA_DIR, "indexes", "skindex")
