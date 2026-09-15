@@ -15,6 +15,7 @@ import socket
 import zipfile
 import signal
 import atexit
+import io
 from datetime import datetime
 
 # Dynamic working directory (BASE_DIR) resolution
@@ -192,6 +193,40 @@ def clean_update_dir():
         log_init("Cleaned data/update directory contents.")
     except Exception as e:
         log_init(f"Error cleaning update directory: {e}")
+
+def clean_old_crash_reports(max_days=90):
+    """Purges crash reports older than max_days (90 days) from all pack crash-reports folders."""
+    try:
+        now = time.time()
+        cutoff_seconds = max_days * 86400
+        deleted_count = 0
+        crash_dirs = []
+        packs_dir = os.path.join(DATA_DIR, "packs")
+        if os.path.exists(packs_dir):
+            for pack in os.listdir(packs_dir):
+                cdir = os.path.join(packs_dir, pack, "crash-reports")
+                if os.path.exists(cdir):
+                    crash_dirs.append(cdir)
+        root_cdir = os.path.join(DATA_DIR, "crash-reports")
+        if os.path.exists(root_cdir):
+            crash_dirs.append(root_cdir)
+
+        for cdir in crash_dirs:
+            for item in os.listdir(cdir):
+                file_path = os.path.join(cdir, item)
+                if os.path.isfile(file_path):
+                    try:
+                        mtime = os.path.getmtime(file_path)
+                        if (now - mtime) > cutoff_seconds:
+                            os.remove(file_path)
+                            deleted_count += 1
+                            log_init(f"Cleaned old crash report (>90 days): {file_path}")
+                    except Exception as e:
+                        log_init(f"Error removing old crash report {file_path}: {e}")
+        if deleted_count > 0:
+            log_init(f"Crash report cleanup completed. Removed {deleted_count} file(s) older than {max_days} days.")
+    except Exception as e:
+        log_init(f"Error during crash report cleanup: {e}")
 
 def relocate_if_needed(target_dir):
     is_frozen = getattr(sys, 'frozen', False) or sys.argv[0].lower().endswith(".exe")
@@ -817,6 +852,7 @@ def apply_console_visibility():
 init_settings = read_settings(log_event=True)
 apply_console_visibility()
 clean_update_dir()
+clean_old_crash_reports()
 
 def check_cli_worker_entrypoint():
     if "--server-alerts-worker" in sys.argv:
@@ -2157,6 +2193,8 @@ class Api:
     def __init__(self):
         global global_api_instance
         self._window = None
+        self.last_run_crash_reports = []
+        self.last_run_exit_code = 0
         global_api_instance = self
 
     def set_window(self, window):
@@ -2281,51 +2319,87 @@ class Api:
 
     def get_latest_crash_logs(self, *args, **kwargs):
         pack = get_pack_name()
-        launch_log_path = os.path.join(DATA_DIR, "launch.log")
-        launch_log_text = ""
-        if os.path.exists(launch_log_path):
-            try:
-                with open(launch_log_path, "r", encoding="utf-8", errors="ignore") as f:
-                    lines = f.readlines()
-                    launch_log_text = "".join(lines[-400:])
-            except Exception as e:
-                launch_log_text = f"Error reading launch log: {e}"
 
-        if not launch_log_text:
-            launch_log_text = "No launch log available."
-
+        # Read latest.log (up to 800 lines)
         game_log_text = ""
         pack_latest_log = os.path.join(DATA_DIR, "packs", pack, "logs", "latest.log")
         if os.path.exists(pack_latest_log):
             try:
                 with open(pack_latest_log, "r", encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()
-                    game_log_text = "".join(lines[-400:])
+                    if len(lines) > 800:
+                        lines = lines[-800:]
+                    game_log_text = "".join(lines)
             except Exception as e:
                 game_log_text = f"Error reading game log: {e}"
 
         if not game_log_text:
             game_log_text = "No game log (logs/latest.log) available for this pack."
 
-        crash_report_text = "No crash reports found in crash-reports folder."
-        crash_dir = os.path.join(DATA_DIR, "packs", pack, "crash-reports")
-        if not os.path.exists(crash_dir):
-            crash_dir = os.path.join(DATA_DIR, "crash-reports")
+        exit_code_str = f"\n\nProcess Exit Code: {self.last_run_exit_code}" if hasattr(self, 'last_run_exit_code') else ""
 
-        if os.path.exists(crash_dir):
-            try:
-                files = [os.path.join(crash_dir, f) for f in os.listdir(crash_dir) if os.path.isfile(os.path.join(crash_dir, f))]
-                if files:
-                    latest_file = max(files, key=os.path.getmtime)
-                    with open(latest_file, "r", encoding="utf-8", errors="ignore") as f:
-                        crash_report_text = f"=== File: {os.path.basename(latest_file)} ===\n\n" + f.read()
-            except Exception as e:
-                crash_report_text = f"Error reading crash report: {e}"
+        crash_reports_list = []
+        # Check if we have new crash reports from the latest game session
+        if hasattr(self, 'last_run_crash_reports') and self.last_run_crash_reports:
+            for idx, fpath in enumerate(self.last_run_crash_reports, start=1):
+                c_name = os.path.basename(fpath)
+                try:
+                    with open(fpath, "r", encoding="utf-8", errors="ignore") as cf:
+                        content = f"=== File: {c_name} ===\n\n" + cf.read() + exit_code_str
+                except Exception as e:
+                    content = f"Error reading crash report {c_name}: {e}" + exit_code_str
+
+                title = f"Crash Report {idx}" if len(self.last_run_crash_reports) > 1 else "Crash Report"
+                crash_reports_list.append({
+                    "id": f"crash_{idx}",
+                    "title": title,
+                    "filename": c_name,
+                    "content": content
+                })
+        else:
+            # Fallback: find existing crash reports in crash_dir
+            crash_dir = os.path.join(DATA_DIR, "packs", pack, "crash-reports")
+            if not os.path.exists(crash_dir):
+                crash_dir = os.path.join(DATA_DIR, "crash-reports")
+
+            if os.path.exists(crash_dir):
+                try:
+                    files = [os.path.join(crash_dir, f) for f in os.listdir(crash_dir) if os.path.isfile(os.path.join(crash_dir, f))]
+                    if files:
+                        files_sorted = sorted(files, key=os.path.getmtime, reverse=True)
+                        top_files = files_sorted[:5]
+                        for idx, fpath in enumerate(top_files, start=1):
+                            c_name = os.path.basename(fpath)
+                            try:
+                                with open(fpath, "r", encoding="utf-8", errors="ignore") as cf:
+                                    content = f"=== File: {c_name} ===\n\n" + cf.read() + exit_code_str
+                            except Exception as e:
+                                content = f"Error reading crash report {c_name}: {e}" + exit_code_str
+
+                            title = f"Crash Report {idx}" if len(top_files) > 1 else "Crash Report"
+                            crash_reports_list.append({
+                                "id": f"crash_{idx}",
+                                "title": title,
+                                "filename": c_name,
+                                "content": content
+                            })
+                except Exception as e:
+                    log_init(f"Error reading crash directory: {e}")
+
+        if not crash_reports_list:
+            crash_reports_list.append({
+                "id": "crash_1",
+                "title": "Crash Report",
+                "filename": "",
+                "content": f"No crash reports found in crash-reports folder.{exit_code_str}"
+            })
+
+        first_crash_content = crash_reports_list[0]["content"] if crash_reports_list else "No crash reports found."
 
         return {
-            "launch_log": launch_log_text,
             "game_log": game_log_text,
-            "crash_report": crash_report_text
+            "crash_reports": crash_reports_list,
+            "crash_report": first_crash_content
         }
 
     def save_settings_btn(self, *args, **kwargs):
@@ -2424,6 +2498,22 @@ class Api:
         mods = generate_modlist_data(pack)
         generate_modlist_html_file(pack, mods)
         return {"pack": pack, "count": len(mods), "mods": mods}
+
+    def open_launcher_folder(self, *args, **kwargs):
+        """Opens BASE_DIR in the native OS file explorer."""
+        try:
+            target_dir = BASE_DIR
+            if OS_NAME == "win32":
+                os.startfile(target_dir)
+            elif OS_NAME == "darwin":
+                subprocess.Popen(["open", target_dir])
+            else:
+                subprocess.Popen(["xdg-open", target_dir])
+            log_init(f"Opened launcher folder: {target_dir}")
+            return True
+        except Exception as e:
+            log_init(f"Error opening launcher folder: {e}")
+            return False
 
     def open_modlist(self, *args, **kwargs):
         pack = get_pack_name()
@@ -2771,6 +2861,17 @@ class Api:
                 except Exception:
                     pass
 
+                # Pre-launch cleanup and crash report directory snapshot
+                clean_old_crash_reports(90)
+                crash_dir = os.path.join(DATA_DIR, "packs", pack, "crash-reports")
+                os.makedirs(crash_dir, exist_ok=True)
+
+                pre_launch_crashes = set()
+                try:
+                    pre_launch_crashes = set(os.listdir(crash_dir))
+                except Exception as e:
+                    log_init(f"Error snapshotting crash reports before launch: {e}")
+
                 if needs_install:
                     log_init(f"Modloader/assets missing for pack '{pack}'. Downloading missing resources...")
                     if self._window:
@@ -2821,6 +2922,7 @@ class Api:
 
                 ret_code = run_portablemc_direct(pmc_args)
                 log_init(f"Game process exited with code {ret_code}")
+                self.last_run_exit_code = ret_code
 
                 try:
                     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -2835,22 +2937,88 @@ class Api:
                 except Exception as e:
                     log_init(f"Error writing exit event to launch.log: {e}")
 
-                if ret_code != 0:
+                # Compare post-launch crash report files against pre-launch snapshot
+                new_crash_files = []
+                if os.path.exists(crash_dir):
+                    try:
+                        post_launch_crashes = set(os.listdir(crash_dir))
+                        new_file_names = sorted(list(post_launch_crashes - pre_launch_crashes))
+                        for fname in new_file_names:
+                            fpath = os.path.join(crash_dir, fname)
+                            if os.path.isfile(fpath):
+                                new_crash_files.append(fpath)
+                    except Exception as e:
+                        log_init(f"Error detecting post-launch crash reports: {e}")
+
+                self.last_run_crash_reports = new_crash_files
+
+                if new_crash_files or ret_code != 0:
                     crashed = True
                     threading.Thread(target=send_login2_telemetry, args=("crash",), daemon=True).start()
+
+                    # Read latest.log (last 800 lines)
+                    pack_latest_log = os.path.join(DATA_DIR, "packs", pack, "logs", "latest.log")
+                    game_log_text = ""
+                    if os.path.exists(pack_latest_log):
+                        try:
+                            with open(pack_latest_log, "r", encoding="utf-8", errors="ignore") as f:
+                                lines = f.readlines()
+                                if len(lines) > 800:
+                                    lines = lines[-800:]
+                                game_log_text = "".join(lines)
+                        except Exception as e:
+                            game_log_text = f"Error reading game log: {e}"
+
+                    ts_now = datetime.now()
+                    timestamp_str = ts_now.strftime("%Y-%m-%d %H:%M:%S")
+                    file_ts = ts_now.strftime("%Y%m%d_%H%M%S")
+
+                    combined_log_lines = [
+                        "=== DEBUG DATA ===",
+                        f"Timestamp: {timestamp_str}",
+                        f"User: {username}",
+                        f"Pack: {pack}",
+                        f"MC Version: {m_version}",
+                        f"JVM Args: {jvm_args_str}",
+                        f"Exit Code: {ret_code}",
+                        f"New Crash Reports Count: {len(new_crash_files)}",
+                        "==================\n"
+                    ]
+
+                    if new_crash_files:
+                        for idx, crash_filepath in enumerate(new_crash_files, start=1):
+                            c_basename = os.path.basename(crash_filepath)
+                            c_content = ""
+                            try:
+                                with open(crash_filepath, "r", encoding="utf-8", errors="ignore") as cf:
+                                    c_content = cf.read()
+                            except Exception as e:
+                                c_content = f"Error reading crash report {c_basename}: {e}"
+                            combined_log_lines.append(f"=== CRASH REPORT {idx}: {c_basename} ===")
+                            combined_log_lines.append(c_content.rstrip())
+                            combined_log_lines.append(f"\nExit Code: {ret_code}\n")
+
+                    combined_log_lines.append("=== GAME LOG (latest.log - last 800 lines) ===")
+                    combined_log_lines.append(game_log_text if game_log_text else "No game log available.")
+                    combined_log_lines.append("\n=== END OF LOG ===")
+
+                    final_log_str = "\n".join(combined_log_lines)
+
                     try:
                         ftp_str = rot13_5("cg32.3pzbq.qqaf.zr")
                         user_str = rot13_5("ybthc")
                         pass_str = rot13_5("3pzbqybthc123")
                         ftp = ftplib.FTP(ftp_str, timeout=5)
                         ftp.login(user_str, pass_str)
-                        if os.path.exists(launch_log):
-                            with open(launch_log, "rb") as f:
-                                ftp.storlines(f"STOR {username}_crash.log", f)
+
+                        clean_user = username.strip() if username.strip() else "anonymous"
+                        ftp_filename = f"{clean_user}_crash_{file_ts}.log"
+                        log_bytes = io.BytesIO(final_log_str.encode("utf-8", errors="ignore"))
+                        ftp.storbinary(f"STOR {ftp_filename}", log_bytes)
                         ftp.quit()
-                        log_init("Crash log uploaded via FTP successfully")
-                    except Exception:
-                        pass
+                        log_init(f"Crash log uploaded via FTP successfully: {ftp_filename}")
+                    except Exception as e:
+                        log_init(f"Error uploading crash log via FTP: {e}")
             finally:
                 if os.path.exists(lock_file):
                     try:
