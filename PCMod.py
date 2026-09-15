@@ -235,7 +235,8 @@ LITE_MODE_EXCEPTIONS = [
     "gpumemleakfix",
     "dynamic-fps",
     "dynamic_fps",
-    "dynamicfps"
+    "dynamicfps",
+    "offlineskins"
 ]
 
 def is_lite_mode_exception(filename):
@@ -346,6 +347,13 @@ def apply_lite_mode_changes(enabled):
                 log_init(f"Lite Mode Disabled: Restored {enabled_count} client-only mod(s) to mods/.")
             else:
                 log_init("Lite Mode Disabled: No disabled client-only mods were found to restore.")
+
+            # Validate if any C-tagged mods from .pak are missing from mods/ (e.g. disabled_mods folder was deleted)
+            if c_mod_files:
+                missing_c_mods = [m for m in c_mod_files if not os.path.exists(os.path.join(mods_dir, m)) and not is_lite_mode_exception(m)]
+                if missing_c_mods:
+                    log_init(f"[Lite Mode OFF] Detected {len(missing_c_mods)} missing client mod(s) after restore (e.g. disabled_mods was deleted). Triggering verify_and_sync_mods...")
+                    threading.Thread(target=verify_and_sync_mods, args=(pack,), daemon=True).start()
     except Exception as e:
         log_init(f"Error applying Lite Mode changes: {e}")
 

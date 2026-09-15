@@ -22,3 +22,16 @@
 [2026-09-15 20:56:08] Lite Mode setting changed to: OFF
 [2026-09-15 20:56:08] [Lite Mode OFF] Restored client mod to mods: disabled_mods/AltOriginGui.jar -> mods/AltOriginGui.jar
 [2026-09-15 20:56:08] Lite Mode Disabled: Restored 1 client-only mod(s) to mods/.
+[2026-09-15 21:15:24] === PCMod Client Starting ===
+[2026-09-15 21:15:24] Read settings.txt successfully: {'shortcut': '1', 'autoserver': '0', 'log-logins': '1', 'lite': '0', 'showconsole': '0', 'cleanup_updates': '1', 'server_alerts': '0', 'server_alerts_mode': '1', 'pack': '2-5-x', 'memory': '4096', 'username': ''}
+[2026-09-15 21:15:24] Checking for updates... Pack 2-5-x [2.5.4] Launcher [2.0f]
+[2026-09-15 21:15:24] Checking for PORTABLEMC... 4.4.1
+[2026-09-15 21:15:24] Wrote settings.txt successfully
+[2026-09-15 21:15:24] Lite Mode setting changed to: ON
+[2026-09-15 21:15:24] [Lite Mode ON] Moved client mod to disabled_mods: AltOriginGui.jar -> disabled_mods/AltOriginGui.jar
+[2026-09-15 21:15:24] Lite Mode Enabled: Moved 1 client-only mod(s) to disabled_mods/.
+[2026-09-15 21:15:24] Wrote settings.txt successfully
+[2026-09-15 21:15:24] Lite Mode setting changed to: OFF
+[2026-09-15 21:15:24] Lite Mode Disabled: No disabled client-only mods were found to restore.
+[2026-09-15 21:15:24] [Lite Mode OFF] Detected 1 missing client mod(s) after restore (e.g. disabled_mods was deleted). Triggering verify_and_sync_mods...
+[2026-09-15 21:15:24] Starting mod verification and sync for pack '2-5-x' (version: None)...
