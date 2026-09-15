@@ -435,9 +435,6 @@ def bootstrap_missing_files():
 
     log_init("=== Launcher Bootstrap Completed ===")
 
-# Run bootstrap check before anything else
-bootstrap_missing_files()
-
 def sync_pack_file(local_path, remote_url, label="Pack File"):
     os.makedirs(os.path.dirname(local_path), exist_ok=True)
     local_size = os.path.getsize(local_path) if os.path.exists(local_path) else -1
@@ -1244,6 +1241,7 @@ def update_version_index(key, new_ver):
 
 # Startup Check for PortableMC & Updates
 def startup_checks():
+    bootstrap_missing_files()
     pack = get_pack_name()
     l_ver, p_ver = read_version_indexes(pack)
     log_init(f"Checking for updates... Pack {pack} [{p_ver}] Launcher [{l_ver}]")
