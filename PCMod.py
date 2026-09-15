@@ -15,6 +15,7 @@ import socket
 import zipfile
 import signal
 import atexit
+import io
 from datetime import datetime
 
 # Dynamic working directory (BASE_DIR) resolution
@@ -192,6 +193,169 @@ def clean_update_dir():
         log_init("Cleaned data/update directory contents.")
     except Exception as e:
         log_init(f"Error cleaning update directory: {e}")
+
+def clean_old_crash_reports(max_days=90):
+    """Purges crash reports older than max_days (90 days) from all pack crash-reports folders."""
+    try:
+        now = time.time()
+        cutoff_seconds = max_days * 86400
+        deleted_count = 0
+        crash_dirs = []
+        packs_dir = os.path.join(DATA_DIR, "packs")
+        if os.path.exists(packs_dir):
+            for pack in os.listdir(packs_dir):
+                cdir = os.path.join(packs_dir, pack, "crash-reports")
+                if os.path.exists(cdir):
+                    crash_dirs.append(cdir)
+        root_cdir = os.path.join(DATA_DIR, "crash-reports")
+        if os.path.exists(root_cdir):
+            crash_dirs.append(root_cdir)
+
+        for cdir in crash_dirs:
+            for item in os.listdir(cdir):
+                file_path = os.path.join(cdir, item)
+                if os.path.isfile(file_path):
+                    try:
+                        mtime = os.path.getmtime(file_path)
+                        if (now - mtime) > cutoff_seconds:
+                            os.remove(file_path)
+                            deleted_count += 1
+                            log_init(f"Cleaned old crash report (>90 days): {file_path}")
+                    except Exception as e:
+                        log_init(f"Error removing old crash report {file_path}: {e}")
+        if deleted_count > 0:
+            log_init(f"Crash report cleanup completed. Removed {deleted_count} file(s) older than {max_days} days.")
+    except Exception as e:
+        log_init(f"Error during crash report cleanup: {e}")
+
+LITE_MODE_EXCEPTIONS = [
+    "sodiumextras",
+    "sodiumdynamiclights",
+    "betterbiomereblend",
+    "gpumemleakfix",
+    "dynamic-fps",
+    "dynamic_fps",
+    "dynamicfps",
+    "offlineskins"
+]
+
+def is_lite_mode_exception(filename):
+    """Returns True if filename matches any Lite Mode exception mod."""
+    norm = filename.lower().replace("-", "").replace("_", "")
+    for exc in LITE_MODE_EXCEPTIONS:
+        norm_exc = exc.replace("-", "").replace("_", "")
+        if norm_exc in norm:
+            return True
+    return False
+
+def apply_lite_mode_changes(enabled):
+    """Moves client-only mods (tagged 'C' in PCMod-{pack}.pak) between mods/ and disabled_mods/ based on Lite Mode state, preserving exception performance mods."""
+    try:
+        pack = get_pack_name()
+        pack_dir = os.path.join(DATA_DIR, "packs", pack)
+        mods_dir = os.path.join(pack_dir, "mods")
+        disabled_dir = os.path.join(pack_dir, "disabled_mods")
+
+        os.makedirs(mods_dir, exist_ok=True)
+        os.makedirs(disabled_dir, exist_ok=True)
+
+        # Always restore any exception mods that may be inside disabled_dir
+        if os.path.exists(disabled_dir):
+            for f in os.listdir(disabled_dir):
+                if is_lite_mode_exception(f):
+                    src_path = os.path.join(disabled_dir, f)
+                    dst_path = os.path.join(mods_dir, f)
+                    try:
+                        if os.path.exists(dst_path):
+                            os.remove(dst_path)
+                        os.rename(src_path, dst_path)
+                        log_init(f"[Lite Mode Exception] Restored essential client mod to mods/: {f}")
+                    except Exception as e:
+                        log_init(f"[Lite Mode Exception] Error restoring exception mod {f}: {e}")
+
+        # Parse PCMod-{pack}.pak to identify C-tagged mods
+        c_mod_files = set()
+        pak_file = os.path.join(pack_dir, f"PCMod-{pack}.pak")
+        if os.path.exists(pak_file):
+            try:
+                with open(pak_file, "r", encoding="utf-8", errors="ignore") as pf:
+                    for line in pf:
+                        parts = line.strip().split(";")
+                        if len(parts) >= 2 and parts[0].strip() == "C":
+                            c_mod_files.add(parts[1].strip())
+            except Exception as e:
+                log_init(f"Warning reading pak file for Lite Mode: {e}")
+
+        if enabled:
+            disabled_count = 0
+            # Process files in mods_dir that match C tag or end with -client.jar or -client.disabled
+            if os.path.exists(mods_dir):
+                for f in os.listdir(mods_dir):
+                    if is_lite_mode_exception(f):
+                        continue
+                    is_c_mod = f in c_mod_files or f.endswith("-client.jar") or f.endswith("-client.disabled")
+                    if is_c_mod:
+                        src_path = os.path.join(mods_dir, f)
+                        dest_filename = f[:-9] + ".jar" if f.endswith(".disabled") else f
+                        dst_path = os.path.join(disabled_dir, dest_filename)
+                        try:
+                            if os.path.exists(dst_path):
+                                os.remove(dst_path)
+                            os.rename(src_path, dst_path)
+                            disabled_count += 1
+                            log_init(f"[Lite Mode ON] Moved client mod to disabled_mods: {f} -> disabled_mods/{dest_filename}")
+                        except Exception as e:
+                            log_init(f"[Lite Mode ON] Error disabling mod {f}: {e}")
+            if disabled_count > 0:
+                log_init(f"Lite Mode Enabled: Moved {disabled_count} client-only mod(s) to disabled_mods/.")
+            else:
+                log_init("Lite Mode Enabled: No active client-only mods were found to disable.")
+        else:
+            enabled_count = 0
+            # 1. Move back all files from disabled_mods/ to mods/
+            if os.path.exists(disabled_dir):
+                for f in os.listdir(disabled_dir):
+                    src_path = os.path.join(disabled_dir, f)
+                    if os.path.isfile(src_path):
+                        dst_path = os.path.join(mods_dir, f)
+                        try:
+                            if os.path.exists(dst_path):
+                                os.remove(dst_path)
+                            os.rename(src_path, dst_path)
+                            enabled_count += 1
+                            log_init(f"[Lite Mode OFF] Restored client mod to mods: disabled_mods/{f} -> mods/{f}")
+                        except Exception as e:
+                            log_init(f"[Lite Mode OFF] Error restoring mod {f}: {e}")
+
+            # 2. Also check for any leftover -client.disabled files in mods_dir
+            if os.path.exists(mods_dir):
+                for f in os.listdir(mods_dir):
+                    if f.endswith("-client.disabled"):
+                        src_path = os.path.join(mods_dir, f)
+                        target_name = f[:-9] + ".jar"
+                        dst_path = os.path.join(mods_dir, target_name)
+                        try:
+                            if os.path.exists(dst_path):
+                                os.remove(dst_path)
+                            os.rename(src_path, dst_path)
+                            enabled_count += 1
+                            log_init(f"[Lite Mode OFF] Re-enabled legacy disabled mod: {f} -> {target_name}")
+                        except Exception as e:
+                            log_init(f"[Lite Mode OFF] Error re-enabling mod {f}: {e}")
+
+            if enabled_count > 0:
+                log_init(f"Lite Mode Disabled: Restored {enabled_count} client-only mod(s) to mods/.")
+            else:
+                log_init("Lite Mode Disabled: No disabled client-only mods were found to restore.")
+
+            # Validate if any C-tagged mods from .pak are missing from mods/ (e.g. disabled_mods folder was deleted)
+            if c_mod_files:
+                missing_c_mods = [m for m in c_mod_files if not os.path.exists(os.path.join(mods_dir, m)) and not is_lite_mode_exception(m)]
+                if missing_c_mods:
+                    log_init(f"[Lite Mode OFF] Detected {len(missing_c_mods)} missing client mod(s) after restore (e.g. disabled_mods was deleted). Triggering verify_and_sync_mods...")
+                    threading.Thread(target=verify_and_sync_mods, args=(pack,), daemon=True).start()
+    except Exception as e:
+        log_init(f"Error applying Lite Mode changes: {e}")
 
 def relocate_if_needed(target_dir):
     is_frozen = getattr(sys, 'frozen', False) or sys.argv[0].lower().endswith(".exe")
@@ -817,6 +981,7 @@ def apply_console_visibility():
 init_settings = read_settings(log_event=True)
 apply_console_visibility()
 clean_update_dir()
+clean_old_crash_reports()
 
 def check_cli_worker_entrypoint():
     if "--server-alerts-worker" in sys.argv:
@@ -1414,6 +1579,24 @@ def rot13_5(text):
             res.append(ch)
     return "".join(res)
 
+def encode_multipart_formdata(fields, files):
+    """Encodes form fields and files into (content_type, body_bytes) for multipart/form-data POST."""
+    boundary = "----WebKitFormBoundary" + hashlib.md5(str(time.time()).encode()).hexdigest()[:16]
+    body = bytearray()
+    for name, value in fields.items():
+        body.extend(f"--{boundary}\r\n".encode("utf-8"))
+        body.extend(f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode("utf-8"))
+        body.extend(f"{value}\r\n".encode("utf-8"))
+    for name, filename, content_bytes, content_type in files:
+        body.extend(f"--{boundary}\r\n".encode("utf-8"))
+        body.extend(f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'.encode("utf-8"))
+        body.extend(f"Content-Type: {content_type}\r\n\r\n".encode("utf-8"))
+        body.extend(content_bytes)
+        body.extend(b"\r\n")
+    body.extend(f"--{boundary}--\r\n".encode("utf-8"))
+    content_type_header = f"multipart/form-data; boundary={boundary}"
+    return content_type_header, bytes(body)
+
 def xor_crypt(data_bytes, key_bytes):
     if not key_bytes:
         return data_bytes
@@ -1992,6 +2175,7 @@ def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, t
                 "update_in_progress": True
             })
 
+        alt_disabled = src_path[:-4] + ".disabled" if src_path.endswith("-client.jar") else None
         if os.path.exists(src_path):
             try:
                 os.rename(src_path, dst_path)
@@ -2000,6 +2184,16 @@ def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, t
                 shutil.copy2(src_path, dst_path)
                 try:
                     os.remove(src_path)
+                except Exception:
+                    pass
+        elif alt_disabled and os.path.exists(alt_disabled):
+            try:
+                os.rename(alt_disabled, dst_path)
+            except Exception:
+                import shutil
+                shutil.copy2(alt_disabled, dst_path)
+                try:
+                    os.remove(alt_disabled)
                 except Exception:
                     pass
         else:
@@ -2095,6 +2289,9 @@ def verify_and_sync_mods(pack_name, pack_version=None, progress_callback=None, t
                 log_init(f"FAILED to download mod {m_name} ({m_file}) after 3 attempts.")
 
     log_init(f"Mod verification and sync completed for pack '{pack_name}'.")
+    st = read_settings()
+    is_lite = str(st.get("lite", "0")).strip() in ["1", "true", "True"]
+    apply_lite_mode_changes(is_lite)
 
 def extract_zip_with_progress(zip_path, extract_dir, progress_callback=None, title="Extracting..."):
     global UPDATE_CANCEL_REQUESTED
@@ -2157,6 +2354,8 @@ class Api:
     def __init__(self):
         global global_api_instance
         self._window = None
+        self.last_run_crash_reports = []
+        self.last_run_exit_code = 0
         global_api_instance = self
 
     def set_window(self, window):
@@ -2281,51 +2480,87 @@ class Api:
 
     def get_latest_crash_logs(self, *args, **kwargs):
         pack = get_pack_name()
-        launch_log_path = os.path.join(DATA_DIR, "launch.log")
-        launch_log_text = ""
-        if os.path.exists(launch_log_path):
-            try:
-                with open(launch_log_path, "r", encoding="utf-8", errors="ignore") as f:
-                    lines = f.readlines()
-                    launch_log_text = "".join(lines[-400:])
-            except Exception as e:
-                launch_log_text = f"Error reading launch log: {e}"
 
-        if not launch_log_text:
-            launch_log_text = "No launch log available."
-
+        # Read latest.log (up to 800 lines)
         game_log_text = ""
         pack_latest_log = os.path.join(DATA_DIR, "packs", pack, "logs", "latest.log")
         if os.path.exists(pack_latest_log):
             try:
                 with open(pack_latest_log, "r", encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()
-                    game_log_text = "".join(lines[-400:])
+                    if len(lines) > 800:
+                        lines = lines[-800:]
+                    game_log_text = "".join(lines)
             except Exception as e:
                 game_log_text = f"Error reading game log: {e}"
 
         if not game_log_text:
             game_log_text = "No game log (logs/latest.log) available for this pack."
 
-        crash_report_text = "No crash reports found in crash-reports folder."
-        crash_dir = os.path.join(DATA_DIR, "packs", pack, "crash-reports")
-        if not os.path.exists(crash_dir):
-            crash_dir = os.path.join(DATA_DIR, "crash-reports")
+        exit_code_str = f"\n\nProcess Exit Code: {self.last_run_exit_code}" if hasattr(self, 'last_run_exit_code') else ""
 
-        if os.path.exists(crash_dir):
-            try:
-                files = [os.path.join(crash_dir, f) for f in os.listdir(crash_dir) if os.path.isfile(os.path.join(crash_dir, f))]
-                if files:
-                    latest_file = max(files, key=os.path.getmtime)
-                    with open(latest_file, "r", encoding="utf-8", errors="ignore") as f:
-                        crash_report_text = f"=== File: {os.path.basename(latest_file)} ===\n\n" + f.read()
-            except Exception as e:
-                crash_report_text = f"Error reading crash report: {e}"
+        crash_reports_list = []
+        # Check if we have new crash reports from the latest game session
+        if hasattr(self, 'last_run_crash_reports') and self.last_run_crash_reports:
+            for idx, fpath in enumerate(self.last_run_crash_reports, start=1):
+                c_name = os.path.basename(fpath)
+                try:
+                    with open(fpath, "r", encoding="utf-8", errors="ignore") as cf:
+                        content = f"=== File: {c_name} ===\n\n" + cf.read() + exit_code_str
+                except Exception as e:
+                    content = f"Error reading crash report {c_name}: {e}" + exit_code_str
+
+                title = f"Crash Report {idx}" if len(self.last_run_crash_reports) > 1 else "Crash Report"
+                crash_reports_list.append({
+                    "id": f"crash_{idx}",
+                    "title": title,
+                    "filename": c_name,
+                    "content": content
+                })
+        else:
+            # Fallback: find existing crash reports in crash_dir
+            crash_dir = os.path.join(DATA_DIR, "packs", pack, "crash-reports")
+            if not os.path.exists(crash_dir):
+                crash_dir = os.path.join(DATA_DIR, "crash-reports")
+
+            if os.path.exists(crash_dir):
+                try:
+                    files = [os.path.join(crash_dir, f) for f in os.listdir(crash_dir) if os.path.isfile(os.path.join(crash_dir, f))]
+                    if files:
+                        files_sorted = sorted(files, key=os.path.getmtime, reverse=True)
+                        top_files = files_sorted[:5]
+                        for idx, fpath in enumerate(top_files, start=1):
+                            c_name = os.path.basename(fpath)
+                            try:
+                                with open(fpath, "r", encoding="utf-8", errors="ignore") as cf:
+                                    content = f"=== File: {c_name} ===\n\n" + cf.read() + exit_code_str
+                            except Exception as e:
+                                content = f"Error reading crash report {c_name}: {e}" + exit_code_str
+
+                            title = f"Crash Report {idx}" if len(top_files) > 1 else "Crash Report"
+                            crash_reports_list.append({
+                                "id": f"crash_{idx}",
+                                "title": title,
+                                "filename": c_name,
+                                "content": content
+                            })
+                except Exception as e:
+                    log_init(f"Error reading crash directory: {e}")
+
+        if not crash_reports_list:
+            crash_reports_list.append({
+                "id": "crash_1",
+                "title": "Crash Report",
+                "filename": "",
+                "content": f"No crash reports found in crash-reports folder.{exit_code_str}"
+            })
+
+        first_crash_content = crash_reports_list[0]["content"] if crash_reports_list else "No crash reports found."
 
         return {
-            "launch_log": launch_log_text,
             "game_log": game_log_text,
-            "crash_report": crash_report_text
+            "crash_reports": crash_reports_list,
+            "crash_report": first_crash_content
         }
 
     def save_settings_btn(self, *args, **kwargs):
@@ -2353,6 +2588,9 @@ class Api:
         s = read_settings()
         s["lite"] = str(val)
         write_settings(s)
+        is_lite = str(val).strip() in ["1", "true", "True"]
+        log_init(f"Lite Mode setting changed to: {'ON' if is_lite else 'OFF'}")
+        apply_lite_mode_changes(is_lite)
         return True
 
     def set_memory(self, *args, **kwargs):
@@ -2424,6 +2662,22 @@ class Api:
         mods = generate_modlist_data(pack)
         generate_modlist_html_file(pack, mods)
         return {"pack": pack, "count": len(mods), "mods": mods}
+
+    def open_launcher_folder(self, *args, **kwargs):
+        """Opens BASE_DIR in the native OS file explorer."""
+        try:
+            target_dir = BASE_DIR
+            if OS_NAME == "win32":
+                os.startfile(target_dir)
+            elif OS_NAME == "darwin":
+                subprocess.Popen(["open", target_dir])
+            else:
+                subprocess.Popen(["xdg-open", target_dir])
+            log_init(f"Opened launcher folder: {target_dir}")
+            return True
+        except Exception as e:
+            log_init(f"Error opening launcher folder: {e}")
+            return False
 
     def open_modlist(self, *args, **kwargs):
         pack = get_pack_name()
@@ -2601,18 +2855,7 @@ class Api:
         # Telemetry logging with 'launcher' state
         threading.Thread(target=send_login2_telemetry, args=("launcher",), daemon=True).start()
 
-        mods_dir = os.path.join(DATA_DIR, "packs", pack, "mods")
-        if os.path.exists(mods_dir):
-            try:
-                for f in os.listdir(mods_dir):
-                    if litemode:
-                        if f.endswith("-client.jar"):
-                            os.rename(os.path.join(mods_dir, f), os.path.join(mods_dir, f[:-4] + ".disabled"))
-                    else:
-                        if f.endswith("-client.disabled"):
-                            os.rename(os.path.join(mods_dir, f), os.path.join(mods_dir, f[:-9] + ".jar"))
-            except Exception:
-                pass
+        apply_lite_mode_changes(litemode)
 
         # Fetch and cache skindex
         skindex_file = os.path.join(DATA_DIR, "indexes", "skindex")
@@ -2771,6 +3014,17 @@ class Api:
                 except Exception:
                     pass
 
+                # Pre-launch cleanup and crash report directory snapshot
+                clean_old_crash_reports(90)
+                crash_dir = os.path.join(DATA_DIR, "packs", pack, "crash-reports")
+                os.makedirs(crash_dir, exist_ok=True)
+
+                pre_launch_crashes = set()
+                try:
+                    pre_launch_crashes = set(os.listdir(crash_dir))
+                except Exception as e:
+                    log_init(f"Error snapshotting crash reports before launch: {e}")
+
                 if needs_install:
                     log_init(f"Modloader/assets missing for pack '{pack}'. Downloading missing resources...")
                     if self._window:
@@ -2821,6 +3075,7 @@ class Api:
 
                 ret_code = run_portablemc_direct(pmc_args)
                 log_init(f"Game process exited with code {ret_code}")
+                self.last_run_exit_code = ret_code
 
                 try:
                     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -2835,22 +3090,134 @@ class Api:
                 except Exception as e:
                     log_init(f"Error writing exit event to launch.log: {e}")
 
-                if ret_code != 0:
+                # Compare post-launch crash report files against pre-launch snapshot
+                new_crash_files = []
+                if os.path.exists(crash_dir):
+                    try:
+                        post_launch_crashes = set(os.listdir(crash_dir))
+                        new_file_names = sorted(list(post_launch_crashes - pre_launch_crashes))
+                        for fname in new_file_names:
+                            fpath = os.path.join(crash_dir, fname)
+                            if os.path.isfile(fpath):
+                                new_crash_files.append(fpath)
+                    except Exception as e:
+                        log_init(f"Error detecting post-launch crash reports: {e}")
+
+                self.last_run_crash_reports = new_crash_files
+
+                if new_crash_files or ret_code != 0:
                     crashed = True
                     threading.Thread(target=send_login2_telemetry, args=("crash",), daemon=True).start()
+
+                    # Read latest.log (last 800 lines)
+                    pack_latest_log = os.path.join(DATA_DIR, "packs", pack, "logs", "latest.log")
+                    game_log_text = ""
+                    if os.path.exists(pack_latest_log):
+                        try:
+                            with open(pack_latest_log, "r", encoding="utf-8", errors="ignore") as f:
+                                lines = f.readlines()
+                                if len(lines) > 800:
+                                    lines = lines[-800:]
+                                game_log_text = "".join(lines)
+                        except Exception as e:
+                            game_log_text = f"Error reading game log: {e}"
+
+                    ts_now = datetime.now()
+                    timestamp_str = ts_now.strftime("%Y-%m-%d %H:%M:%S")
+                    file_ts = ts_now.strftime("%Y%m%d_%H%M%S")
+
+                    combined_log_lines = [
+                        "=== DEBUG DATA ===",
+                        f"Timestamp: {timestamp_str}",
+                        f"User: {username}",
+                        f"Pack: {pack}",
+                        f"MC Version: {m_version}",
+                        f"JVM Args: {jvm_args_str}",
+                        f"Exit Code: {ret_code}",
+                        f"New Crash Reports Count: {len(new_crash_files)}",
+                        "==================\n"
+                    ]
+
+                    if new_crash_files:
+                        for idx, crash_filepath in enumerate(new_crash_files, start=1):
+                            c_basename = os.path.basename(crash_filepath)
+                            c_content = ""
+                            try:
+                                with open(crash_filepath, "r", encoding="utf-8", errors="ignore") as cf:
+                                    c_content = cf.read()
+                            except Exception as e:
+                                c_content = f"Error reading crash report {c_basename}: {e}"
+                            combined_log_lines.append(f"=== CRASH REPORT {idx}: {c_basename} ===")
+                            combined_log_lines.append(c_content.rstrip())
+                            combined_log_lines.append(f"\nExit Code: {ret_code}\n")
+
+                    combined_log_lines.append("=== GAME LOG (latest.log - last 800 lines) ===")
+                    combined_log_lines.append(game_log_text if game_log_text else "No game log available.")
+                    combined_log_lines.append("\n=== END OF LOG ===")
+
+                    final_log_str = "\n".join(combined_log_lines)
+
+                    clean_user = username.strip() if username.strip() else "anonymous"
+                    ftp_filename = f"{clean_user}_crash_{file_ts}.log"
+
+                    # 1. Attempt HTTPS POST upload to https://files.pcmod.ddns.me/upload_crash.php via multipart/form-data
+                    https_uploaded = False
                     try:
-                        ftp_str = rot13_5("cg32.3pzbq.qqaf.zr")
-                        user_str = rot13_5("ybthc")
-                        pass_str = rot13_5("3pzbqybthc123")
-                        ftp = ftplib.FTP(ftp_str, timeout=5)
-                        ftp.login(user_str, pass_str)
-                        if os.path.exists(launch_log):
-                            with open(launch_log, "rb") as f:
-                                ftp.storlines(f"STOR {username}_crash.log", f)
-                        ftp.quit()
-                        log_init("Crash log uploaded via FTP successfully")
-                    except Exception:
-                        pass
+                        upload_url = "https://files.pcmod.ddns.me/upload_crash.php"
+                        fields = {"username": clean_user}
+                        files = [("file", ftp_filename, final_log_str.encode("utf-8", errors="ignore"), "text/plain")]
+                        c_type, post_data = encode_multipart_formdata(fields, files)
+
+                        req = urllib.request.Request(
+                            upload_url,
+                            data=post_data,
+                            headers={
+                                "User-Agent": "PCModClient/2.0",
+                                "Content-Type": c_type
+                            },
+                            method="POST"
+                        )
+                        ctx = ssl.create_default_context()
+                        ctx.check_hostname = False
+                        ctx.verify_mode = ssl.CERT_NONE
+                        with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
+                            if resp.status == 200:
+                                https_uploaded = True
+                                log_init(f"Crash log uploaded via HTTPS successfully: {ftp_filename}")
+                    except Exception as e:
+                        log_init(f"HTTPS crash upload note (falling back to active FTP): {e}")
+
+                    # 2. FTP Upload fallback using active transfer mode and ROT13_5 credentials
+                    if not https_uploaded:
+                        try:
+                            ftp_host = rot13_5("cpzbq.qqaf.zr")
+                            ftp_user = rot13_5("cpzbq")
+                            ftp_pass = rot13_5("cpzbqsgc")
+                            ftp = ftplib.FTP(ftp_host, timeout=5)
+                            ftp.login(ftp_user, ftp_pass)
+                            ftp.set_pasv(False)  # Enforce Active Transfer Mode
+
+                            # Navigate/Create /logins/{clean_user}/crash-reports directory
+                            target_dir = f"/logins/{clean_user}/crash-reports"
+                            dirs = [d for d in target_dir.split('/') if d]
+                            curr_dir = ""
+                            for d in dirs:
+                                curr_dir += "/" + d
+                                try:
+                                    ftp.cwd(curr_dir)
+                                except Exception:
+                                    try:
+                                        ftp.mkd(curr_dir)
+                                        ftp.cwd(curr_dir)
+                                    except Exception as err:
+                                        log_init(f"FTP mkdir/cwd warning on {curr_dir}: {err}")
+
+                            log_bytes = io.BytesIO(final_log_str.encode("utf-8", errors="ignore"))
+                            ftp.storbinary(f"STOR {ftp_filename}", log_bytes)
+                            ftp.quit()
+                            log_init(f"Crash log uploaded via active FTP successfully: {target_dir}/{ftp_filename}")
+                        except Exception as e:
+                            log_init(f"Error uploading crash log via FTP: {e}")
             finally:
                 if os.path.exists(lock_file):
                     try:

@@ -607,7 +607,7 @@
         <div class="panel left-sidebar" style="width: 100%; height: 100%;">
           <div class="panel-title">Tasks / Links</div>
           <button class="nav-btn" onclick="showModList()" id="modlistBtn">Mod List ( -- mods)</button>
-          <button class="nav-btn" onclick="openWeb('pcmod')">PCMod Website</button>
+          <button class="nav-btn" onclick="openLauncherFolder()">PCMod Folder</button>
           <button class="nav-btn" onclick="openWeb('discord')">Join Discord</button>
           <button class="nav-btn" onclick="openWeb('auth')">My Account</button>
 
@@ -739,10 +739,7 @@
         <div style="font-weight: 700; font-size: 16px; color: #ef4444;">Game Crashed! Crash Report Viewer</div>
         <div></div>
       </div>
-      <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-        <button class="btn-secondary" id="tabCrashBtn" onclick="switchCrashTab('crash_report')" style="width: 160px; background: rgba(59, 130, 246, 0.3);">Crash Report</button>
-        <button class="btn-secondary" id="tabGameLogBtn" onclick="switchCrashTab('game_log')" style="width: 160px;">Game Log</button>
-        <button class="btn-secondary" id="tabLaunchBtn" onclick="switchCrashTab('launch_log')" style="width: 160px;">Launch Log</button>
+      <div id="crashTabContainer" style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
       </div>
       <div class="table-container" style="padding: 12px; font-family: monospace; white-space: pre-wrap; word-break: break-all; color: #f8fafc;" id="crashTextContent">
         Loading crash report...
@@ -1044,7 +1041,7 @@
       initLauncher();
     }
 
-    var crashLogsCache = { launch_log: '', game_log: '', crash_report: '' };
+    var crashLogsCache = { game_log: '', crash_reports: [] };
 
     function onGameCrashed() {
       onGameLaunchState('idle');
@@ -1061,30 +1058,79 @@
         window.pywebview.api.get_latest_crash_logs().then(function(res) {
           if (!res) return;
           crashLogsCache = res;
-          switchCrashTab('crash_report');
+          renderCrashTabs();
         });
       }
     }
 
-    function switchCrashTab(tab) {
-      var tabCrashBtn = document.getElementById('tabCrashBtn');
-      var tabGameLogBtn = document.getElementById('tabGameLogBtn');
-      var tabLaunchBtn = document.getElementById('tabLaunchBtn');
+    function renderCrashTabs() {
+      var container = document.getElementById('crashTabContainer');
+      if (!container) return;
+      container.innerHTML = '';
+
+      var reports = crashLogsCache.crash_reports || [];
+      if (!Array.isArray(reports) || reports.length === 0) {
+        reports = [{ id: 'crash_1', title: 'Crash Report', content: crashLogsCache.crash_report || 'No crash reports found.' }];
+      }
+
+      reports.forEach(function(item, idx) {
+        var btn = document.createElement('button');
+        btn.className = 'btn-secondary crash-tab-btn';
+        btn.id = 'tab_' + item.id;
+        btn.style.width = '160px';
+        btn.innerText = item.title || ('Crash Report ' + (idx + 1));
+        btn.onclick = function() { switchCrashTab(item.id); };
+        container.appendChild(btn);
+      });
+
+      var gameLogBtn = document.createElement('button');
+      gameLogBtn.className = 'btn-secondary crash-tab-btn';
+      gameLogBtn.id = 'tab_game_log';
+      gameLogBtn.style.width = '160px';
+      gameLogBtn.innerText = 'Game Log';
+      gameLogBtn.onclick = function() { switchCrashTab('game_log'); };
+      container.appendChild(gameLogBtn);
+
+      if (reports.length > 0) {
+        switchCrashTab(reports[0].id);
+      } else {
+        switchCrashTab('game_log');
+      }
+    }
+
+    function switchCrashTab(tabId) {
+      var container = document.getElementById('crashTabContainer');
+      if (container) {
+        var buttons = container.getElementsByClassName('crash-tab-btn');
+        for (var i = 0; i < buttons.length; i++) {
+          buttons[i].style.background = 'rgba(255, 255, 255, 0.06)';
+        }
+      }
+
+      var activeBtn = document.getElementById('tab_' + tabId);
+      if (activeBtn) {
+        activeBtn.style.background = 'rgba(59, 130, 246, 0.4)';
+      }
+
       var contentDiv = document.getElementById('crashTextContent');
+      if (!contentDiv) return;
 
-      tabCrashBtn.style.background = 'rgba(255, 255, 255, 0.06)';
-      tabGameLogBtn.style.background = 'rgba(255, 255, 255, 0.06)';
-      tabLaunchBtn.style.background = 'rgba(255, 255, 255, 0.06)';
-
-      if (tab === 'crash_report') {
-        tabCrashBtn.style.background = 'rgba(59, 130, 246, 0.4)';
-        contentDiv.innerText = crashLogsCache.crash_report || 'No crash report available.';
-      } else if (tab === 'game_log') {
-        tabGameLogBtn.style.background = 'rgba(59, 130, 246, 0.4)';
+      if (tabId === 'game_log') {
         contentDiv.innerText = crashLogsCache.game_log || 'No game log available.';
       } else {
-        tabLaunchBtn.style.background = 'rgba(59, 130, 246, 0.4)';
-        contentDiv.innerText = crashLogsCache.launch_log || 'No launch log available.';
+        var reports = crashLogsCache.crash_reports || [];
+        var found = null;
+        for (var idx = 0; idx < reports.length; idx++) {
+          if (reports[idx].id === tabId) {
+            found = reports[idx];
+            break;
+          }
+        }
+        if (found) {
+          contentDiv.innerText = found.content;
+        } else {
+          contentDiv.innerText = crashLogsCache.crash_report || 'No crash report content available.';
+        }
       }
     }
 
@@ -1515,6 +1561,12 @@
     function openWeb(site) {
       if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.open_web(site);
+      }
+    }
+
+    function openLauncherFolder() {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.open_launcher_folder();
       }
     }
 
