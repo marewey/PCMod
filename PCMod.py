@@ -2183,7 +2183,7 @@ class Api:
                 except Exception:
                     pass
 
-            main_pack_installed = os.path.exists(os.path.join(DATA_DIR, "packs", main_pack))
+            main_pack_installed = os.path.exists(os.path.join(DATA_DIR, "packs", main_pack, f"PCMod-{main_pack}.pak"))
             game_info = get_running_game_info()
 
             return {
@@ -2399,7 +2399,7 @@ class Api:
                                 continue
                             ver = parts[1].strip()
                             loader = parts[2].strip() if len(parts) >= 3 else "forge"
-                            installed = os.path.exists(os.path.join(DATA_DIR, "packs", k))
+                            installed = os.path.exists(os.path.join(DATA_DIR, "packs", k, f"PCMod-{k}.pak"))
                             packs.append({
                                 "name": k,
                                 "version": ver,
@@ -2414,7 +2414,7 @@ class Api:
                 "name": "2-5-x",
                 "version": "2.5.3a",
                 "modloader": "forge",
-                "installed": os.path.exists(os.path.join(DATA_DIR, "packs", "2-5-x"))
+                "installed": os.path.exists(os.path.join(DATA_DIR, "packs", "2-5-x", "PCMod-2-5-x.pak"))
             }]
 
         return {"packs": packs}
