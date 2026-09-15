@@ -229,48 +229,88 @@ def clean_old_crash_reports(max_days=90):
         log_init(f"Error during crash report cleanup: {e}")
 
 def apply_lite_mode_changes(enabled):
-    """Renames *-client.jar to *-client.disabled (when enabled=True) or vice-versa (when enabled=False), logging every mod modified."""
+    """Moves client-only mods (tagged 'C' in PCMod-{pack}.pak) between mods/ and disabled_mods/ based on Lite Mode state."""
     try:
         pack = get_pack_name()
-        mods_dir = os.path.join(DATA_DIR, "packs", pack, "mods")
-        if not os.path.exists(mods_dir):
-            log_init(f"Mods directory '{mods_dir}' does not exist yet. Skipping Lite Mode mod renaming.")
-            return
+        pack_dir = os.path.join(DATA_DIR, "packs", pack)
+        mods_dir = os.path.join(pack_dir, "mods")
+        disabled_dir = os.path.join(pack_dir, "disabled_mods")
+
+        os.makedirs(mods_dir, exist_ok=True)
+        os.makedirs(disabled_dir, exist_ok=True)
+
+        # Parse PCMod-{pack}.pak to identify C-tagged mods
+        c_mod_files = set()
+        pak_file = os.path.join(pack_dir, f"PCMod-{pack}.pak")
+        if os.path.exists(pak_file):
+            try:
+                with open(pak_file, "r", encoding="utf-8", errors="ignore") as pf:
+                    for line in pf:
+                        parts = line.strip().split(";")
+                        if len(parts) >= 2 and parts[0].strip() == "C":
+                            c_mod_files.add(parts[1].strip())
+            except Exception as e:
+                log_init(f"Warning reading pak file for Lite Mode: {e}")
 
         if enabled:
-            disabled_mods = []
-            for f in os.listdir(mods_dir):
-                if f.endswith("-client.jar"):
-                    old_path = os.path.join(mods_dir, f)
-                    new_file = f[:-4] + ".disabled"
-                    new_path = os.path.join(mods_dir, new_file)
-                    try:
-                        os.rename(old_path, new_path)
-                        disabled_mods.append(f)
-                        log_init(f"[Lite Mode ON] Disabled client mod: {f} -> {new_file}")
-                    except Exception as e:
-                        log_init(f"[Lite Mode ON] Error disabling mod {f}: {e}")
-            if disabled_mods:
-                log_init(f"Lite Mode Enabled: Disabled {len(disabled_mods)} client mod(s): {', '.join(disabled_mods)}")
+            disabled_count = 0
+            # Process files in mods_dir that match C tag or end with -client.jar or -client.disabled
+            if os.path.exists(mods_dir):
+                for f in os.listdir(mods_dir):
+                    is_c_mod = f in c_mod_files or f.endswith("-client.jar") or f.endswith("-client.disabled")
+                    if is_c_mod:
+                        src_path = os.path.join(mods_dir, f)
+                        dest_filename = f[:-9] + ".jar" if f.endswith(".disabled") else f
+                        dst_path = os.path.join(disabled_dir, dest_filename)
+                        try:
+                            if os.path.exists(dst_path):
+                                os.remove(dst_path)
+                            os.rename(src_path, dst_path)
+                            disabled_count += 1
+                            log_init(f"[Lite Mode ON] Moved client mod to disabled_mods: {f} -> disabled_mods/{dest_filename}")
+                        except Exception as e:
+                            log_init(f"[Lite Mode ON] Error disabling mod {f}: {e}")
+            if disabled_count > 0:
+                log_init(f"Lite Mode Enabled: Moved {disabled_count} client-only mod(s) to disabled_mods/.")
             else:
-                log_init("Lite Mode Enabled: No active '-client.jar' mods were found to disable.")
+                log_init("Lite Mode Enabled: No active client-only mods were found to disable.")
         else:
-            enabled_mods = []
-            for f in os.listdir(mods_dir):
-                if f.endswith("-client.disabled"):
-                    old_path = os.path.join(mods_dir, f)
-                    new_file = f[:-9] + ".jar"
-                    new_path = os.path.join(mods_dir, new_file)
-                    try:
-                        os.rename(old_path, new_path)
-                        enabled_mods.append(new_file)
-                        log_init(f"[Lite Mode OFF] Re-enabled client mod: {f} -> {new_file}")
-                    except Exception as e:
-                        log_init(f"[Lite Mode OFF] Error re-enabling mod {f}: {e}")
-            if enabled_mods:
-                log_init(f"Lite Mode Disabled: Re-enabled {len(enabled_mods)} client mod(s): {', '.join(enabled_mods)}")
+            enabled_count = 0
+            # 1. Move back all files from disabled_mods/ to mods/
+            if os.path.exists(disabled_dir):
+                for f in os.listdir(disabled_dir):
+                    src_path = os.path.join(disabled_dir, f)
+                    if os.path.isfile(src_path):
+                        dst_path = os.path.join(mods_dir, f)
+                        try:
+                            if os.path.exists(dst_path):
+                                os.remove(dst_path)
+                            os.rename(src_path, dst_path)
+                            enabled_count += 1
+                            log_init(f"[Lite Mode OFF] Restored client mod to mods: disabled_mods/{f} -> mods/{f}")
+                        except Exception as e:
+                            log_init(f"[Lite Mode OFF] Error restoring mod {f}: {e}")
+
+            # 2. Also check for any leftover -client.disabled files in mods_dir
+            if os.path.exists(mods_dir):
+                for f in os.listdir(mods_dir):
+                    if f.endswith("-client.disabled"):
+                        src_path = os.path.join(mods_dir, f)
+                        target_name = f[:-9] + ".jar"
+                        dst_path = os.path.join(mods_dir, target_name)
+                        try:
+                            if os.path.exists(dst_path):
+                                os.remove(dst_path)
+                            os.rename(src_path, dst_path)
+                            enabled_count += 1
+                            log_init(f"[Lite Mode OFF] Re-enabled legacy disabled mod: {f} -> {target_name}")
+                        except Exception as e:
+                            log_init(f"[Lite Mode OFF] Error re-enabling mod {f}: {e}")
+
+            if enabled_count > 0:
+                log_init(f"Lite Mode Disabled: Restored {enabled_count} client-only mod(s) to mods/.")
             else:
-                log_init("Lite Mode Disabled: No '-client.disabled' mods were found to re-enable.")
+                log_init("Lite Mode Disabled: No disabled client-only mods were found to restore.")
     except Exception as e:
         log_init(f"Error applying Lite Mode changes: {e}")
 
