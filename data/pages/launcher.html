@@ -1,0 +1,1590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="../icons/icon.ico" type="image/x-icon">
+  <title>PCMod Client</title>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --card-bg: rgba(15, 23, 42, 0.88);
+      --card-border: rgba(255, 255, 255, 0.12);
+      --card-hover-border: rgba(59, 130, 246, 0.4);
+      --accent-blue: #3b82f6;
+      --accent-blue-hover: #2563eb;
+      --accent-green: #10b981;
+      --accent-green-hover: #059669;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --input-bg: rgba(30, 41, 59, 0.7);
+      --input-border: rgba(255, 255, 255, 0.15);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 30%, #1e293b 0%, #0f172a 60%, #090d16 100%);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* Ambient background glow */
+    body::before {
+      content: '';
+      position: absolute;
+      top: -10%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 300px;
+      background: radial-gradient(ellipse at center, rgba(59, 130, 246, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .app-container {
+      width: 1140px;
+      height: 650px;
+      padding: 14px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .view-panel {
+      width: 100%;
+      height: 100%;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 210px 1fr 210px;
+      gap: 14px;
+      height: 100%;
+    }
+
+    .panel {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      transition: border-color 0.3s;
+    }
+
+    .panel:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .panel-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      color: #38bdf8;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      text-align: center;
+      text-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+    }
+
+    /* Left Sidebar */
+    .left-sidebar {
+      gap: 10px;
+    }
+
+    .nav-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .nav-btn:hover {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: rgba(59, 130, 246, 0.4);
+      color: #ffffff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .player-list {
+      flex: 1;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+      overflow-y: auto;
+      margin-top: 8px;
+    }
+
+    /* Main Center Content */
+    .main-content {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: center;
+      height: 100%;
+    }
+
+    .logo-header {
+      text-align: center;
+      margin-bottom: 0px;
+      flex-shrink: 0;
+      width: 100%;
+    }
+
+    .logo-header img {
+      max-height: 95px;
+      max-width: 100%;
+      object-fit: contain;
+      filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.6));
+    }
+
+    .news-card {
+      flex: 1;
+      width: 100%;
+      overflow: hidden;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .news-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.4);
+      flex: 1;
+    }
+
+    .action-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      width: 100%;
+      flex-shrink: 0;
+    }
+
+    .btn-launch {
+      background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    }
+
+    .btn-launch:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5);
+      background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+    }
+
+    .btn-launch:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btn-update {
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.35);
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    }
+
+    .btn-update:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(59, 130, 246, 0.5);
+      background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+    }
+
+    .version-footer {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: right;
+      width: 100%;
+      padding-top: 2px;
+    }
+
+    /* Right Sidebar (Settings & Login) */
+    .right-sidebar {
+      gap: 8px;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: var(--text-main);
+    }
+
+    .setting-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent-blue);
+      cursor: pointer;
+    }
+
+    .setting-row input[type="number"],
+    .setting-row select {
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text-main);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 12px;
+      width: 90px;
+      outline: none;
+    }
+
+    .login-section {
+      margin-top: auto;
+      padding-top: 8px;
+    }
+
+    .input-field {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text-main);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 13px;
+      margin-bottom: 8px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-field:focus {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .btn-login {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+      margin-top: 4px;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-login:hover {
+      background: linear-gradient(135deg, #60a5fa 0%, #1d4ed8 100%);
+    }
+
+    .login-msg {
+      font-size: 11px;
+      margin-bottom: 8px;
+      text-align: center;
+      display: none;
+    }
+
+    /* Modal Update Notification */
+    .modal-overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal-card {
+      background: #1e293b;
+      border: 1px solid var(--accent-blue);
+      border-radius: 12px;
+      padding: 20px 24px;
+      width: 420px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+      text-align: center;
+    }
+
+    /* Modlist & Updater Views */
+    .header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .btn-back {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-back:hover {
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    .table-container {
+      flex: 1;
+      overflow-y: auto;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 10px;
+    }
+
+    table.mod-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    table.mod-table th {
+      position: sticky;
+      top: 0;
+      background: #1e293b;
+      color: #38bdf8;
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    table.mod-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: #f8fafc;
+    }
+
+    /* Streamlined Updater Layout */
+    .updater-header-card {
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .updater-status-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .status-badge.badge-success {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid rgba(16, 185, 129, 0.5);
+      color: #34d399;
+    }
+
+    .status-badge.badge-warning {
+      background: rgba(234, 179, 8, 0.2);
+      border: 1px solid rgba(234, 179, 8, 0.5);
+      color: #fde047;
+    }
+
+    .updater-sections-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .updater-section-box {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .updater-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #38bdf8;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-updater-action {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 12px 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-updater-action:hover {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: var(--accent-blue);
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    .btn-updater-primary {
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-updater-primary:hover {
+      background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+    }
+
+    .pack-downloader-panel {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 12px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .pack-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      overflow-y: auto;
+      padding-right: 4px;
+      flex: 1;
+      margin-top: 8px;
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 14px;
+      background: rgba(0,0,0,0.5);
+      border-radius: 7px;
+      overflow: hidden;
+      border: 1px solid var(--card-border);
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
+      transition: width 0.2s ease-in-out;
+    }
+
+    .log-drawer {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--input-border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #94a3b8;
+      max-height: 48px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- 1. MAIN LAUNCHER VIEW -->
+    <div id="mainView" class="view-panel main-grid">
+      <!-- Left Column: Navigation & Server Info -->
+      <div class="main-content" style="grid-column: 1;">
+        <div class="panel left-sidebar" style="width: 100%; height: 100%;">
+          <div class="panel-title">Tasks / Links</div>
+          <button class="nav-btn" onclick="showModList()" id="modlistBtn">Mod List ( -- mods)</button>
+          <button class="nav-btn" onclick="openWeb('pcmod')">PCMod Website</button>
+          <button class="nav-btn" onclick="openWeb('discord')">Join Discord</button>
+          <button class="nav-btn" onclick="openWeb('auth')">My Account</button>
+
+          <div style="margin-top: 10px; border-top: 1px solid var(--card-border); padding-top: 10px; flex: 1; display: flex; flex-direction: column;">
+            <div class="panel-title" style="margin-bottom: 8px;">Players Online</div>
+            <button class="nav-btn" style="padding: 6px; font-size: 12px;" onclick="refreshPlayers()">Refresh</button>
+            <div class="player-list" id="playerList">
+              Loading...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Middle Column: Logo, News & Main Actions -->
+      <div class="main-content" style="grid-column: 2;">
+        <div class="logo-header">
+          <img src="../icons/pcmod.png" alt="PCMod Client" id="logoImg">
+        </div>
+
+        <div class="panel news-card">
+          <iframe src="updates.html" class="news-iframe" id="newsIframe"></iframe>
+        </div>
+
+        <div class="action-bar">
+          <button class="btn-launch" id="launchBtn" onclick="launchGame()">
+            <span id="launchBtnText">LAUNCH</span>
+            <span id="launchBtnSubText" style="display: none; font-size: 10px; font-weight: 500; margin-top: 2px; color: #bae6fd;">Downloading Missing Resources...</span>
+          </button>
+          <button class="btn-update" onclick="handleUpdateButtonClick()">UPDATE</button>
+        </div>
+
+        <div class="version-footer" id="versionFooter">Launcher: 1.2a / Pack: 2.5.3a</div>
+      </div>
+
+      <!-- Right Column: Settings & Account Login -->
+      <div class="main-content" style="grid-column: 3;">
+        <div class="panel right-sidebar" style="width: 100%; height: 100%;">
+          <div class="panel-title">Settings</div>
+
+          <div class="setting-row">
+            <label for="shortcut">Shortcut</label>
+            <input type="checkbox" id="shortcut" onchange="toggleShortcut()">
+          </div>
+          <div class="setting-row">
+            <label for="autoserver">Auto Server</label>
+            <input type="checkbox" id="autoserver" onchange="toggleAutoServer()">
+          </div>
+          <div class="setting-row">
+            <label for="loglogins">Log Logins</label>
+            <input type="checkbox" id="loglogins" onchange="toggleLogLogins()">
+          </div>
+          <div class="setting-row">
+            <label for="litemode">Lite Mode</label>
+            <input type="checkbox" id="litemode" onchange="toggleLiteMode()">
+          </div>
+          <div class="setting-row">
+            <label for="showconsole">Console</label>
+            <input type="checkbox" id="showconsole" onchange="toggleShowConsole()">
+          </div>
+          <div class="setting-row">
+            <label for="serveralerts">Server Alerts</label>
+            <input type="checkbox" id="serveralerts" onchange="toggleServerAlerts()">
+          </div>
+          <div class="setting-row" style="margin-top: 4px;">
+            <label for="selver">Version</label>
+            <select id="selver" onchange="changeVersion()">
+              <option value="">Default</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="maxram">Memory</label>
+            <input type="number" id="maxram" value="4096" step="512" min="1024" onchange="changeMemory()">
+          </div>
+
+          <hr style="border: none; border-top: 1px solid var(--card-border); margin: 8px 0 8px 0;">
+
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <button class="btn-secondary" onclick="launchServer()">Launch Server</button>
+          </div>
+
+          <div class="login-section">
+            <div class="login-msg" id="loginMsg"></div>
+            <div style="border-top: 1px solid var(--card-border); padding-top: 8px;">
+              <div class="panel-title" style="margin-bottom: 6px;">Login</div>
+              <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                <span style="font-size: 12px; color: var(--text-muted); width: 35px;">User</span>
+                <input type="text" class="input-field" id="username" placeholder="Username" style="margin-bottom: 0;">
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                <span style="font-size: 12px; color: var(--text-muted); width: 35px;">Pass</span>
+                <input type="password" class="input-field" id="password" placeholder="Password" style="margin-bottom: 0;">
+              </div>
+              <button class="btn-login" onclick="performLogin()">Login</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. MODLIST VIEW -->
+    <div id="modlistView" class="view-panel panel" style="display: none; flex-direction: column;">
+      <div class="header-bar">
+        <button class="btn-back" onclick="showMainView()">← Back to Launcher</button>
+        <div style="font-weight: 700; font-size: 16px; color: #38bdf8;" id="modlistTitle">
+          Mod List (<span id="modlistCount">0</span> mods) - Pack: <span id="modlistPack">2-5-x</span>
+        </div>
+        <input type="text" class="input-field" id="modSearch" placeholder="Filter mods..." oninput="filterModList()" style="width: 180px; margin-bottom: 0;">
+      </div>
+      <div class="table-container">
+        <table class="mod-table">
+          <thead>
+            <tr>
+              <th>Mod Name</th>
+              <th>Requirement / Side</th>
+              <th>Version Added/Updated</th>
+            </tr>
+          </thead>
+          <tbody id="modTableBody">
+            <tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Loading mod list...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 2.5 CRASH REPORT VIEW -->
+    <div id="crashView" class="view-panel panel" style="display: none; flex-direction: column;">
+      <div class="header-bar">
+        <button class="btn-back" onclick="showMainView()">← Back to Launcher</button>
+        <div style="font-weight: 700; font-size: 16px; color: #ef4444;">Game Crashed! Crash Report Viewer</div>
+        <div></div>
+      </div>
+      <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+        <button class="btn-secondary" id="tabCrashBtn" onclick="switchCrashTab('crash_report')" style="width: 160px; background: rgba(59, 130, 246, 0.3);">Crash Report</button>
+        <button class="btn-secondary" id="tabGameLogBtn" onclick="switchCrashTab('game_log')" style="width: 160px;">Game Log</button>
+        <button class="btn-secondary" id="tabLaunchBtn" onclick="switchCrashTab('launch_log')" style="width: 160px;">Launch Log</button>
+      </div>
+      <div class="table-container" style="padding: 12px; font-family: monospace; white-space: pre-wrap; word-break: break-all; color: #f8fafc;" id="crashTextContent">
+        Loading crash report...
+      </div>
+    </div>
+
+    <!-- 3. UPDATER VIEW -->
+    <div id="updateView" class="view-panel panel" style="display: none; flex-direction: column;">
+      <div class="header-bar" style="margin-bottom: 10px;">
+        <button class="btn-back" onclick="showMainView()">← Back to Launcher</button>
+        <div style="font-weight: 700; font-size: 16px; color: #38bdf8;">PCMod Client Updater</div>
+        <button class="btn-secondary" style="width: auto; padding: 6px 12px;" onclick="cancelOrCloseUpdate()">Cancel / Close</button>
+      </div>
+
+      <!-- Top Status Card -->
+      <div class="updater-header-card">
+        <div class="updater-status-header">
+          <div>
+            <span style="font-size: 14px; font-weight: 700; color: #38bdf8;" id="updateTitle">Updater Menu</span>
+            <span style="font-size: 12px; color: var(--text-muted); margin-left: 8px;" id="updaterVersionText">Checking versions...</span>
+          </div>
+          <span class="status-badge badge-success" id="updateBadge">
+            <span style="width: 6px; height: 6px; border-radius: 50%; background: currentColor;"></span>
+            <span id="updateBadgeText">UP TO DATE</span>
+          </span>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+          <div class="progress-bar-bg" style="flex: 1;">
+            <div class="progress-bar-fill" id="updateProgressFill"></div>
+          </div>
+          <span style="font-size: 12px; font-weight: 700; color: #38bdf8; width: 36px; text-align: right;" id="updateProgressText">0%</span>
+        </div>
+
+        <div class="log-drawer" id="updateMessage">Select an update task below.</div>
+      </div>
+
+      <!-- Sections Grid -->
+      <div class="updater-sections-grid">
+        <!-- Quick Actions Box -->
+        <div class="updater-section-box">
+          <div class="updater-section-title">⚡ Quick Actions</div>
+          <div class="action-row">
+            <button class="btn-updater-action btn-updater-primary" onclick="hidePackCards(); runUpdateAction('auto');">
+              <span style="font-size: 16px;">⚡</span>
+              <span>Auto Update</span>
+            </button>
+            <button class="btn-updater-action" onclick="hidePackCards(); runUpdateAction('refresh_mods');">
+              <span style="font-size: 16px;">🔄</span>
+              <span>Refresh Mods</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Version Management Box -->
+        <div class="updater-section-box">
+          <div class="updater-section-title">🚀 Version Management</div>
+          <div class="action-row">
+            <button class="btn-updater-action" onclick="openVersionSelector('launcher')">
+              <span style="font-size: 16px;">🚀</span>
+              <span>Launcher Version</span>
+            </button>
+            <button class="btn-updater-action" onclick="openVersionSelector('pack')">
+              <span style="font-size: 16px;">🎮</span>
+              <span>Pack Version</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pack Downloader Panel -->
+      <div class="pack-downloader-panel">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;">
+          <div class="updater-section-title">📦 Pack Downloader (Available Packs)</div>
+          <button class="btn-secondary" style="width: auto; padding: 4px 10px; font-size: 11px;" onclick="showPackDownloaderCards(true)">Refresh List</button>
+        </div>
+        <div class="pack-cards-grid" id="packCardsList">
+          <div style="color: var(--text-muted); font-size: 12px; grid-column: span 3; text-align: center; padding: 20px;">Loading available packs...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. VERSION SELECTOR MODAL -->
+    <div id="versionSelectModal" class="modal-overlay" style="display: none;">
+      <div class="modal-card" style="width: 380px;">
+        <div style="font-size: 16px; font-weight: 800; color: #38bdf8; margin-bottom: 12px;" id="versionSelectModalTitle">Select Version</div>
+
+        <div style="text-align: left; margin-bottom: 12px;">
+          <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px;">Choose Version:</label>
+          <select id="versionDropdownSelect" class="input-field" style="margin-bottom: 0;" onchange="onVersionDropdownChange()">
+            <option value="latest">Latest (Auto)</option>
+            <option value="custom">Custom...</option>
+          </select>
+        </div>
+
+        <div id="customVersionInputContainer" style="display: none; text-align: left; margin-bottom: 16px;">
+          <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px;">Enter Custom Version String:</label>
+          <input type="text" id="customVersionTextInput" class="input-field" placeholder="e.g. 2.0a or 2.5.3a" style="margin-bottom: 0;">
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: center;">
+          <button class="btn-login" style="width: 120px; margin-top:0;" onclick="confirmVersionSelection()">Install</button>
+          <button class="btn-secondary" style="width: 100px;" onclick="closeVersionSelectModal()">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. UPDATE NOTIFICATION MODAL -->
+    <div id="updateAlertModal" class="modal-overlay" style="display: none;">
+      <div class="modal-card">
+        <div style="font-size: 18px; font-weight: 800; color: #38bdf8; margin-bottom: 8px;" id="updateAlertTitle">New Update Available!</div>
+        <div style="font-size: 13px; color: var(--text-main); margin-bottom: 16px;" id="updateAlertDetails">
+          A new update was found for PCMod.
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: center;" id="updateAlertButtons">
+          <button class="btn-login" style="width: 140px; margin-top:0;" onclick="startModalAutoUpdate()">Update Now</button>
+          <button class="btn-secondary" style="width: 100px;" onclick="closeUpdateModal()">Later</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. RAM WARNING MODAL -->
+    <div id="ramWarningModal" class="modal-overlay" style="display: none;">
+      <div class="modal-card" style="width: 440px;">
+        <div style="font-size: 18px; font-weight: 800; color: #f59e0b; margin-bottom: 10px;">⚠️ Memory Warning</div>
+        <div style="font-size: 13px; color: var(--text-main); margin-bottom: 18px; line-height: 1.5;" id="ramWarningDetails">
+          Allocated RAM is low or system RAM is 8GB or less. The game might be unplayable or really unstable.
+        </div>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+          <button class="btn-login" style="width: 150px; margin-top:0; background: #f59e0b; color: #0f172a;" onclick="confirmRamWarningLaunch()">Continue Anyway</button>
+          <button class="btn-secondary" style="width: 110px;" onclick="closeRamWarningModal()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var isInitialized = false;
+    var allModsCache = [];
+
+    var currentGameLaunchState = 'idle';
+    var isUpdateActive = false;
+    var hasShownStartupPopup = false;
+    var hasShownUpdateBtnPopup = false;
+
+    function onGameLaunchState(state) {
+      currentGameLaunchState = state;
+      var launchBtn = document.getElementById('launchBtn');
+      var mainText = document.getElementById('launchBtnText');
+      var subText = document.getElementById('launchBtnSubText');
+      var u = document.getElementById('username').value;
+
+      if (!launchBtn) return;
+
+      if (state === 'downloading') {
+        launchBtn.disabled = true;
+        launchBtn.style.opacity = '0.7';
+        launchBtn.style.cursor = 'not-allowed';
+        if (mainText) mainText.innerText = 'LAUNCHING...';
+        if (subText) subText.style.display = 'block';
+      } else if (state === 'running') {
+        launchBtn.disabled = false;
+        launchBtn.style.opacity = '0.7';
+        launchBtn.style.cursor = 'pointer';
+        if (mainText) mainText.innerText = 'GAME RUNNING...';
+        if (subText) subText.style.display = 'none';
+      } else {
+        // Idle
+        if (mainText) mainText.innerText = 'LAUNCH';
+        if (subText) subText.style.display = 'none';
+        updateLaunchButtonState(u);
+      }
+    }
+
+    function updateLaunchButtonState(username) {
+      if (currentGameLaunchState !== 'idle') return;
+      var launchBtn = document.getElementById('launchBtn');
+      var isLoggedIn = username && username.trim() !== "";
+
+      if (isUpdateActive) {
+        if (launchBtn) {
+          launchBtn.disabled = true;
+          launchBtn.style.opacity = '0.5';
+          launchBtn.style.cursor = 'not-allowed';
+          launchBtn.title = 'Update in progress...';
+        }
+        return;
+      }
+
+      if (launchBtn) {
+        launchBtn.disabled = !isLoggedIn;
+        if (!isLoggedIn) {
+          launchBtn.style.opacity = '0.5';
+          launchBtn.style.cursor = 'not-allowed';
+          launchBtn.title = 'Please enter a username and login first!';
+        } else {
+          launchBtn.style.opacity = '1.0';
+          launchBtn.style.cursor = 'pointer';
+          launchBtn.title = 'Launch Game';
+        }
+      }
+    }
+
+    function initLauncher() {
+      if (!window.pywebview || !window.pywebview.api) {
+        setTimeout(initLauncher, 150);
+        return;
+      }
+      window.pywebview.api.init_launcher().then(function(data) {
+        if (!data) return;
+
+        // 1. User & Launch restriction
+        if (data.user) {
+          document.getElementById('username').value = data.user;
+        }
+
+        if (data.game_running) {
+          onGameLaunchState('running');
+        } else if (data.user) {
+          updateLaunchButtonState(data.user);
+        } else {
+          updateLaunchButtonState("");
+        }
+
+        // 2. Settings Checkboxes
+        if (data.settings) {
+          document.getElementById('shortcut').checked = (data.settings.shortcut === "1");
+          document.getElementById('autoserver').checked = (data.settings.autoserver === "1");
+          document.getElementById('loglogins').checked = (data.settings.log_logins === "1" || data.settings['log-logins'] === "1");
+          document.getElementById('litemode').checked = (data.settings.lite === "1");
+          document.getElementById('showconsole').checked = (data.settings.showconsole === "1");
+          document.getElementById('serveralerts').checked = (data.settings.server_alerts === "1");
+          if (data.settings.memory) {
+            document.getElementById('maxram').value = data.settings.memory;
+          }
+        }
+
+        // 3. Mod count label: Mod List (--- mods)
+        if (data.modcount !== undefined) {
+          document.getElementById('modlistBtn').innerText = "Mod List (" + data.modcount + " mods)";
+        }
+
+        // 4. Version footer
+        if (data.launcher_version && data.pack_version) {
+          document.getElementById('versionFooter').innerText = "Launcher: " + data.launcher_version + " / Pack: " + data.pack_version;
+        }
+
+        // 5. Version dropdown select
+        if (data.versions_list && data.versions_list.length > 0) {
+          var select = document.getElementById('selver');
+          select.innerHTML = "";
+          for (var i = 0; i < data.versions_list.length; i++) {
+            var v = data.versions_list[i];
+            var opt = document.createElement('option');
+            opt.value = i + " " + v.name;
+            opt.text = v.name;
+            if (v.name === (data.settings ? data.settings.pack : '')) {
+              opt.selected = true;
+            }
+            select.add(opt);
+          }
+        }
+
+        refreshPlayers();
+        checkUpdatesOnStartup();
+
+        // Prompt if main default pack from line 2 of version file is missing (checked LAST after UI is populated)
+        if (data.main_pack && data.main_pack_installed === false) {
+          setTimeout(function() {
+            if (confirm("Main Pack (" + data.main_pack + ") is not installed.\n\nDo you want to Download Main Pack: (" + data.main_pack + ")?")) {
+              openUpdateViewWithAction('download_full_pack', data.main_pack);
+            }
+          }, 200);
+        }
+      }).catch(function(err) {
+        console.error("init_launcher call failed, retrying in 300ms...", err);
+        setTimeout(initLauncher, 300);
+      });
+    }
+
+    var initInterval = setInterval(function() {
+      if (window.pywebview && window.pywebview.api) {
+        clearInterval(initInterval);
+        initLauncher();
+      }
+    }, 100);
+
+    window.addEventListener('pywebviewready', function() {
+      clearInterval(initInterval);
+      initLauncher();
+    });
+
+    // View Navigation
+    function showMainView() {
+      document.getElementById('mainView').style.display = 'grid';
+      document.getElementById('modlistView').style.display = 'none';
+      document.getElementById('crashView').style.display = 'none';
+      document.getElementById('updateView').style.display = 'none';
+      initLauncher();
+    }
+
+    var crashLogsCache = { launch_log: '', game_log: '', crash_report: '' };
+
+    function onGameCrashed() {
+      onGameLaunchState('idle');
+      showCrashView();
+    }
+
+    function showCrashView() {
+      document.getElementById('mainView').style.display = 'none';
+      document.getElementById('modlistView').style.display = 'none';
+      document.getElementById('crashView').style.display = 'flex';
+      document.getElementById('updateView').style.display = 'none';
+
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.get_latest_crash_logs().then(function(res) {
+          if (!res) return;
+          crashLogsCache = res;
+          switchCrashTab('crash_report');
+        });
+      }
+    }
+
+    function switchCrashTab(tab) {
+      var tabCrashBtn = document.getElementById('tabCrashBtn');
+      var tabGameLogBtn = document.getElementById('tabGameLogBtn');
+      var tabLaunchBtn = document.getElementById('tabLaunchBtn');
+      var contentDiv = document.getElementById('crashTextContent');
+
+      tabCrashBtn.style.background = 'rgba(255, 255, 255, 0.06)';
+      tabGameLogBtn.style.background = 'rgba(255, 255, 255, 0.06)';
+      tabLaunchBtn.style.background = 'rgba(255, 255, 255, 0.06)';
+
+      if (tab === 'crash_report') {
+        tabCrashBtn.style.background = 'rgba(59, 130, 246, 0.4)';
+        contentDiv.innerText = crashLogsCache.crash_report || 'No crash report available.';
+      } else if (tab === 'game_log') {
+        tabGameLogBtn.style.background = 'rgba(59, 130, 246, 0.4)';
+        contentDiv.innerText = crashLogsCache.game_log || 'No game log available.';
+      } else {
+        tabLaunchBtn.style.background = 'rgba(59, 130, 246, 0.4)';
+        contentDiv.innerText = crashLogsCache.launch_log || 'No launch log available.';
+      }
+    }
+
+    function showModList() {
+      document.getElementById('mainView').style.display = 'none';
+      document.getElementById('modlistView').style.display = 'flex';
+      document.getElementById('updateView').style.display = 'none';
+
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.get_modlist().then(function(res) {
+          if (!res) return;
+          allModsCache = res.mods || [];
+          document.getElementById('modlistCount').innerText = res.count || allModsCache.length;
+          document.getElementById('modlistBtn').innerText = "Mod List (" + (res.count || allModsCache.length) + " mods)";
+          document.getElementById('modlistPack').innerText = res.pack || '';
+          renderModTable(allModsCache);
+        });
+      }
+    }
+
+    function renderModTable(mods) {
+      var tbody = document.getElementById('modTableBody');
+      tbody.innerHTML = '';
+      if (!mods || mods.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">No mods found.</td></tr>';
+        return;
+      }
+      for (var i = 0; i < mods.length; i++) {
+        var m = mods[i];
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td>' + m.name + '</td><td>' + m.side + '</td><td>' + m.version + '</td>';
+        tbody.appendChild(tr);
+      }
+    }
+
+    function filterModList() {
+      var query = document.getElementById('modSearch').value.toLowerCase();
+      var filtered = allModsCache.filter(function(m) {
+        return m.name.toLowerCase().includes(query) || m.side.toLowerCase().includes(query) || m.version.toLowerCase().includes(query);
+      });
+      renderModTable(filtered);
+    }
+
+    function hidePackCards() {
+      var container = document.getElementById('packCardsContainer');
+      if (container) container.style.display = 'none';
+    }
+
+    var activeVersionTarget = 'launcher'; // 'launcher' or 'pack'
+
+    function openVersionSelector(target) {
+      activeVersionTarget = target;
+      var modalTitle = document.getElementById('versionSelectModalTitle');
+      var dropdown = document.getElementById('versionDropdownSelect');
+      var customInput = document.getElementById('customVersionTextInput');
+
+      if (target === 'launcher') {
+        modalTitle.innerText = "Select Launcher Version";
+      } else {
+        modalTitle.innerText = "Select Pack Version";
+      }
+
+      // Reset dropdown choices
+      dropdown.innerHTML = "";
+      var optLatest = document.createElement('option');
+      optLatest.value = "latest";
+      optLatest.text = "Latest (Auto)";
+      dropdown.add(optLatest);
+
+      // Add cached/remote version if available
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.check_updates().then(function(info) {
+          if (info) {
+            var targetVer = (target === 'launcher') ? (info.launcher_update || info.current_launcher) : (info.pack_update || info.current_pack);
+            if (targetVer) {
+              var optVer = document.createElement('option');
+              optVer.value = targetVer;
+              optVer.text = "v" + targetVer + (info.launcher_update || info.pack_update ? " (Update Available)" : " (Current)");
+              dropdown.add(optVer);
+            }
+          }
+          var optCustom = document.createElement('option');
+          optCustom.value = "custom";
+          optCustom.text = "Custom...";
+          dropdown.add(optCustom);
+          dropdown.value = "latest";
+          onVersionDropdownChange();
+        });
+      } else {
+        var optCustom = document.createElement('option');
+        optCustom.value = "custom";
+        optCustom.text = "Custom...";
+        dropdown.add(optCustom);
+        dropdown.value = "latest";
+        onVersionDropdownChange();
+      }
+
+      customInput.value = "";
+      document.getElementById('versionSelectModal').style.display = 'flex';
+    }
+
+    function onVersionDropdownChange() {
+      var dropdown = document.getElementById('versionDropdownSelect');
+      var container = document.getElementById('customVersionInputContainer');
+      if (dropdown.value === 'custom') {
+        container.style.display = 'block';
+      } else {
+        container.style.display = 'none';
+      }
+    }
+
+    function closeVersionSelectModal() {
+      document.getElementById('versionSelectModal').style.display = 'none';
+    }
+
+    function confirmVersionSelection() {
+      var dropdown = document.getElementById('versionDropdownSelect');
+      var selectedVal = dropdown.value;
+      if (selectedVal === 'custom') {
+        selectedVal = document.getElementById('customVersionTextInput').value.trim();
+        if (!selectedVal) {
+          alert("Please enter a custom version string.");
+          return;
+        }
+      }
+
+      closeVersionSelectModal();
+      if (activeVersionTarget === 'launcher') {
+        runUpdateAction('launcher_update', selectedVal);
+      } else {
+        runUpdateAction('pack_update', selectedVal);
+      }
+    }
+
+    function selectActivePack(packName) {
+      hasShownStartupPopup = false;
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_version_select(packName).then(function() {
+          initLauncher();
+          showPackDownloaderCards(true);
+        });
+      }
+    }
+
+    function showPackDownloaderCards(forceRefresh) {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.get_settings().then(function(s) {
+          var currentActivePack = (s && s.pack) ? s.pack : '';
+
+          window.pywebview.api.get_available_packs_manifest().then(function(res) {
+            var listDiv = document.getElementById('packCardsList');
+            if (!listDiv || !res || !res.packs) return;
+            listDiv.innerHTML = '';
+            for (var i = 0; i < res.packs.length; i++) {
+              var p = res.packs[i];
+              var card = document.createElement('div');
+              card.style.background = 'rgba(15, 23, 42, 0.9)';
+              card.style.border = (p.name === currentActivePack) ? '1px solid #38bdf8' : '1px solid var(--card-border)';
+              card.style.borderRadius = '8px';
+              card.style.padding = '10px';
+              card.style.display = 'flex';
+              card.style.flexDirection = 'column';
+              card.style.justifyContent = 'space-between';
+
+              var activeBadge = (p.name === currentActivePack) ? '<span style="color:#38bdf8; font-size:11px; font-weight:bold;">[Active]</span> ' : '';
+              var statusBadge = p.installed ? '<span style="color:#10b981; font-size:11px; font-weight:bold;">[Installed]</span>' : '<span style="color:#eab308; font-size:11px; font-weight:bold;">[Not Installed]</span>';
+
+              var selectBtnText = (p.name === currentActivePack) ? 'Active Pack' : 'Select Pack';
+              var selectBtnDisabled = (p.name === currentActivePack) ? 'disabled style="padding:6px; font-size:11px; flex:1; opacity:0.6; cursor:default;"' : 'style="padding:6px; font-size:11px; flex:1;" onclick="selectActivePack(\'' + p.name + '\')"';
+
+              card.innerHTML = '<div style="font-weight:bold; color:#f8fafc; font-size:13px; margin-bottom: 2px;">' + activeBadge + p.name + ' ' + statusBadge + '</div>' +
+                               '<div style="font-size:11px; color:var(--text-muted); margin-bottom: 8px;">v' + p.version + ' • ' + p.modloader + '</div>' +
+                               '<div style="display:flex; gap:6px; margin-top: auto;">' +
+                               '  <button class="btn-secondary" ' + selectBtnDisabled + '>' + selectBtnText + '</button>' +
+                               '  <button class="btn-secondary" style="padding:6px; font-size:11px; flex:1;" onclick="runUpdateAction(\'download_full_pack\', \'' + p.name + '\')">Install Pack</button>' +
+                               '</div>';
+              listDiv.appendChild(card);
+            }
+          });
+        });
+      }
+    }
+
+    function updateBadgeState(hasUpdate, updateText) {
+      var badge = document.getElementById('updateBadge');
+      var badgeText = document.getElementById('updateBadgeText');
+      if (!badge || !badgeText) return;
+
+      if (hasUpdate) {
+        badge.className = "status-badge badge-warning";
+        badgeText.innerText = updateText || "UPDATE AVAILABLE";
+      } else {
+        badge.className = "status-badge badge-success";
+        badgeText.innerText = "UP TO DATE";
+      }
+    }
+
+    function showUpdateView() {
+      document.getElementById('mainView').style.display = 'none';
+      document.getElementById('modlistView').style.display = 'none';
+      document.getElementById('updateView').style.display = 'flex';
+
+      showPackDownloaderCards();
+
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.check_updates().then(function(info) {
+          if (!info) return;
+          var text = "Launcher: v" + info.current_launcher + " / Pack " + info.pack + ": v" + info.current_pack;
+          var hasUp = false;
+          var badgeLabel = "";
+          if (info.launcher_update) {
+            text += " [New Launcher v" + info.launcher_update + " available!]";
+            hasUp = true;
+            badgeLabel = "LAUNCHER UPDATE";
+          }
+          if (info.pack_update) {
+            text += " [New Pack v" + info.pack_update + " available!]";
+            hasUp = true;
+            badgeLabel = badgeLabel ? "UPDATES AVAILABLE" : "PACK UPDATE";
+          }
+          document.getElementById('updaterVersionText').innerText = text;
+          updateBadgeState(hasUp, badgeLabel);
+        });
+      }
+    }
+
+    function openUpdateViewWithAction(action, targetVer) {
+      showUpdateView();
+      runUpdateAction(action, targetVer);
+    }
+
+    function cancelOrCloseUpdate() {
+      hidePackCards();
+      if (isUpdateActive && window.pywebview && window.pywebview.api) {
+        window.pywebview.api.cancel_update_action();
+        document.getElementById('updateTitle').innerText = "Cancelling Update...";
+        document.getElementById('updateMessage').innerText = "Cleaning up...";
+      } else {
+        showMainView();
+      }
+    }
+
+    function runUpdateAction(action, targetVer) {
+      isUpdateActive = true;
+      updateLaunchButtonState(document.getElementById('username').value);
+      document.getElementById('updateTitle').innerText = "Running " + action + "...";
+      document.getElementById('updateMessage').innerText = "Starting task...";
+      document.getElementById('updateProgressFill').style.width = "0%";
+      document.getElementById('updateProgressText').innerText = "0%";
+
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.run_update_action(action, targetVer);
+      }
+    }
+
+    // Progress updates from Python
+    window.onUpdateProgress = function(info) {
+      if (!info) return;
+      if (info.title) document.getElementById('updateTitle').innerText = info.title;
+      if (info.message) document.getElementById('updateMessage').innerText = info.message;
+      if (info.percent !== undefined) {
+        document.getElementById('updateProgressFill').style.width = info.percent + "%";
+        document.getElementById('updateProgressText').innerText = info.percent + "%";
+      }
+
+      if (info.update_in_progress !== undefined) {
+        isUpdateActive = info.update_in_progress;
+        updateLaunchButtonState(document.getElementById('username').value);
+      } else if (info.status === 'downloading' || info.status === 'extracting' || info.status === 'installing') {
+        isUpdateActive = true;
+        updateLaunchButtonState(document.getElementById('username').value);
+      }
+
+      if (info.status === 'complete' || info.status === 'error' || info.status === 'cancelled' || info.update_in_progress === false) {
+        isUpdateActive = false;
+        if (info.status === 'complete') {
+          hasShownStartupPopup = false;
+          hasShownUpdateBtnPopup = false;
+        }
+        updateLaunchButtonState(document.getElementById('username').value);
+        initLauncher();
+        showPackDownloaderCards(true);
+      }
+    };
+
+    function checkUpdatesOnStartup() {
+      if (hasShownStartupPopup) return;
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.check_updates().then(function(info) {
+          if (info && info.update_available) {
+            hasShownStartupPopup = true;
+            var details = "";
+            if (info.launcher_update) details += "New Launcher Update v" + info.launcher_update + " is available.<br>";
+            if (info.pack_update) details += "New Pack Update v" + info.pack_update + " is available.<br>";
+            details += "Click Update Now to install.";
+            document.getElementById('updateAlertDetails').innerHTML = details;
+            document.getElementById('updateAlertModal').style.display = 'flex';
+          }
+        });
+      }
+    }
+
+    function handleUpdateButtonClick() {
+      showUpdateView();
+      if (!hasShownUpdateBtnPopup && window.pywebview && window.pywebview.api) {
+        window.pywebview.api.check_updates().then(function(info) {
+          if (info && info.update_available) {
+            hasShownUpdateBtnPopup = true;
+            var details = "";
+            if (info.launcher_update) details += "New Launcher Update v" + info.launcher_update + " is available.<br>";
+            if (info.pack_update) details += "New Pack Update v" + info.pack_update + " is available.<br>";
+            details += "Click Update Now to install.";
+            document.getElementById('updateAlertDetails').innerHTML = details;
+            document.getElementById('updateAlertModal').style.display = 'flex';
+          }
+        });
+      }
+    }
+
+    function closeUpdateModal() {
+      document.getElementById('updateAlertModal').style.display = 'none';
+    }
+
+    function startModalAutoUpdate() {
+      closeUpdateModal();
+      showUpdateView();
+      runUpdateAction('auto');
+    }
+
+    // Settings
+    function toggleShortcut() {
+      var val = document.getElementById('shortcut').checked ? "1" : "0";
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_setting('shortcut', val);
+      }
+    }
+
+    function toggleAutoServer() {
+      var val = document.getElementById('autoserver').checked ? "1" : "0";
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_setting('autoserver', val);
+      }
+    }
+
+    function toggleLogLogins() {
+      var val = document.getElementById('loglogins').checked ? "1" : "0";
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_setting('log-logins', val);
+      }
+    }
+
+    function toggleLiteMode() {
+      var val = document.getElementById('litemode').checked ? "1" : "0";
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_lite_mode(val).then(function() {
+          initLauncher();
+        });
+      }
+    }
+
+    function toggleShowConsole() {
+      var val = document.getElementById('showconsole').checked ? "1" : "0";
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_setting('showconsole', val);
+      }
+    }
+
+    function toggleServerAlerts() {
+      var val = document.getElementById('serveralerts').checked ? "1" : "0";
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_setting('server_alerts', val);
+      }
+    }
+
+    function changeMemory() {
+      var val = document.getElementById('maxram').value;
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_memory(val).then(function() {
+          initLauncher();
+        });
+      }
+    }
+
+    function changeVersion() {
+      hasShownStartupPopup = false;
+      var select = document.getElementById('selver');
+      var val = select.value;
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_version_select(val).then(function() {
+          initLauncher();
+        });
+      }
+    }
+
+    function refreshPlayers() {
+      document.getElementById('playerList').innerText = 'Refreshing...';
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.refresh_players().then(function(html) {
+          document.getElementById('playerList').innerHTML = (html && html.trim() !== "") ? html : "No Players Online";
+        });
+      }
+    }
+
+    function performLogin() {
+      var u = document.getElementById('username').value;
+      var p = document.getElementById('password').value;
+      var msgDiv = document.getElementById('loginMsg');
+      msgDiv.style.display = 'block';
+      msgDiv.style.color = '#eab308';
+      msgDiv.innerText = 'Logging in...';
+
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.verify_login(u, p).then(function(res) {
+          if (res && res.success) {
+            msgDiv.style.color = '#10b981';
+            msgDiv.innerText = 'Login successful!';
+            updateLaunchButtonState(u);
+            initLauncher();
+          } else {
+            msgDiv.style.color = '#ef4444';
+            msgDiv.innerText = (res && res.message) ? res.message : 'Login failed';
+            updateLaunchButtonState("");
+          }
+        });
+      }
+    }
+
+    function openWeb(site) {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.open_web(site);
+      }
+    }
+
+    function launchGame(bypassRamCheck) {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.check_game_running().then(function(res) {
+          if (res && res.running) {
+            if (confirm("Minecraft is currently running (PID: " + res.pid + ").\n\nDo you want to force kill the active instance and unlock the launcher?")) {
+              window.pywebview.api.force_unlock().then(function() {
+                onGameLaunchState('idle');
+              });
+            }
+          } else {
+            if (currentGameLaunchState === 'running') {
+              onGameLaunchState('idle');
+            }
+            var u = document.getElementById('username').value;
+            if (!u || u.trim() === "") {
+              alert("Please enter a username and login first!");
+              return;
+            }
+
+            if (!bypassRamCheck && window.pywebview.api.check_ram_warning) {
+              window.pywebview.api.check_ram_warning().then(function(ramRes) {
+                if (ramRes && ramRes.warn) {
+                  var warningMsg = ramRes.message + "<br><br>Do you want to continue anyway?";
+                  document.getElementById('ramWarningDetails').innerHTML = warningMsg;
+                  document.getElementById('ramWarningModal').style.display = 'flex';
+                } else {
+                  window.pywebview.api.launch_game();
+                }
+              }).catch(function() {
+                window.pywebview.api.launch_game();
+              });
+            } else {
+              window.pywebview.api.launch_game();
+            }
+          }
+        });
+        return;
+      }
+
+      var u = document.getElementById('username').value;
+      if (!u || u.trim() === "") {
+        alert("Please enter a username and login first!");
+        return;
+      }
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.launch_game();
+      }
+    }
+
+    function confirmRamWarningLaunch() {
+      closeRamWarningModal();
+      launchGame(true);
+    }
+
+    function closeRamWarningModal() {
+      document.getElementById('ramWarningModal').style.display = 'none';
+    }
+
+    function updateGame() {
+      showUpdateView();
+    }
+
+    function launchServer() {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.launch_server();
+      }
+    }
+  </script>
+</body>
+</html>

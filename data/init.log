@@ -1,0 +1,14 @@
+[2026-09-15 00:06:20] === PCMod Client Starting ===
+[2026-09-15 00:06:20] Read settings.txt successfully: {'shortcut': '1', 'autoserver': '0', 'log-logins': '1', 'lite': '0', 'showconsole': '0', 'cleanup_updates': '1', 'server_alerts': '0', 'server_alerts_mode': '1', 'pack': '2-5-x', 'memory': '4096', 'username': ''}
+[2026-09-15 00:06:20] Checking for updates... Pack 2-5-x [2.5.4] Launcher [2.0f]
+[2026-09-15 00:06:20] Checking for PORTABLEMC... 4.4.1
+[2026-09-15 00:06:21] [Updates Page Sync] Checking 'https://pcmod.ddns.me/updates.html'...
+[2026-09-15 00:06:21] [Updates Page Sync] File size check -> Local: 47351 bytes | Remote: 47351 bytes
+[2026-09-15 00:06:21] [Updates Page Sync] Local updates.html is up to date. No download needed.
+[2026-09-15 00:06:21] [Pack Script (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/scripts/script_2-5-x.zs...
+[2026-09-15 00:06:21] [Pack Script (2-5-x) Sync] Remote file exists. File size check -> Local: 474 bytes | Remote: 480 bytes
+[2026-09-15 00:06:21] [Pack Script (2-5-x) Sync] File missing or size mismatch. Downloading Pack Script (2-5-x) from https://files.pcmod.ddns.me/download/pack/scripts/script_2-5-x.zs...
+[2026-09-15 00:06:21] [Pack Script (2-5-x) Sync] Successfully downloaded and saved /app/data/packs/2-5-x/scripts/script.zs (480 bytes written).
+[2026-09-15 00:06:21] [Pack Servers (2-5-x) Sync] Checking remote server for https://files.pcmod.ddns.me/download/pack/servers/servers_2-5-x.dat...
+[2026-09-15 00:06:22] [Pack Servers (2-5-x) Sync] Remote file exists. File size check -> Local: 13442 bytes | Remote: 13442 bytes
+[2026-09-15 00:06:22] [Pack Servers (2-5-x) Sync] Local Pack Servers (2-5-x) is up to date (/app/data/packs/2-5-x/servers.dat). No download needed.

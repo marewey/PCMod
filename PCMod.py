@@ -334,6 +334,28 @@ if OS_NAME == "win32":
     except Exception:
         pass
 
+def restart_launcher():
+    log_init("Restarting PCMod Launcher...")
+    clean_env = get_clean_env()
+    if getattr(sys, 'frozen', False):
+        clean_args = []
+        skip_next = False
+        for arg in sys.argv[1:]:
+            if skip_next:
+                skip_next = False
+                continue
+            if arg == "--cleanup-old":
+                skip_next = True
+                continue
+            clean_args.append(arg)
+        target_exe = os.path.join(BASE_DIR, "PCMod.exe") if os.path.exists(os.path.join(BASE_DIR, "PCMod.exe")) else sys.executable
+        subprocess.Popen([target_exe] + clean_args, env=clean_env, cwd=BASE_DIR)
+    else:
+        python_exe = sys.executable
+        script_file = os.path.abspath(__file__)
+        subprocess.Popen([python_exe, script_file] + sys.argv[1:], env=clean_env, cwd=BASE_DIR)
+    os._exit(0)
+
 def bootstrap_missing_files():
     required_files = [
         os.path.join(DATA_DIR, "indexes", "version"),
@@ -759,7 +781,7 @@ def get_default_settings():
         "cleanup_updates": "1",
         "server_alerts": "0",
         "server_alerts_mode": "1",
-        "pack": "Vanilla",
+        "pack": "2-5-x",
         "memory": "6144",
         "username": ""
     }
@@ -867,7 +889,7 @@ def get_pack_name():
                     return val
         except Exception:
             pass
-    return "Vanilla"
+    return "2-5-x"
 
 def read_version_info(pack_name):
     launcher_ver = "2.0c"
@@ -2156,28 +2178,6 @@ def extract_zip_with_progress(zip_path, extract_dir, progress_callback=None, tit
                 })
     log_init(f"Extraction Completed: {title}")
 
-def restart_launcher():
-    log_init("Restarting PCMod Launcher...")
-    clean_env = get_clean_env()
-    if getattr(sys, 'frozen', False):
-        clean_args = []
-        skip_next = False
-        for arg in sys.argv[1:]:
-            if skip_next:
-                skip_next = False
-                continue
-            if arg == "--cleanup-old":
-                skip_next = True
-                continue
-            clean_args.append(arg)
-        target_exe = os.path.join(BASE_DIR, "PCMod.exe") if os.path.exists(os.path.join(BASE_DIR, "PCMod.exe")) else sys.executable
-        subprocess.Popen([target_exe] + clean_args, env=clean_env, cwd=BASE_DIR)
-    else:
-        python_exe = sys.executable
-        script_file = os.path.abspath(__file__)
-        subprocess.Popen([python_exe, script_file] + sys.argv[1:], env=clean_env, cwd=BASE_DIR)
-    os._exit(0)
-
 class Api:
     def __init__(self):
         global global_api_instance
@@ -2233,7 +2233,8 @@ class Api:
                 "main_pack": main_pack,
                 "main_pack_installed": main_pack_installed,
                 "online_players": "Loading...",
-                "news_url": "updates.html"
+                "news_url": "updates.html",
+                "logo_url": "../icons/pcmod.png"
             }
         except Exception as e:
             log_init(f"Error in init_launcher API call: {e}")
@@ -2250,16 +2251,16 @@ class Api:
                     "showconsole": "0",
                     "server_alerts": "0",
                     "memory": "6144",
-                    "pack": "Vanilla"
+                    "pack": "2-5-x"
                 },
                 "modcount": "0",
                 "launcher_version": "2.0a",
-                "pack_version": "1.0",
-                "versions_list": [{"name": "Vanilla", "path": ""}],
-                "main_pack": "Vanilla",
+                "pack_version": "2.5.3b",
+                "versions_list": [{"name": "2-5-x", "path": ""}],
+                "main_pack": "2-5-x",
                 "main_pack_installed": True,
                 "online_players": "Loading...",
-                "news_url": self.get_news_url()
+                "news_url": "updates.html"
             }
 
     def get_settings(self, *args, **kwargs):
@@ -4419,83 +4420,81 @@ LAUNCHER_HTML = """<!DOCTYPE html>
       window.pywebview.api.init_launcher().then(function(data) {
         if (!data) return;
 
-        // 0. Set local resources
-        if (data.news_url) {
-          var newsIframe = document.getElementById('newsIframe');
-          if (newsIframe && newsIframe.src !== data.news_url) {
-            newsIframe.src = data.news_url;
-          }
-        }
-        if (data.logo_url) {
-          var logoImg = document.getElementById('logoImg');
-          if (logoImg && logoImg.src !== data.logo_url) {
-            logoImg.src = data.logo_url;
-          }
-        }
-
         // 1. User & Launch restriction
-        if (data.user) {
-          document.getElementById('username').value = data.user;
-        }
+        try {
+          if (data.user) {
+            document.getElementById('username').value = data.user;
+          }
 
-        if (data.game_running) {
-          onGameLaunchState('running');
-        } else if (data.user) {
-          updateLaunchButtonState(data.user);
-        } else {
-          updateLaunchButtonState("");
-        }
+          if (data.game_running) {
+            onGameLaunchState('running');
+          } else if (data.user) {
+            updateLaunchButtonState(data.user);
+          } else {
+            updateLaunchButtonState("");
+          }
+        } catch(e) { console.error("Error setting user:", e); }
 
         // 2. Settings Checkboxes
-        if (data.settings) {
-          document.getElementById('shortcut').checked = (data.settings.shortcut === "1");
-          document.getElementById('autoserver').checked = (data.settings.autoserver === "1");
-          document.getElementById('loglogins').checked = (data.settings.log_logins === "1" || data.settings['log-logins'] === "1");
-          document.getElementById('litemode').checked = (data.settings.lite === "1");
-          document.getElementById('showconsole').checked = (data.settings.showconsole === "1");
-          document.getElementById('serveralerts').checked = (data.settings.server_alerts === "1");
-          if (data.settings.memory) {
-            document.getElementById('maxram').value = data.settings.memory;
+        try {
+          if (data.settings) {
+            document.getElementById('shortcut').checked = (data.settings.shortcut === "1");
+            document.getElementById('autoserver').checked = (data.settings.autoserver === "1");
+            document.getElementById('loglogins').checked = (data.settings.log_logins === "1" || data.settings['log-logins'] === "1");
+            document.getElementById('litemode').checked = (data.settings.lite === "1");
+            document.getElementById('showconsole').checked = (data.settings.showconsole === "1");
+            document.getElementById('serveralerts').checked = (data.settings.server_alerts === "1");
+            if (data.settings.memory) {
+              document.getElementById('maxram').value = data.settings.memory;
+            }
           }
-        }
+        } catch(e) { console.error("Error setting checkboxes:", e); }
 
         // 3. Mod count label: Mod List (--- mods)
-        if (data.modcount !== undefined) {
-          document.getElementById('modlistBtn').innerText = "Mod List (" + data.modcount + " mods)";
-        }
+        try {
+          if (data.modcount !== undefined) {
+            document.getElementById('modlistBtn').innerText = "Mod List (" + data.modcount + " mods)";
+          }
+        } catch(e) { console.error("Error setting modcount:", e); }
 
         // 4. Version footer
-        if (data.launcher_version && data.pack_version) {
-          document.getElementById('versionFooter').innerText = "Launcher: " + data.launcher_version + " / Pack: " + data.pack_version;
-        }
+        try {
+          if (data.launcher_version && data.pack_version) {
+            document.getElementById('versionFooter').innerText = "Launcher: " + data.launcher_version + " / Pack: " + data.pack_version;
+          }
+        } catch(e) { console.error("Error setting version footer:", e); }
 
         // 5. Version dropdown select
-        if (data.versions_list && data.versions_list.length > 0) {
-          var select = document.getElementById('selver');
-          select.innerHTML = "";
-          for (var i = 0; i < data.versions_list.length; i++) {
-            var v = data.versions_list[i];
-            var opt = document.createElement('option');
-            opt.value = i + " " + v.name;
-            opt.text = v.name;
-            if (v.name === (data.settings ? data.settings.pack : '')) {
-              opt.selected = true;
+        try {
+          if (data.versions_list && data.versions_list.length > 0) {
+            var select = document.getElementById('selver');
+            select.innerHTML = "";
+            for (var i = 0; i < data.versions_list.length; i++) {
+              var v = data.versions_list[i];
+              var opt = document.createElement('option');
+              opt.value = i + " " + v.name;
+              opt.text = v.name;
+              if (v.name === (data.settings ? data.settings.pack : '')) {
+                opt.selected = true;
+              }
+              select.add(opt);
             }
-            select.add(opt);
           }
-        }
+        } catch(e) { console.error("Error setting versions dropdown:", e); }
 
-        refreshPlayers();
-        checkUpdatesOnStartup();
+        try { refreshPlayers(); } catch(e) {}
+        try { checkUpdatesOnStartup(); } catch(e) {}
 
         // Prompt if main default pack from line 2 of version file is missing (checked LAST after UI is populated)
-        if (data.main_pack && data.main_pack_installed === false) {
-          setTimeout(function() {
-            if (confirm("Main Pack (" + data.main_pack + ") is not installed.\n\nDo you want to Download Main Pack: (" + data.main_pack + ")?")) {
-              openUpdateViewWithAction('download_full_pack', data.main_pack);
-            }
-          }, 200);
-        }
+        try {
+          if (data.main_pack && data.main_pack_installed === false) {
+            setTimeout(function() {
+              if (confirm("Main Pack (" + data.main_pack + ") is not installed.\n\nDo you want to Download Main Pack: (" + data.main_pack + ")?")) {
+                openUpdateViewWithAction('download_full_pack', data.main_pack);
+              }
+            }, 200);
+          }
+        } catch(e) { console.error("Error checking main pack prompt:", e); }
       }).catch(function(err) {
         console.error("init_launcher call failed, retrying in 300ms...", err);
         setTimeout(initLauncher, 300);
@@ -5140,11 +5139,9 @@ def main():
     apply_console_visibility()
     api = Api()
     html_path = ensure_launcher_html()
-    abs_html = os.path.abspath(html_path).replace("\\", "/")
-    url = f"file:///{abs_html}" if not abs_html.startswith("/") else f"file://{abs_html}"
     window = webview.create_window(
         "PCMod Client",
-        url=url,
+        url=f"file://{html_path}",
         js_api=api,
         width=1160,
         height=690,
