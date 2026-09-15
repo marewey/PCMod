@@ -441,11 +441,16 @@ def bootstrap_missing_files():
     if download_success and os.path.exists(zip_path):
         try:
             log_init("Extracting launcher core files to root directory...")
+            reboot_needed = False
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 for member in zip_ref.infolist():
                     target_path = os.path.join(BASE_DIR, member.filename)
+                    filename_lower = os.path.basename(member.filename).lower()
+                    if filename_lower in ["pcmod.exe", "pcmod.py", "pcmod.spec", "build.bat"] and os.path.exists(target_path):
+                        continue
                     ext = os.path.splitext(target_path)[1].lower()
                     if os.path.exists(target_path) and not member.is_dir() and ext in [".exe", ".py"]:
+                        reboot_needed = True
                         try:
                             old_path = target_path + ".old"
                             if os.path.exists(old_path):
@@ -468,10 +473,13 @@ def bootstrap_missing_files():
                     except Exception as e:
                         log_init(f"Warning cleaning legacy directory '{legacy_folder}': {e}")
 
-            log_init("Core files extracted successfully. Rebooting launcher to apply core update...")
-            log_init("=== Launcher Bootstrap Completed ===")
-            restart_launcher()
-            return
+            if reboot_needed:
+                log_init("Core executable updated. Rebooting launcher...")
+                log_init("=== Launcher Bootstrap Completed ===")
+                restart_launcher()
+                return
+            else:
+                log_init("=== Launcher Bootstrap Completed ===")
         except Exception as e:
             log_init(f"Error extracting bootstrap zip archive: {e}")
 
@@ -5136,12 +5144,14 @@ def ensure_launcher_html():
 
 def main():
     import webview
+    import pathlib
     apply_console_visibility()
     api = Api()
     html_path = ensure_launcher_html()
+    url = pathlib.Path(os.path.abspath(html_path)).as_uri()
     window = webview.create_window(
         "PCMod Client",
-        url=f"file://{html_path}",
+        url=url,
         js_api=api,
         width=1160,
         height=690,
