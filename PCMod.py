@@ -146,6 +146,28 @@ def cleanup_old_files(dirs):
         except Exception:
             pass
 
+def cleanup_old_crash_reports():
+    try:
+        packs_dir = os.path.join(DATA_DIR, "packs")
+        now = time.time()
+        thirty_days_sec = 30 * 86400
+
+        if os.path.exists(packs_dir):
+            for pack_name in os.listdir(packs_dir):
+                crash_dir = os.path.join(packs_dir, pack_name, "crash-reports")
+                if os.path.exists(crash_dir) and os.path.isdir(crash_dir):
+                    for fname in os.listdir(crash_dir):
+                        fpath = os.path.join(crash_dir, fname)
+                        if os.path.isfile(fpath):
+                            if now - os.path.getmtime(fpath) > thirty_days_sec:
+                                try:
+                                    os.remove(fpath)
+                                    log_init(f"Purged crash report older than 30 days: {fpath}")
+                                except Exception:
+                                    pass
+    except Exception as e:
+        log_init(f"Error purging old crash reports: {e}")
+
 def safe_install_file(src_file, dst_file):
     os.makedirs(os.path.dirname(dst_file), exist_ok=True)
     ext = os.path.splitext(dst_file)[1].lower()
@@ -282,7 +304,6 @@ def resolve_base_directory():
 
 BASE_DIR = resolve_base_directory()
 relocate_if_needed(BASE_DIR)
-cleanup_old_files([EXEC_DIR, BASE_DIR])
 DATA_DIR = os.path.join(BASE_DIR, "data")
 BIN_DIR = os.path.join(BASE_DIR, "bin")
 OLD_CMD_DIR = os.path.join(BASE_DIR, "_old")
@@ -303,6 +324,8 @@ def log_init(msg):
         pass
 
 log_init("=== PCMod Client Starting ===")
+cleanup_old_files([EXEC_DIR, BASE_DIR])
+cleanup_old_crash_reports()
 
 # Explicit AppUserModelID set FIRST before any windows or processes initialize
 if OS_NAME == "win32":
@@ -2432,6 +2455,20 @@ class Api:
         mods = generate_modlist_data(pack)
         generate_modlist_html_file(pack, mods)
         return {"pack": pack, "count": len(mods), "mods": mods}
+
+    def open_launcher_folder(self, *args, **kwargs):
+        log_init(f"Opening launcher directory: {DATA_DIR}")
+        try:
+            if OS_NAME == "win32":
+                os.startfile(BASE_DIR)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", BASE_DIR])
+            else:
+                subprocess.Popen(["xdg-open", BASE_DIR])
+            return True
+        except Exception as e:
+            log_init(f"Error opening launcher folder: {e}")
+            return False
 
     def open_link(self, *args, **kwargs):
         url = args[0] if args else "https://pcmod.ddns.me"
