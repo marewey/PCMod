@@ -335,6 +335,68 @@ if OS_NAME == "win32":
     except Exception:
         pass
 
+def restart_launcher():
+    log_init("Restarting PCMod Launcher...")
+    clean_env = get_clean_env()
+    if getattr(sys, 'frozen', False):
+        clean_args = []
+        skip_next = False
+        for arg in sys.argv[1:]:
+            if skip_next:
+                skip_next = False
+                continue
+            if arg == "--cleanup-old":
+                skip_next = True
+                continue
+            clean_args.append(arg)
+        target_exe = os.path.join(BASE_DIR, "PCMod.exe") if os.path.exists(os.path.join(BASE_DIR, "PCMod.exe")) else sys.executable
+        subprocess.Popen([target_exe] + clean_args, env=clean_env, cwd=BASE_DIR)
+    else:
+        python_exe = sys.executable
+        script_file = os.path.abspath(__file__)
+        subprocess.Popen([python_exe, script_file] + sys.argv[1:], env=clean_env, cwd=BASE_DIR)
+    os._exit(0)
+
+def sync_updates_page():
+    remote_urls = [
+        "https://pcmod.ddns.me/updates.html",
+        "https://files.pcmod.ddns.me/updates.html"
+    ]
+    local_updates_path = os.path.join(DATA_DIR, "pages", "updates.html")
+    os.makedirs(os.path.join(DATA_DIR, "pages"), exist_ok=True)
+
+    local_content = b""
+    if os.path.exists(local_updates_path):
+        try:
+            with open(local_updates_path, "rb") as f:
+                local_content = f.read()
+        except Exception:
+            pass
+
+    local_size = len(local_content) if local_content else -1
+
+    for remote_url in remote_urls:
+        log_init(f"[Updates Page Sync] Checking '{remote_url}'...")
+        try:
+            req_get = urllib.request.Request(remote_url, headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req_get, timeout=8.0, context=ctx) as resp:
+                remote_content = resp.read()
+                if remote_content:
+                    remote_size = len(remote_content)
+                    log_init(f"[Updates Page Sync] File size check -> Local: {local_size} bytes | Remote: {remote_size} bytes")
+                    if remote_content != local_content:
+                        with open(local_updates_path, "wb") as f:
+                            f.write(remote_content)
+                        log_init(f"[Updates Page Sync] Successfully updated local updates.html ({remote_size} bytes written).")
+                    else:
+                        log_init("[Updates Page Sync] Local updates.html is up to date. No download needed.")
+                    return
+        except Exception as e:
+            log_init(f"[Updates Page Sync] Check/Download failed from {remote_url}: {e}")
+
 def bootstrap_missing_files():
     required_files = [
         os.path.join(DATA_DIR, "pages", "launcher.html"),
@@ -527,45 +589,6 @@ def sync_active_pack_resources(pack_name=None):
     servers_remote = f"https://files.pcmod.ddns.me/download/pack/servers/servers_{pack_name}.dat"
     sync_pack_file(servers_local, servers_remote, label=f"Pack Servers ({pack_name})")
 
-def sync_updates_page():
-    remote_urls = [
-        "https://pcmod.ddns.me/updates.html",
-        "https://files.pcmod.ddns.me/updates.html"
-    ]
-    local_updates_path = os.path.join(DATA_DIR, "pages", "updates.html")
-    os.makedirs(os.path.join(DATA_DIR, "pages"), exist_ok=True)
-
-    local_content = b""
-    if os.path.exists(local_updates_path):
-        try:
-            with open(local_updates_path, "rb") as f:
-                local_content = f.read()
-        except Exception:
-            pass
-
-    local_size = len(local_content) if local_content else -1
-
-    for remote_url in remote_urls:
-        log_init(f"[Updates Page Sync] Checking '{remote_url}'...")
-        try:
-            req_get = urllib.request.Request(remote_url, headers={'User-Agent': 'Mozilla/5.0'})
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req_get, timeout=8.0, context=ctx) as resp:
-                remote_content = resp.read()
-                if remote_content:
-                    remote_size = len(remote_content)
-                    log_init(f"[Updates Page Sync] File size check -> Local: {local_size} bytes | Remote: {remote_size} bytes")
-                    if remote_content != local_content:
-                        with open(local_updates_path, "wb") as f:
-                            f.write(remote_content)
-                        log_init(f"[Updates Page Sync] Successfully updated local updates.html ({remote_size} bytes written).")
-                    else:
-                        log_init("[Updates Page Sync] Local updates.html is up to date. No download needed.")
-                    return
-        except Exception as e:
-            log_init(f"[Updates Page Sync] Check/Download failed from {remote_url}: {e}")
 
 def update_console_title(username):
     if OS_NAME == "win32":
@@ -2156,27 +2179,6 @@ def extract_zip_with_progress(zip_path, extract_dir, progress_callback=None, tit
                 })
     log_init(f"Extraction Completed: {title}")
 
-def restart_launcher():
-    log_init("Restarting PCMod Launcher...")
-    clean_env = get_clean_env()
-    if getattr(sys, 'frozen', False):
-        clean_args = []
-        skip_next = False
-        for arg in sys.argv[1:]:
-            if skip_next:
-                skip_next = False
-                continue
-            if arg == "--cleanup-old":
-                skip_next = True
-                continue
-            clean_args.append(arg)
-        target_exe = os.path.join(BASE_DIR, "PCMod.exe") if os.path.exists(os.path.join(BASE_DIR, "PCMod.exe")) else sys.executable
-        subprocess.Popen([target_exe] + clean_args, env=clean_env, cwd=BASE_DIR)
-    else:
-        python_exe = sys.executable
-        script_file = os.path.abspath(__file__)
-        subprocess.Popen([python_exe, script_file] + sys.argv[1:], env=clean_env, cwd=BASE_DIR)
-    os._exit(0)
 
 class Api:
     def __init__(self):
