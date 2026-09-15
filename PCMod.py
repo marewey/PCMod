@@ -228,8 +228,27 @@ def clean_old_crash_reports(max_days=90):
     except Exception as e:
         log_init(f"Error during crash report cleanup: {e}")
 
+LITE_MODE_EXCEPTIONS = [
+    "sodiumextras",
+    "sodiumdynamiclights",
+    "betterbiomereblend",
+    "gpumemleakfix",
+    "dynamic-fps",
+    "dynamic_fps",
+    "dynamicfps"
+]
+
+def is_lite_mode_exception(filename):
+    """Returns True if filename matches any Lite Mode exception mod."""
+    norm = filename.lower().replace("-", "").replace("_", "")
+    for exc in LITE_MODE_EXCEPTIONS:
+        norm_exc = exc.replace("-", "").replace("_", "")
+        if norm_exc in norm:
+            return True
+    return False
+
 def apply_lite_mode_changes(enabled):
-    """Moves client-only mods (tagged 'C' in PCMod-{pack}.pak) between mods/ and disabled_mods/ based on Lite Mode state."""
+    """Moves client-only mods (tagged 'C' in PCMod-{pack}.pak) between mods/ and disabled_mods/ based on Lite Mode state, preserving exception performance mods."""
     try:
         pack = get_pack_name()
         pack_dir = os.path.join(DATA_DIR, "packs", pack)
@@ -238,6 +257,20 @@ def apply_lite_mode_changes(enabled):
 
         os.makedirs(mods_dir, exist_ok=True)
         os.makedirs(disabled_dir, exist_ok=True)
+
+        # Always restore any exception mods that may be inside disabled_dir
+        if os.path.exists(disabled_dir):
+            for f in os.listdir(disabled_dir):
+                if is_lite_mode_exception(f):
+                    src_path = os.path.join(disabled_dir, f)
+                    dst_path = os.path.join(mods_dir, f)
+                    try:
+                        if os.path.exists(dst_path):
+                            os.remove(dst_path)
+                        os.rename(src_path, dst_path)
+                        log_init(f"[Lite Mode Exception] Restored essential client mod to mods/: {f}")
+                    except Exception as e:
+                        log_init(f"[Lite Mode Exception] Error restoring exception mod {f}: {e}")
 
         # Parse PCMod-{pack}.pak to identify C-tagged mods
         c_mod_files = set()
@@ -257,6 +290,8 @@ def apply_lite_mode_changes(enabled):
             # Process files in mods_dir that match C tag or end with -client.jar or -client.disabled
             if os.path.exists(mods_dir):
                 for f in os.listdir(mods_dir):
+                    if is_lite_mode_exception(f):
+                        continue
                     is_c_mod = f in c_mod_files or f.endswith("-client.jar") or f.endswith("-client.disabled")
                     if is_c_mod:
                         src_path = os.path.join(mods_dir, f)
