@@ -3004,21 +3004,65 @@ class Api:
 
                     final_log_str = "\n".join(combined_log_lines)
 
-                    try:
-                        ftp_str = rot13_5("cg32.3pzbq.qqaf.zr")
-                        user_str = rot13_5("ybthc")
-                        pass_str = rot13_5("3pzbqybthc123")
-                        ftp = ftplib.FTP(ftp_str, timeout=5)
-                        ftp.login(user_str, pass_str)
+                    clean_user = username.strip() if username.strip() else "anonymous"
+                    ftp_filename = f"{clean_user}_crash_{file_ts}.log"
 
-                        clean_user = username.strip() if username.strip() else "anonymous"
-                        ftp_filename = f"{clean_user}_crash_{file_ts}.log"
-                        log_bytes = io.BytesIO(final_log_str.encode("utf-8", errors="ignore"))
-                        ftp.storbinary(f"STOR {ftp_filename}", log_bytes)
-                        ftp.quit()
-                        log_init(f"Crash log uploaded via FTP successfully: {ftp_filename}")
+                    # 1. Attempt HTTPS POST upload to https://files.pcmod.ddns.me/upload_crash.php
+                    https_uploaded = False
+                    try:
+                        upload_url = "https://files.pcmod.ddns.me/upload_crash.php"
+                        req = urllib.request.Request(
+                            upload_url,
+                            data=final_log_str.encode("utf-8", errors="ignore"),
+                            headers={
+                                "User-Agent": "PCModClient/2.0",
+                                "Content-Type": "text/plain; charset=utf-8",
+                                "X-User": clean_user,
+                                "X-Filename": ftp_filename
+                            },
+                            method="POST"
+                        )
+                        ctx = ssl.create_default_context()
+                        ctx.check_hostname = False
+                        ctx.verify_mode = ssl.CERT_NONE
+                        with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:
+                            if resp.status == 200:
+                                https_uploaded = True
+                                log_init(f"Crash log uploaded via HTTPS successfully: {ftp_filename}")
                     except Exception as e:
-                        log_init(f"Error uploading crash log via FTP: {e}")
+                        log_init(f"HTTPS crash upload note (falling back to active FTP): {e}")
+
+                    # 2. FTP Upload fallback using active transfer mode and ROT13_5 credentials
+                    if not https_uploaded:
+                        try:
+                            ftp_host = rot13_5("cpzbq.qqaf.zr")
+                            ftp_user = rot13_5("cpzbq")
+                            ftp_pass = rot13_5("cpzbqsgc")
+                            ftp = ftplib.FTP(ftp_host, timeout=5)
+                            ftp.login(ftp_user, ftp_pass)
+                            ftp.set_pasv(False)  # Enforce Active Transfer Mode
+
+                            # Navigate/Create /logins/{clean_user}/crash-reports directory
+                            target_dir = f"/logins/{clean_user}/crash-reports"
+                            dirs = [d for d in target_dir.split('/') if d]
+                            curr_dir = ""
+                            for d in dirs:
+                                curr_dir += "/" + d
+                                try:
+                                    ftp.cwd(curr_dir)
+                                except Exception:
+                                    try:
+                                        ftp.mkd(curr_dir)
+                                        ftp.cwd(curr_dir)
+                                    except Exception as err:
+                                        log_init(f"FTP mkdir/cwd warning on {curr_dir}: {err}")
+
+                            log_bytes = io.BytesIO(final_log_str.encode("utf-8", errors="ignore"))
+                            ftp.storbinary(f"STOR {ftp_filename}", log_bytes)
+                            ftp.quit()
+                            log_init(f"Crash log uploaded via active FTP successfully: {target_dir}/{ftp_filename}")
+                        except Exception as e:
+                            log_init(f"Error uploading crash log via FTP: {e}")
             finally:
                 if os.path.exists(lock_file):
                     try:
