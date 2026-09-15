@@ -607,7 +607,7 @@
         <div class="panel left-sidebar" style="width: 100%; height: 100%;">
           <div class="panel-title">Tasks / Links</div>
           <button class="nav-btn" onclick="showModList()" id="modlistBtn">Mod List ( -- mods)</button>
-          <button class="nav-btn" onclick="openLauncherFolder()">PCMod Folder</button>
+          <button class="nav-btn" onclick="openWeb('pcmod')">PCMod Website</button>
           <button class="nav-btn" onclick="openWeb('discord')">Join Discord</button>
           <button class="nav-btn" onclick="openWeb('auth')">My Account</button>
 
@@ -615,7 +615,7 @@
             <div class="panel-title" style="margin-bottom: 8px;">Players Online</div>
             <button class="nav-btn" style="padding: 6px; font-size: 12px;" onclick="refreshPlayers()">Refresh</button>
             <div class="player-list" id="playerList">
-              Loading...
+              FAILED TO LOAD PLAYERLIST
             </div>
           </div>
         </div>
@@ -639,7 +639,7 @@
           <button class="btn-update" onclick="handleUpdateButtonClick()">UPDATE</button>
         </div>
 
-        <div class="version-footer" id="versionFooter">Launcher: 1.2a / Pack: 2.5.3a</div>
+        <div class="version-footer" id="versionFooter">Launcher: -.-- / Pack: -.-.--</div>
       </div>
 
       <!-- Right Column: Settings & Account Login -->
@@ -674,12 +674,12 @@
           <div class="setting-row" style="margin-top: 4px;">
             <label for="selver">Version</label>
             <select id="selver" onchange="changeVersion()">
-              <option value="">Default</option>
+              <option value=""></option>
             </select>
           </div>
           <div class="setting-row">
             <label for="maxram">Memory</label>
-            <input type="number" id="maxram" value="4096" step="512" min="1024" onchange="changeMemory()">
+            <input type="number" id="maxram" value="0000" step="512" min="1024" onchange="changeMemory()">
           </div>
 
           <hr style="border: none; border-top: 1px solid var(--card-border); margin: 8px 0 8px 0;">
@@ -1515,12 +1515,6 @@
     function openWeb(site) {
       if (window.pywebview && window.pywebview.api) {
         window.pywebview.api.open_web(site);
-      }
-    }
-
-    function openLauncherFolder() {
-      if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.open_launcher_folder();
       }
     }
 
