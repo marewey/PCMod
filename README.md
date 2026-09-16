@@ -1,53 +1,85 @@
-<h3>What is PCMod?</h3>
-PCMod is a Portable Modded Minecraft Launcher designed mainly for Plattecraft Server.
-PCMod uses <a href="https://github.com/mindstorm38/portablemc">portable-mc</a>, which is a python program for Java Edition of Minecraft.
-This program uses Batch (MS-Dos) to orginize the files, authenticate users, and update modpacks.
-<hr>
-<h3>What is Plattecraft Server?</h3>
-Plattecraft Server is a server that is mostly played by people in Platteville, WI.
-<hr>
-<h3>How to install (Windows)</h3>
-<ul><li>PCMod.zip
-        <ol>
-                <li>Go to the Downloads Tab, and Download PCMod.zip
-                <li>Once it has finished downloading, go to that zip file and extract it. (You can move this folder wherever you want)
-                <li>Finally run the file called PCMod.hta and if there are any problems, view the troubleshooting page or contact me on discord.
-        </ol>
-<li>Installer
-        <ol>
-                <li>Download the Installer, and run it
-        </ol>
-</ul>
-<hr>
-<h3>How to install (Linux/Mac) (Not Fully Supported yet)</h3>
-<ul><li>Auto-Updating Version
-        <ol>
-                <li>Currently WIP
-        </ol>
-<li>Use Existing Minecraft Install
-        <ol>
-                <li>Just copy the files from the zip under [data/packs/2-4-x] to your minecraft folder
-        </ol>
-</ul>
-<hr>
-<h3>Discord Group</h3>
-Click <a href="https://discord.gg/AJaVhvR">here</a> to join the Discord Group for Plattecraft Server.<br>
-This Discord group is for if you want to voice communicate while on the server!
-<hr>
+# PCMod - Custom Minecraft Launcher
 
+**PCMod** is a lightweight, manifest-driven custom Minecraft launcher built in Python. It manages multiple modded and vanilla Minecraft instances using remote `.pak` manifests to dynamically download, sync, and update files. 
 
+By leveraging **PortableMC** under the hood, PCMod handles all Java Runtime Environment (JRE) requirements, asset fetching, and game executions automatically—meaning users do not need to pre-install Java on their systems.
 
-<ol><h2>Windows (PCMod)</h2>
-        <li>Download <a href="http://markspi.ddns.me/pcmod2/downloads/PCMod2.zip">PCMod2.zip</a></li>
-        <li>Extract PCMod.zip</li>
-        <li>Move Folder 'PCMod' to where ever you want to store it</li>
-        <li>Run PCMod.hta</li>
-        <br>
-</ol>
-<hr>
-<ol><h2>Windows Installer (Downloader)</h2>
-        <li>Download <a href="http://markspi.ddns.me/pcmod2/downloads/PCMod2_Installer.exe">PCMod2_Installer.exe</a> or <a href="http://markspi.ddns.me/pcmod2/downloads/PCMod2_Installer32.exe">PCMod2_Installer32.exe</a>
-        <li>Run PCMod2_Installer.exe</li>
-        <li>It will launch the PCMod program at the end of the install. It should also create a shortcut on your desktop as well</li>
-</ol>
-<hr>
+---
+
+## Features
+
+* **Manifest-Driven Mod Syncing**: Uses custom `.pak` files to dynamically download and verify mods per instance.
+* **No Java Required**: Integrated with PortableMC to automatically isolate and manage the correct Java environments and vanilla game assets[cite: 1].
+* **Webview UI**: Renders launcher interfaces, mod lists, and news updates using lightweight embedded HTML pages via `pywebview`[cite: 1].
+* **Offline Authentication**: securely caches session tokens using XOR encryption, allowing offline play if the authentication server is down[cite: 1].
+* **Automated Crash Reporting**: Automatically captures game crash logs and securely uploads them via FTP for administrative review[cite: 1].
+* **Server Alerts Worker**: Optional background process that triggers system tray notifications and audio alerts when players join the server[cite: 1].
+
+---
+
+## Prerequisites & Installation
+
+PCMod is designed to be highly portable. It will automatically bootstrap its own core files (like the HTML frontend) from the server if they are missing upon first launch[cite: 1].
+
+### Requirements
+* **Python 3.8+**
+* **pywebview** (`pip install pywebview`)
+
+*(Note: Java is **not** required. The internal PortableMC engine handles JRE allocation automatically.)*
+
+### How to Run
+
+1. Clone or download the repository to your local machine.
+2. Install the required webview dependency:
+   ```bash
+   pip install pywebview
+   ```
+3. Execute the launcher script:
+   ```bash
+   python PCMod.py
+   ```
+## Project & Data Structure
+The launcher operates out of the `data/` directory, keeping the Git repository lightweight and free of binary mod `.jar` files.
+```text
+├── PCMod.py          # Core launcher logic, UI bridge, and PortableMC wrapper
+├── settings.txt      # Launcher configuration (key=value format)
+└── data/             # System runtime data & instance directory
+    ├── icons/        # Application graphics and window icons
+    ├── indexes/      # Version manifests, skin logs, and encrypted auth cache
+    ├── pages/        # HTML UI views (launcher.html, updates.html, modlist.html)
+    ├── update/       # Staging area for downloads and update extractions
+    └── packs/        # Isolated Minecraft instances
+        └── 2-5-x/    # Example modded instance workspace
+```
+## Configuration (`settings.txt`)
+`PCMod.py` reads and writes configuration options using a simple `setting=value` format in `settings.txt`:
+
+| Setting | Default | Description |
+| :--- | :--- | :--- |
+| `username` | *(Empty)* | Active player profile name |
+| `memory` | `6144` | Allocated RAM for Java in Megabytes |
+| `pack` | `2-5-x` | Selected instance target directory |
+| `shortcut` | `1` | Toggles automatic creation of a desktop shortcut (`PCMod Client.lnk`) |
+| `autoserver` | `0` | Auto-connects to the target server upon game launch |
+| `log-logins` | `1` | Enables login/launch telemetry reporting to server |
+| `lite` | `0` | Disables client-side mods by renaming them to `.disabled` |
+| `showconsole` | `0` | Toggles visibility of the command prompt debug window |
+| `cleanup_updates` | `1` | Automatically cleans temporary staging files in `data/update/` |
+| `server_alerts` | `0` | Enables background worker process for player join notifications |
+| `server_alerts_mode` | `1` | Alert notification type (`1` = sound & tray popup, `0` = sound only, `-1` = popup only) |
+
+## Manifest-Driven Instance System (`.pak`)
+Mods are excluded from Git to avoid repository bloat. Instead, each pack directory under `data/packs/<pack-name>/` includes a `PCMod-<pack-name>.pak` index file.
+### .pak Schema
+Each line in a `.pak` file uses a semicolon-delimited 5-field structure:
+```text
+[Side];[Filename];[VersionAdded];[ModID/DisplayName];[Dependencies]
+```
+* **Side Flags**:
+  * `U`: Universal (Client & Server)
+  * `C`: Client-side only
+  * `S`: Server-side only
+  * `B`: Base Library / Coremod
+* **Dependencies**: Set to `#` for none, or list dependencies separated by `+` (e.g., `Mekanism+appliedenergistics`).
+
+`PCMod.py` reads this manifest to compare local files against server manifests, downloading missing `.jar` files into the instance `/mods` folder automatically.

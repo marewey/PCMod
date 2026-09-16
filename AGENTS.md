@@ -35,7 +35,7 @@ This repository contains a custom Python-based Minecraft launcher (`PCMod.py`) a
 The `/data` folder contains dynamic assets, web interfaces, instance storage, and persistent index files:
 
 * **`/data/icons/`**: Graphical assets and application icons.
-* **`/data/pages/`**: HTML views rendered inside the launcher window (e.g., `launcher.html`, `updates.html`).
+* **`/data/pages/`**: HTML views rendered inside the launcher window (e.g., `updates.html`).
 * **`/data/indexes/`**: System state and cache tracking files:
   * **`version.tmp`**: Temporarily stored remote manifest downloaded from the server to check for pending updates.
   * **`version`**: Local version database file. Updated **only** after an update has completed successfully.
