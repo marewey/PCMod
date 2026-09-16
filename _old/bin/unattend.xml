@@ -1,6 +1,0 @@
-<Options>
-    <Option Name="InstallAllUsers" Value="no" />
-    <Option Name="Include_pip" Value="yes" />
-    <Option Name="PrependPath" Value="yes" />
-    <Option Name="SimpleInstall" Value="yes" />
-</Options>

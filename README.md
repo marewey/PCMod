@@ -9,23 +9,23 @@ By leveraging **PortableMC** under the hood, PCMod handles all Java Runtime Envi
 ## Features
 
 * **Manifest-Driven Mod Syncing**: Uses custom `.pak` files to dynamically download and verify mods per instance.
-* **No Java Required**: Integrated with PortableMC to automatically isolate and manage the correct Java environments and vanilla game assets[cite: 1].
-* **Webview UI**: Renders launcher interfaces, mod lists, and news updates using lightweight embedded HTML pages via `pywebview`[cite: 1].
-* **Offline Authentication**: securely caches session tokens using XOR encryption, allowing offline play if the authentication server is down[cite: 1].
-* **Automated Crash Reporting**: Automatically captures game crash logs and securely uploads them via FTP for administrative review[cite: 1].
-* **Server Alerts Worker**: Optional background process that triggers system tray notifications and audio alerts when players join the server[cite: 1].
+* **No Java Required**: Integrated with PortableMC to automatically isolate and manage the correct Java environments and vanilla game assets.
+* **Webview UI**: Renders launcher interfaces, mod lists, and news updates using lightweight embedded HTML pages via `pywebview`.
+* **Offline Authentication**: securely caches session tokens using XOR encryption, allowing offline play if the authentication server is down.
+* **Automated Crash Reporting**: Automatically captures game crash logs and securely uploads them via FTP for administrative review.
+* **Server Alerts Worker**: Optional background process that triggers system tray notifications and audio alerts when players join the server.
 
 ---
 
 ## Prerequisites & Installation
 
-PCMod is designed to be highly portable. It will automatically bootstrap its own core files (like the HTML frontend) from the server if they are missing upon first launch[cite: 1].
+PCMod is designed to be highly portable. It will automatically bootstrap its own core files (like the HTML frontend) from the server if they are missing upon first launch.
 
 ### Requirements
 * **Python 3.8+**
 * **pywebview** (`pip install pywebview`)
 
-*(Note: Java is **not** required. The internal PortableMC engine handles JRE allocation automatically.)*
+*(Note: Java is **not** required. The internal PortableMC engine handles JRE download and allocation automatically.)*
 
 ### How to Run
 
