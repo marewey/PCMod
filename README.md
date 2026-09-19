@@ -23,18 +23,13 @@ PCMod is designed to be highly portable. It will automatically bootstrap its own
 
 ### Requirements
 * **Python 3.8+**
-* **pywebview** (`pip install pywebview`)
 
-*(Note: Java is **not** required. The internal PortableMC engine handles JRE download and allocation automatically.)*
+*(Note: Java is **not** required. The internal PortableMC engine handles JRE download and allocation automatically. When running from Python source, required packages such as `pywebview` and `portablemc` will auto-install via `pip` on first run if missing, or can be installed via `pip install -r requirements.txt`.)*
 
 ### How to Run
 
 1. Clone or download the repository to your local machine.
-2. Install the required webview dependency:
-   ```bash
-   pip install pywebview
-   ```
-3. Execute the launcher script:
+2. Execute the launcher script:
    ```bash
    python PCMod.py
    ```

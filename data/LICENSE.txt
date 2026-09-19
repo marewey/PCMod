@@ -1,19 +1,35 @@
-I. Mod Permissions
-	1. I did not make any of these mods, you can look them all up on curseforge.
-	2. I do not own any of these mods (Except Mark's Coins). This is just a modpack with a custom launcher for Plattecraft Server.
-II. Minecraft
-	1. Minecraft was made by Mojang and owns this game.
-III. Code Permissions
-	1. By using this product, you are aware that information about the machine you are using will be collected.
-	2. By using this product, you may use 3rd party software in order to simplify the process of the code.
-	3. By using this product, you agree to these terms.
-IV. Ownership
-	1. I (Mark Rewey) only own the code of everything in .\cmd\*.bat, MLC.exe, as well as PCMod.hta.
-	2. I do not own Minecraft, Mojang, Microsoft, Java, or any of the mods in the mods folder.
-	3. I do not own wget, ftps, 7za, tr, nircmd, or xcode.
-	4. I do host the update server.
-	5. I did create the Coin Mod, however textures are from an old commodity mod.
-V. portable-mc
-	1. I do not own portable-mc. portable-mc is something I found online.
-VI. Java
-	1. I do not own Java or Oracle.
+PCMod Launcher & Modpack Distribution License & Terms
+===================================================
+
+I. Third-Party Mods & Modpack Disclaimers
+-----------------------------------------
+1. PCMod and its server hosts do not claim ownership, copyright, or rights over any third-party Minecraft mods hosted on or downloaded via the PCMod distribution servers. All third-party mods remain the intellectual property of their respective original authors.
+2. Third-party mods included in PCMod instances are available publicly on CurseForge, Modrinth, or official developer repositories.
+3. The Mark's Coins mod logic was created by Mark Rewey (textures derived from legacy commodity mod assets).
+
+II. Minecraft & Mojang Specifications
+-------------------------------------
+1. Minecraft is a registered trademark of Mojang AB and Microsoft Corporation.
+2. PCMod is an unofficial custom launcher and modpack manager for the Plattecraft Server community and is not affiliated with, endorsed by, or associated with Mojang AB, Microsoft, or Oracle.
+
+III. PortableMC Integration
+---------------------------
+1. PCMod integrates PortableMC as its underlying Minecraft instance and runtime execution engine.
+2. PortableMC is an open-source project developed by theorzr and contributors.
+   Source Repository: https://github.com/theorzr/portablemc
+3. PCMod does not claim ownership or rights over PortableMC or its associated tools.
+
+IV. Java & Runtime Dependencies
+-------------------------------
+1. Java and the Java Runtime Environment (JRE) are owned by Oracle Corporation and OpenJDK contributors.
+2. PCMod does not distribute Java directly; required runtime environments are fetched and managed dynamically via PortableMC.
+
+V. Ownership & Codebase Permissions
+-----------------------------------
+1. PCMod launcher source code, custom UI scripts, bridge APIs, and configuration manifests were developed by Mark Rewey.
+2. Historical utility executables (wget, 7za, nircmd, ftps, tr, xcode) and third-party tools are the property of their respective creators.
+
+VI. Terms of Use & Telemetry Notice
+-----------------------------------
+1. By using the PCMod launcher, users acknowledge that basic telemetry data (such as username, launch status, instance memory allocation, and crash reports) may be collected for launcher functionality, server alerts, and stability reporting.
+2. By launching or updating instances via PCMod, you agree to these terms.

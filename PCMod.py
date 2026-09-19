@@ -1,6 +1,26 @@
 import os
 import sys
 import time
+import subprocess
+
+# Auto-install required packages via pip when running directly from source
+if not getattr(sys, 'frozen', False):
+    missing_pkgs = []
+    try:
+        import webview
+    except ImportError:
+        missing_pkgs.append("pywebview")
+    try:
+        import portablemc
+    except ImportError:
+        missing_pkgs.append("portablemc")
+
+    if missing_pkgs:
+        print(f"Installing missing requirements via pip: {', '.join(missing_pkgs)}...")
+        try:
+            subprocess.run([sys.executable, "-m", "pip", "install"] + missing_pkgs, check=True)
+        except Exception as e:
+            print(f"Warning: Failed to auto-install packages via pip: {e}")
 import json
 import urllib.request
 import urllib.error
@@ -1009,8 +1029,8 @@ def get_pack_name():
     return "2-5-x"
 
 def read_version_info(pack_name):
-    launcher_ver = "2.0c"
-    pack_ver = "2.5.3a"
+    launcher_ver = "-.--"
+    pack_ver = "-.-.--"
     modloader = "forge"
     mcversion = "1.20.1"
     mlversion = "47.4.10"
@@ -2427,8 +2447,8 @@ class Api:
                     "pack": "2-5-x"
                 },
                 "modcount": "0",
-                "launcher_version": "2.0a",
-                "pack_version": "2.5.3b",
+                "launcher_version": "-.--",
+                "pack_version": "-.-.--",
                 "versions_list": [{"name": "2-5-x", "path": ""}],
                 "main_pack": "2-5-x",
                 "main_pack_installed": True,
