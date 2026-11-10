@@ -1950,6 +1950,48 @@ UPDATE_CANCEL_REQUESTED = False
 # Server Update Check & Download Engine
 check_cli_entrypoint()
 
+def sync_version_manifest():
+    """Merges new pack lines from version.tmp into version without overwriting local pack states."""
+    vfile = os.path.join(DATA_DIR, "indexes", "version")
+    tmp_vfile = os.path.join(DATA_DIR, "indexes", "version.tmp")
+
+    if not os.path.exists(tmp_vfile):
+        return
+
+    existing_keys = set()
+    if os.path.exists(vfile):
+        try:
+            with open(vfile, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    parts = line.strip().split(";")
+                    if len(parts) >= 2:
+                        existing_keys.add(parts[0].strip().lower())
+        except Exception:
+            pass
+
+    new_lines = []
+    try:
+            for line in f:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                parts = stripped.split(";")
+                if len(parts) >= 2:
+                    key = parts[0].strip().lower()
+                    if key not in existing_keys:
+                        new_lines.append(stripped + "\n")
+                        existing_keys.add(key)
+    except Exception:
+        pass
+
+    if new_lines:
+        try:
+            with open(vfile, "a", encoding="utf-8") as f:
+                f.writelines(new_lines)
+            log_init(f"Synced {len(new_lines)} new pack entry(ies) from version.tmp into version manifest.")
+        except Exception as e:
+            log_init(f"Error merging new packs to version manifest: {e}")
+
 def check_updates_server():
     pack = get_pack_name()
     l_ver, p_ver = read_version_indexes(pack)
@@ -1991,6 +2033,7 @@ def check_updates_server():
         except Exception:
             pass
 
+    sync_version_manifest()
     launcher_update = ""
     if remote_versions.get("Launcher") and remote_versions.get("Launcher") != l_ver:
         launcher_update = remote_versions.get("Launcher")

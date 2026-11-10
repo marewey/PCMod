@@ -1,7 +1,7 @@
 @echo off
 title PCMod Standalone EXE Builder
 echo ==========================================
-echo       PCMod Standalone EXE Builder
+echo        PCMod Standalone EXE Builder
 echo ==========================================
 echo.
 
@@ -32,6 +32,12 @@ if %errorlevel% equ 0 (
     if exist "dist\PCMod.exe" (
         copy /y "dist\PCMod.exe" "PCMod.exe" >nul
         echo [SUCCESS] Standalone PCMod.exe created successfully in the root folder!
+        
+        echo.
+        echo Cleaning up temporary build directories...
+        if exist "build" rmdir /s /q "build"
+        if exist "dist" rmdir /s /q "dist"
+        echo [SUCCESS] Build artifacts cleaned up successfully.
     ) else (
         echo [WARNING] Dist folder produced output but dist\PCMod.exe was not found.
     )

@@ -14,6 +14,8 @@ if os.path.exists('data/pages'):
 if os.path.exists('data/packs/Vanilla'):
     datas_list.append(('data/packs/Vanilla', 'data/packs/Vanilla'))
 
+version_file_path = 'version.txt' if os.path.exists('version.txt') else None
+
 a = Analysis(
     ['PCMod.py'],
     pathex=[],
@@ -67,5 +69,6 @@ exe = EXE(
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
-    icon='data/icons/icon.ico'
+    icon='data/icons/icon.ico',
+    version=version_file_path
 )
