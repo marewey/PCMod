@@ -1971,6 +1971,7 @@ def sync_version_manifest():
 
     new_lines = []
     try:
+        with open(tmp_vfile, "r", encoding="utf-8", errors="ignore") as f:
             for line in f:
                 stripped = line.strip()
                 if not stripped:
