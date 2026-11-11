@@ -610,6 +610,7 @@
           <button class="nav-btn" onclick="openLauncherFolder()">PCMod Folder</button>
           <button class="nav-btn" onclick="openWeb('discord')">Join Discord</button>
           <button class="nav-btn" onclick="openWeb('auth')">My Account</button>
+          <button class="nav-btn" id="btn-my-skin">My Skin</button>
 
           <div style="margin-top: 10px; border-top: 1px solid var(--card-border); padding-top: 10px; flex: 1; display: flex; flex-direction: column;">
             <div class="panel-title" style="margin-bottom: 8px;">Players Online</div>
@@ -701,6 +702,11 @@
                 <input type="password" class="input-field" id="password" placeholder="Password" style="margin-bottom: 0;">
               </div>
               <button class="btn-login" onclick="performLogin()">Login</button>
+              <div style="text-align: center; margin-top: 6px;">
+                <a href="#" id="link-create-account" style="color: #38bdf8; font-size: 12px; text-decoration: underline; cursor: pointer;">
+                  Create an account
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -876,6 +882,385 @@
     </div>
   </div>
 
+<div id="modal-create-account" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.85); z-index: 9999; align-items: center; justify-content: center;">
+  <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 20px; width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); color: #f8fafc;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid #334155; padding-bottom: 8px;">
+      <h3 style="margin: 0; font-size: 16px; color: #38bdf8;">Create PCMod Account</h3>
+      <button type="button" onclick="closeLauncherModal('modal-create-account')" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; line-height: 1;">&times;</button>
+    </div>
+
+    <form onsubmit="return false;">
+      <div style="margin-bottom: 12px;">
+        <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px;">Username</label>
+        <input type="text" id="popup-reg-u" size="16" style="width: 100%; padding: 8px; background: #0f172a; border: 1px solid #475569; color: #fff; border-radius: 4px; box-sizing: border-box;" />
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px;">Password</label>
+        <input type="password" id="popup-reg-x" size="16" style="width: 100%; padding: 8px; background: #0f172a; border: 1px solid #475569; color: #fff; border-radius: 4px; box-sizing: border-box;" />
+      </div>
+
+      <div style="margin-bottom: 14px;">
+        <label style="font-size: 12px; color: #94a3b8; cursor: pointer;">
+          <input type="checkbox" onchange="document.getElementById('popup-reg-x').type = this.checked ? 'text' : 'password';" /> Show Password
+        </label>
+      </div>
+
+      <button type="button" id="btn-submit-create-acc" style="width: 100%; padding: 9px; background: #0284c7; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">
+        Create Account
+      </button>
+
+      <div id="popup-reg-status" style="margin-top: 10px; font-size: 12px; min-height: 16px; text-align: center;"></div>
+    </form>
+  </div>
+</div>
+
+<!-- MY SKIN MODAL -->
+<div id="modal-my-skin" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.85); z-index: 9999; align-items: center; justify-content: center;">
+  <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 20px; width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); color: #f8fafc; text-align: center;">
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid #334155; padding-bottom: 8px;">
+      <h3 style="margin: 0; font-size: 16px; color: #10b981;">My Skin</h3>
+      <button type="button" onclick="closeLauncherModal('modal-my-skin')" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; line-height: 1;">&times;</button>
+    </div>
+
+    <div style="margin: 15px 0;">
+      <img id="popup-skin-img" src="https://pcmod.ddns.me/skins/default" width="96" height="96" style="image-rendering: pixelated; border: 2px solid #475569; border-radius: 6px; background: #0f172a; padding: 4px;" alt="Skin Preview" />
+    </div>
+
+    <p id="popup-skin-subtext" style="font-size: 12px; color: #94a3b8; margin-bottom: 14px;">Select a 64x64 .png skin file to preview and upload.</p>
+
+    <!-- Action Buttons -->
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <button type="button" id="btn-select-skin" style="width: 100%; padding: 9px; background: #334155; color: #fff; border: 1px solid #475569; border-radius: 4px; font-weight: bold; cursor: pointer;">
+        Select Skin (.png)
+      </button>
+      
+      <button type="button" id="btn-confirm-upload-skin" style="display: none; width: 100%; padding: 9px; background: #10b981; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">
+        Confirm & Upload Skin
+      </button>
+    </div>
+
+    <div id="popup-skin-status" style="margin-top: 10px; font-size: 12px; min-height: 16px;"></div>
+  </div>
+</div>
+<script>
+  let stagedSkinPath = null;
+
+  function openLauncherModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) modal.style.display = 'flex';
+  }
+
+  function closeLauncherModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) modal.style.display = 'none';
+  }
+
+  function resetSkinModalState() {
+    stagedSkinPath = null;
+    const btnConfirm = document.getElementById('btn-confirm-upload-skin');
+    const btnSelect = document.getElementById('btn-select-skin');
+    const subtext = document.getElementById('popup-skin-subtext');
+    const status = document.getElementById('popup-skin-status');
+    
+    if (btnConfirm) btnConfirm.style.display = 'none';
+    if (btnSelect) btnSelect.innerText = 'Select Skin (.png)';
+    if (subtext) subtext.innerText = 'Select a 64x64 .png skin file to preview and upload.';
+    if (status) status.innerText = '';
+  }
+
+  async function getLoggedInUsername() {
+    if (window.currentLauncherUser && typeof window.currentLauncherUser === 'string' && window.currentLauncherUser.trim()) {
+      return window.currentLauncherUser.trim();
+    }
+
+    const uInput = document.getElementById('username') || document.getElementById('u') || document.getElementById('username-input');
+    if (uInput && uInput.value && uInput.value.trim()) {
+      return uInput.value.trim();
+    }
+
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.init_launcher) {
+      try {
+        const data = await window.pywebview.api.init_launcher();
+        if (data && data.user) {
+          window.currentLauncherUser = data.user.trim();
+          return window.currentLauncherUser;
+        }
+      } catch (e) {}
+    }
+
+    return '';
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // 1. Open Create Account Modal
+    const linkCreate = document.getElementById('link-create-account');
+    if (linkCreate) {
+      linkCreate.addEventListener('click', (e) => {
+        e.preventDefault();
+        openLauncherModal('modal-create-account');
+      });
+    }
+
+    // 2. Open My Skin Modal
+    const btnSkin = document.getElementById('btn-my-skin');
+    if (btnSkin) {
+      btnSkin.addEventListener('click', async () => {
+        resetSkinModalState();
+        openLauncherModal('modal-my-skin');
+
+        const username = await getLoggedInUsername();
+        const img = document.getElementById('popup-skin-img');
+        const subtext = document.getElementById('popup-skin-subtext');
+        const btnSelect = document.getElementById('btn-select-skin');
+        const btnConfirm = document.getElementById('btn-confirm-upload-skin');
+
+        if (!username) {
+          if (btnSelect) btnSelect.style.display = 'none';
+          if (btnConfirm) btnConfirm.style.display = 'none';
+          if (img) img.src = 'https://pcmod.ddns.me/skins/default';
+          if (subtext) {
+            subtext.style.color = '#f87171';
+            subtext.innerHTML = '<strong>You are not logged in.</strong><br>Please log in to update your skin.';
+          }
+        } else {
+          if (btnSelect) btnSelect.style.display = 'block';
+          if (btnConfirm) btnConfirm.style.display = 'none';
+          if (subtext) {
+            subtext.style.color = '#94a3b8';
+            subtext.innerText = `Logged in as: ${username}`;
+          }
+          if (img) {
+            img.onerror = function() {
+              this.onerror = null;
+              this.src = 'https://pcmod.ddns.me/skins/default';
+            };
+            img.src = `https://files.pcmod.ddns.me/skins/${username}?t=${Date.now()}`;
+          }
+        }
+      });
+    }
+
+    // 3. Restrict Username Input (letters, numbers, and underscores)
+    const regU = document.getElementById('popup-reg-u');
+    if (regU) {
+      regU.addEventListener('keypress', (evt) => {
+        const charCode = evt.which ? evt.which : evt.keyCode;
+        if (
+          !(
+            (charCode >= 48 && charCode <= 57) || // 0-9
+            (charCode >= 65 && charCode <= 90) || // A-Z
+            (charCode >= 97 && charCode <= 122) || // a-z
+            charCode === 95                       // _
+          )
+        ) {
+          evt.preventDefault();
+        }
+      });
+    }
+
+    // 4. Submit Create Account with Auto-Login
+    const btnSubmitCreate = document.getElementById('btn-submit-create-acc');
+    if (btnSubmitCreate) {
+      btnSubmitCreate.addEventListener('click', async () => {
+        const u = document.getElementById('popup-reg-u').value.trim();
+        const x = document.getElementById('popup-reg-x').value.trim();
+        const status = document.getElementById('popup-reg-status');
+
+        if (!u || !x) {
+          status.style.color = '#f87171';
+          status.innerText = 'Please enter both username and password.';
+          return;
+        }
+
+        status.style.color = '#38bdf8';
+        status.innerText = 'Creating account...';
+
+        try {
+          const res = await window.pywebview.api.create_account(u, x);
+          if (res.success) {
+            status.style.color = '#4ade80';
+            status.innerText = 'Account created! Logging you in...';
+
+            // Trigger auto-login via Python API
+            const loginRes = await window.pywebview.api.verify_login(u, x);
+            if (loginRes.success) {
+              setTimeout(() => {
+                const mainUserInput = document.getElementById('username') || document.getElementById('u') || document.getElementById('username-input');
+                const mainPassInput = document.getElementById('x') || document.getElementById('password-input');
+                
+                if (mainUserInput) mainUserInput.value = u;
+                if (mainPassInput) mainPassInput.value = '';
+
+                closeLauncherModal('modal-create-account');
+                document.getElementById('popup-reg-u').value = '';
+                document.getElementById('popup-reg-x').value = '';
+                status.innerText = '';
+                
+                if (typeof initLauncher === 'function') {
+                  initLauncher();
+                } else if (typeof loadLauncherData === 'function') {
+                  loadLauncherData();
+                }
+              }, 800);
+            } else {
+              status.style.color = '#f87171';
+              status.innerText = `Account created, but auto-login failed: ${loginRes.message}`;
+            }
+          } else {
+            status.style.color = '#f87171';
+            status.innerText = res.message;
+          }
+        } catch (err) {
+          status.style.color = '#f87171';
+          status.innerText = 'Error calling create_account API.';
+        }
+      });
+    }
+
+    // 5. Select Skin File (Step 1)
+    const btnSelectSkin = document.getElementById('btn-select-skin');
+    if (btnSelectSkin) {
+      btnSelectSkin.addEventListener('click', async () => {
+        const status = document.getElementById('popup-skin-status');
+        const username = await getLoggedInUsername();
+
+        if (!username) {
+          status.style.color = '#f87171';
+          status.innerText = 'You must be logged in to select a skin file.';
+          return;
+        }
+
+        status.style.color = '#38bdf8';
+        status.innerText = 'Opening file chooser...';
+
+        try {
+          const res = await window.pywebview.api.select_skin_file(username);
+          if (res.success) {
+            stagedSkinPath = res.file_path;
+            
+            const img = document.getElementById('popup-skin-img');
+            if (img) img.src = res.preview_url;
+
+            const btnConfirm = document.getElementById('btn-confirm-upload-skin');
+            if (btnConfirm) btnConfirm.style.display = 'block';
+            btnSelectSkin.innerText = 'Choose Different File';
+            
+            const subtext = document.getElementById('popup-skin-subtext');
+            if (subtext) subtext.innerText = `Staged: ${res.filename}`;
+
+            status.style.color = '#4ade80';
+            status.innerText = 'Preview loaded! Click "Confirm & Upload" to finish.';
+          } else {
+            status.style.color = '#f87171';
+            status.innerText = res.message;
+          }
+        } catch (err) {
+          status.style.color = '#f87171';
+          status.innerText = 'Error selecting skin file.';
+        }
+      });
+    }
+
+    // 6. Confirm Upload Skin (Step 2)
+    const btnConfirmUpload = document.getElementById('btn-confirm-upload-skin');
+    if (btnConfirmUpload) {
+      btnConfirmUpload.addEventListener('click', async () => {
+        if (!stagedSkinPath) return;
+
+        const status = document.getElementById('popup-skin-status');
+        const username = await getLoggedInUsername();
+
+        if (!username) {
+          status.style.color = '#f87171';
+          status.innerText = 'You must be logged in to upload a skin file.';
+          return;
+        }
+
+        status.style.color = '#38bdf8';
+        status.innerText = 'Uploading skin to server...';
+
+        try {
+          const res = await window.pywebview.api.confirm_upload_skin(stagedSkinPath, username);
+          if (res.success) {
+            status.style.color = '#38bdf8';
+            status.innerText = 'Skin updated! Finalizing preview...';
+
+            btnConfirmUpload.style.display = 'none';
+            if (btnSelectSkin) btnSelectSkin.innerText = 'Select Skin (.png)';
+            stagedSkinPath = null;
+
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            status.style.color = '#4ade80';
+            status.innerText = res.message;
+
+            const img = document.getElementById('popup-skin-img');
+            if (username && img) {
+              img.onerror = function() {
+                this.onerror = null;
+                this.src = 'https://pcmod.ddns.me/skins/default';
+              };
+              img.src = `https://files.pcmod.ddns.me/skins/${username}?t=${Date.now()}`;
+            }
+          } else {
+            status.style.color = '#f87171';
+            status.innerText = res.message;
+          }
+        } catch (err) {
+          status.style.color = '#f87171';
+          status.innerText = 'Error calling confirm_upload_skin API.';
+        }
+      });
+    }
+    // 1. Restrict Username Input & Focus Password on Enter
+    const mainUser = document.getElementById('username');
+    if (mainUser) {
+      mainUser.addEventListener('keypress', (evt) => {
+        const charCode = evt.which ? evt.which : evt.keyCode;
+
+        // Enter Key -> Move Focus to Password Field
+        if (charCode === 13) {
+          evt.preventDefault();
+          const mainPass = document.getElementById('password');
+          if (mainPass) mainPass.focus();
+          return;
+        }
+
+        // Character Restriction: 0-9, A-Z, a-z, and _
+        if (
+          !(
+            (charCode >= 48 && charCode <= 57) ||
+            (charCode >= 65 && charCode <= 90) ||
+            (charCode >= 97 && charCode <= 122) ||
+            charCode === 95
+          )
+        ) {
+          evt.preventDefault();
+        }
+      });
+    }
+
+    // 2. Submit Login on Enter in Password Field
+    const mainPass = document.getElementById('password');
+    if (mainPass) {
+      mainPass.addEventListener('keypress', (evt) => {
+        const charCode = evt.which ? evt.which : evt.keyCode;
+        if (charCode === 13) {
+          evt.preventDefault();
+          if (typeof performLogin === 'function') {
+            performLogin();
+          } else {
+            const btnLogin = document.querySelector('.btn-login');
+            if (btnLogin) btnLogin.click();
+          }
+        }
+      });
+    }
+  });
+</script>
   <script>
     var isInitialized = false;
     var allModsCache = [];
@@ -954,6 +1339,7 @@
         // 1. User & Launch restriction
         if (data.user) {
           document.getElementById('username').value = data.user;
+          window.currentLauncherUser = data.user;
         }
 
         if (data.game_running) {

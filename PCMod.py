@@ -54,6 +54,31 @@ if OS_NAME == "win32":
 
 import shutil
 
+# ==============================================================================
+# DEBUG TOGGLE: Set to True to enable verbose skin updater logs in init.log
+# ==============================================================================
+DEBUG_SKIN_UPDATER = True
+
+def log_skin_debug(msg):
+    """Logs skin updater events to stdout and init.log when debug mode is enabled."""
+    if DEBUG_SKIN_UPDATER:
+        log_init(f"[SKIN_DEBUG] {msg}")
+
+def validate_username(username):
+    """Validates username length (3-16 chars) and alphanumeric/underscore characters."""
+    if not username or not isinstance(username, str):
+        return False, "Username is required."
+
+    user_clean = username.strip()
+    if len(user_clean) < 3:
+        return False, "Username must be at least 3 characters long."
+    if len(user_clean) > 16:
+        return False, "Username cannot exceed 16 characters."
+    if not re.match(r'^[a-zA-Z0-9_]+$', user_clean):
+        return False, "Username can only contain letters, numbers, and underscores."
+
+    return True, ""
+
 def check_cli_entrypoint():
     # Handle cleanup-old argument if present
     if "--cleanup-old" in sys.argv:
@@ -2813,10 +2838,15 @@ class Api:
 
         log_init(f"Verifying login credentials for user '{username}'")
         log_init(f"Checking User Length: {len(username)}")
-        log_init(f"Authorizing User ({username})...")
 
-        if not username:
-            return {"success": False, "message": "Username required"}
+        # Enforce validation requirements
+        valid, msg = validate_username(username)
+        if not valid:
+            log_init(f"Login REJECTED: {msg}")
+            return {"success": False, "message": msg}
+
+        username = username.strip()
+        log_init(f"Authorizing User ({username})...")
 
         # Calculate auth token with leading backslash (\hash)
         auth_token = get_xcode_auth(username, password)
@@ -2875,7 +2905,7 @@ class Api:
                     return {"success": True, "message": "Logged In"}
         except Exception as e:
             log_init(f"Auth Network Exception ({e})")
-        enter_offline_mode()
+            enter_offline_mode()
 
         # Offline Mode logic: Allow offline login ONLY if auth file exists!
         auth_file = os.path.join(DATA_DIR, "indexes", "auth")
@@ -3703,6 +3733,177 @@ class Api:
         except Exception as e:
             log_init(f"Server launch request warning: {e}")
             return False
+    def create_account(self, username, password):
+        """Posts pre-hashed auth token to authp.php using z='lcreate' after input validation."""
+        valid, msg = validate_username(username)
+        if not valid:
+            log_init(f"Account creation REJECTED: {msg}")
+            return {"success": False, "message": msg}
+
+        if not password or not password.strip():
+            return {"success": False, "message": "Password is required."}
+
+        username = username.strip()
+
+        # Generate pre-hashed token (\md5hash)
+        auth_token = get_xcode_auth(username, password)
+
+        auth_url = "https://pcmod.ddns.me/commands/authp.php"
+        post_data = urllib.parse.urlencode({
+            'u': username,
+            'x': auth_token,
+            'z': 'lcreate'
+        }).encode('utf-8')
+
+        log_init(f"Sending pre-hashed account creation request for '{username}' to {auth_url}")
+
+        try:
+            req = urllib.request.Request(auth_url, data=post_data, headers={'User-Agent': 'Mozilla/5.0'})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=10.0, context=ctx) as resp:
+                body = resp.read().decode('utf-8', errors='ignore')
+
+                if "Created User login" in body or "200" in body:
+                    return {"success": True, "message": f"Account '{username}' created successfully!"}
+                elif "already exists" in body:
+                    return {"success": False, "message": f"User '{username}' already exists. Choose another name."}
+                else:
+                    return {"success": False, "message": "Account creation failed."}
+        except Exception as e:
+            log_init(f"Account creation exception: {e}")
+            return {"success": False, "message": f"Network error during registration: {e}"}
+
+    def select_skin_file(self, username=None, *args, **kwargs):
+        """Validates user session, opens file picker, and returns base64 preview."""
+        s = read_settings()
+        
+        active_user = ""
+        if username and isinstance(username, str) and username.strip():
+            active_user = username.strip()
+        elif isinstance(USER_INFO, dict) and USER_INFO.get("username"):
+            active_user = USER_INFO.get("username").strip()
+        elif isinstance(s, dict) and s.get("username"):
+            active_user = s.get("username").strip()
+
+        if not active_user:
+            return {"success": False, "message": "You are not logged in. Please log in to update your skin."}
+
+        file_types = ('PNG Images (*.png)', 'All files (*.*)')
+        
+        try:
+            dialog_type = getattr(webview, 'FileDialog', None)
+            open_flag = dialog_type.OPEN if dialog_type else getattr(webview, 'OPEN_DIALOG', 0)
+        except Exception:
+            open_flag = getattr(webview, 'OPEN_DIALOG', 0)
+
+        result = self._window.create_file_dialog(
+            open_flag,
+            allow_multiple=False,
+            file_types=file_types
+        )
+
+        if not result or len(result) == 0:
+            return {"success": False, "message": "No file selected."}
+
+        file_path = result[0]
+        if not os.path.exists(file_path):
+            return {"success": False, "message": "Selected skin file does not exist."}
+
+        file_size = os.path.getsize(file_path)
+        log_init(f"[SKIN UPDATER] Selected file path: '{file_path}' | Size: {file_size} bytes")
+
+        if file_size > 64000:
+            return {"success": False, "message": "File is too large! Minecraft skins must be under 64KB."}
+
+        try:
+            import base64
+            with open(file_path, "rb") as f:
+                raw_bytes = f.read()
+            
+            b64_str = base64.b64encode(raw_bytes).decode('utf-8')
+            data_url = f"data:image/png;base64,{b64_str}"
+            
+            return {
+                "success": True,
+                "file_path": file_path,
+                "preview_url": data_url,
+                "filename": os.path.basename(file_path)
+            }
+        except Exception as e:
+            log_init(f"[SKIN UPDATER] Exception reading skin file: {e}")
+            return {"success": False, "message": f"Failed reading skin file: {e}"}
+
+    def confirm_upload_skin(self, file_path, username=None, *args, **kwargs):
+        """Uploads the confirmed local PNG skin file to uploadskin.php."""
+        if not file_path or not os.path.exists(file_path):
+            return {"success": False, "message": "No valid skin file staged for upload."}
+
+        s = read_settings()
+
+        active_user = ""
+        if username and isinstance(username, str) and username.strip():
+            active_user = username.strip()
+        elif isinstance(USER_INFO, dict) and USER_INFO.get("username"):
+            active_user = USER_INFO.get("username").strip()
+        elif isinstance(s, dict) and s.get("username"):
+            active_user = s.get("username").strip()
+
+        if not active_user:
+            return {"success": False, "message": "You are not logged in. Please log in to update your skin."}
+
+        if os.path.getsize(file_path) > 64000:
+            return {"success": False, "message": "File is too large! Minecraft skins must be under 64KB."}
+
+        log_init(f"[SKIN UPDATER] Uploading New Skin for user '{active_user}'")
+
+        try:
+            with open(file_path, "rb") as f:
+                skin_bytes = f.read()
+
+            upload_url = "https://pcmod.ddns.me/commands/uploadskin.php"
+            fields = {
+                "submit": "Upload Image",
+                "launcher": "1"
+            }
+            files = [("fileToUpload", os.path.basename(file_path), skin_bytes, "image/png")]
+            
+            c_type, post_data = encode_multipart_formdata(fields, files)
+
+            headers = {
+                'User-Agent': 'Mozilla/5.0',
+                'Content-Type': c_type,
+                'Cookie': f'user={active_user}'
+            }
+
+            req = urllib.request.Request(upload_url, data=post_data, headers=headers, method='POST')
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+
+            with urllib.request.urlopen(req, timeout=12.0, context=ctx) as resp:
+                body = resp.read().decode('utf-8', errors='ignore').strip()
+
+                if "Skin Updated Successfully" in body or "Upload Successful" in body or "200" in body:
+                    log_init(f"[SKIN UPDATER] Upload Successful ({body})")
+                    
+                    # Force local skin cache refresh
+                    pack_name = get_pack_name()
+                    skins_dir = os.path.join(DATA_DIR, "packs", pack_name, "cachedImages", "skins")
+                    user_skin_cache = os.path.join(skins_dir, f"{active_user}.png")
+                    if os.path.exists(user_skin_cache):
+                        try:
+                            os.remove(user_skin_cache)
+                        except Exception:
+                            pass
+                    return {"success": True, "message": "Skin updated successfully!"}
+                else:
+                    log_init(f"[SKIN UPDATER] Upload Failed ({body})")
+                    return {"success": False, "message": "Skin upload failed on server."}
+        except Exception as e:
+            log_init(f"[SKIN UPDATER] Upload Failed Exception: {e}")
+            return {"success": False, "message": f"Upload failed: {e}"}
 
 def apply_win32_window_icons():
     if OS_NAME == "win32":
